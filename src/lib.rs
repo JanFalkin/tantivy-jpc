@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use tantivy::*;
 use lazy_static::lazy_static;
 use std::sync::Mutex;
+use env_logger;
 
 extern crate thiserror;
 use thiserror::Error;
@@ -124,6 +125,7 @@ pub type CallResult = std::result::Result<Vec<u8>, ErrorKinds>;
 ///   * return results to the caller
 #[no_mangle]
 pub unsafe extern "C" fn jpc<'a>(msg: *const u8, len:usize) -> *const u8 {
+  env_logger::init();
   info!("In jpc");
   let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)){
       Ok(x) => x,

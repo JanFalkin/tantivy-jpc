@@ -22,4 +22,5 @@ serde_derive = "*"
 log = "0.4.14"
 tantivy = "*"
 lazy_static = "*"
+env_logger = "*"
 
