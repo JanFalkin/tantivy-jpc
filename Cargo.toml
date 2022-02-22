@@ -1,0 +1,25 @@
+[package]
+name = "tantivy_jrpc"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[build-dependencies]
+cbindgen = "0.20.0"
+
+[dependencies]
+paste = "1.0.0"
+take_mut = "0.2.2"
+chrono = "*"
+thiserror = "1.0.30"
+serde = "*"
+serde_json = "*"
+serde_derive = "*"
+log = "0.4.14"
+tantivy = "*"
+lazy_static = "*"
+
