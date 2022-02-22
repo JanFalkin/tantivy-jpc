@@ -7,10 +7,9 @@ use serde_json::json;
 use serde_derive::{Serialize, Deserialize};
 use std::str;
 use std::collections::HashMap;
-use tantivy::*;
+use tantivy::schema::{Field, TextOptions};
 use lazy_static::lazy_static;
 use std::sync::Mutex;
-use env_logger;
 
 extern crate thiserror;
 use thiserror::Error;
@@ -29,16 +28,56 @@ struct TantivyEntry<'a>{
 impl<'a> TantivyEntry<'a>{
     fn new(id:&'a str) -> TantivyEntry<'a>{
         TantivyEntry{
-            id : id,
+            id,
             doc:None,
             builder:None,
         }
     }
-    pub fn do_method(&self, _method:&str, _obj: &str, _params:serde_json::Value) -> Vec<u8>{
-        self.id;
+    pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> *const u8{
+        info!("In do_method");
+        match obj {
+            "document" => {
+                let d = match &mut self.doc{
+                    Some(x) => x,
+                    None => return make_json_error("document not created", self.id)
+                };
+                match method {
+                    "add_text" => {
+                        let f  = Field::from_field_id(22);
+                        d.add_text(f,params.as_str().unwrap());
+                    },
+                    &_ => {}
+                };
+            },
+            "schema_builder" => {
+                let sb = match &mut self.builder{
+                    Some(x) => x,
+                    None => return make_json_error("schema_builder not created", self.id)
+                };
+                match method {
+                    "add_text_field" => {
+                        let m = match params.as_object(){
+                            Some(x)=> x,
+                            None => return make_json_error("parameters are not a json object", self.id),
+                        };
+                        let name = match m.get("name"){
+                            Some(x) => x.as_str().unwrap(),
+                            None  => return make_json_error("name param not found", self.id),
+                        };
+                        let _ = sb.add_text_field(name, TextOptions::default());
+                    },
+                    "build" => {
+                    },
+                    &_ => {}
+                };
+            },
+            "schema" => {
+            },
+            &_ => {}
+        }
         let _ = &self.doc;
         let _ = &self.builder;
-        vec![]
+        vec![].as_ptr() as *const u8
     }
 }
 /// Bitcode representation of a incomming client request
@@ -116,15 +155,19 @@ impl From<std::str::Utf8Error> for ErrorKinds {
 
 pub type CallResult = std::result::Result<Vec<u8>, ErrorKinds>;
 
-/// jpc is the main entry point into a wasm bitcode for the web assembly procedure calls
-/// this function will
-/// # Steps
-///   * parse the input for the appropriately formatted json
-///   * construct a BitcodeContext from the json
-///   * attempt to call the method using the incomming path
-///   * return results to the caller
+/**
+jpc is the main entry point into a wasm bitcode for the web assembly procedure calls
+this function will
+# Steps
+  * parse the input for the appropriately formatted json
+  * construct a BitcodeContext from the json
+  * attempt to call the method using the incomming path
+  * return results to the caller
+# Safety
+
+*/
 #[no_mangle]
-pub unsafe extern "C" fn jpc<'a>(msg: *const u8, len:usize) -> *const u8 {
+pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize) -> *const u8 {
   env_logger::init();
   info!("In jpc");
   let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)){
@@ -140,31 +183,30 @@ pub unsafe extern "C" fn jpc<'a>(msg: *const u8, len:usize) -> *const u8 {
   };
   info!("Request parsed");
   let mut tm = TANTIVY_MAP.lock().unwrap();
-  let entity:&TantivyEntry<'a> = match json_params.obj {
+  let entity:&mut TantivyEntry<'static> = match json_params.obj {
         "document" => {
-            match tm.get(json_params.id).to_owned(){
+            match tm.get_mut(json_params.id){
                 Some(x) => x,
                 None => {
                     let te = TantivyEntry::new(json_params.id);
                     tm.insert(json_params.id.to_owned(), te);
-                    tm.get(json_params.id).unwrap()
+                    tm.get_mut(json_params.id).unwrap()
                 },
             }
         }
         "builder" => {
-            match tm.get(json_params.id){
+            match tm.get_mut(json_params.id){
                 Some(x) => x,
                 None => {
                     let te = TantivyEntry::new(json_params.id);
                     tm.insert(json_params.id.to_owned(), te);
-                    tm.get(json_params.id).unwrap()
+                    tm.get_mut(json_params.id).unwrap()
                 },
             }
         }
         _ => return ErrorKinds::UnRecognizedCommand(json_params.method).to_string().as_ptr() as *const u8
     };
-    let r = entity.do_method(json_params.method, json_params.obj, json_params.params);
-    r.as_ptr() as *const u8
+    entity.do_method(json_params.method, json_params.obj, json_params.params)
 }
 #[cfg(test)]
 mod tests {
