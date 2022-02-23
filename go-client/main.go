@@ -23,23 +23,36 @@ import (
 */
 type msi map[string]interface{}
 
-func main() {
-	fmt.Println("Hello World")
-	u, err := uuid.NewV4()
-	if err != nil {
-		panic("failed to create new ID")
-	}
+func callTantivy(u, object, method string, params msi) error {
 	f := map[string]interface{}{
-		"id":     u.String(),
+		"id":     u,
 		"jpc":    "1.0",
-		"obj":    "document",
-		"method": "add_text",
-		"params": msi{
-			"a": "b",
-		},
+		"obj":    object,
+		"method": method,
+		"params": params,
 	}
 	b, err := json.Marshal(f)
+	if err != nil {
+		return err
+	}
 	p := C.CString(string(b))
 	cs := (*C.uchar)(unsafe.Pointer(p))
 	C.jpc(cs, C.ulong(uint64(len(string(b)))))
+	return nil
+}
+
+func main() {
+	fmt.Println("Hello World")
+	C.init()
+	u, err := uuid.NewV4()
+	if err != nil {
+		panic("failed to get UUID")
+	}
+	callTantivy(u.String(), "builder", "add_text_field", msi{
+		"name": "kewlness",
+	})
+	callTantivy(u.String(), "builder", "add_text_field", msi{
+		"name": "superKewlness",
+	})
+	callTantivy(u.String(), "builder", "build", msi{})
 }

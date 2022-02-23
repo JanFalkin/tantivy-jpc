@@ -7,7 +7,8 @@ use serde_json::json;
 use serde_derive::{Serialize, Deserialize};
 use std::str;
 use std::collections::HashMap;
-use tantivy::schema::{Field, TextOptions};
+use tantivy::Document;
+use tantivy::schema::{Field, TextOptions, Schema, SchemaBuilder};
 use lazy_static::lazy_static;
 use std::sync::Mutex;
 
@@ -19,10 +20,13 @@ lazy_static! {
   static ref ERRORS: Mutex<HashMap<String, Vec<String>>> = Mutex::new(HashMap::new());
 }
 
+
+
 struct TantivyEntry<'a>{
     pub(crate) id:&'a str,
-    pub(crate) doc:Option<tantivy::Document>,
-    pub(crate) builder:Option<tantivy::schema::SchemaBuilder>,
+    pub(crate) doc:Option<Box<tantivy::Document>>,
+    pub(crate) builder:Option<Box<tantivy::schema::SchemaBuilder>>,
+    pub(crate) schema:Option<tantivy::schema::Schema>,
 }
 
 impl<'a> TantivyEntry<'a>{
@@ -31,31 +35,50 @@ impl<'a> TantivyEntry<'a>{
             id,
             doc:None,
             builder:None,
+            schema:None,
         }
     }
     pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> *const u8{
         info!("In do_method");
         match obj {
             "document" => {
-                let d = match &mut self.doc{
+                info!("SchemaBuilder");
+                let doc = self.doc.as_mut().take();
+                let d = match doc{
                     Some(x) => x,
-                    None => return make_json_error("document not created", self.id)
+                    None => {
+                        let dt: Document = Document::new();
+                        let bt = Box::new(dt);
+                        self.doc = Some(bt);
+                        let t = self.doc.as_mut();
+                        t.unwrap()
+                    },
                 };
                 match method {
                     "add_text" => {
-                        let f  = Field::from_field_id(22);
-                        d.add_text(f,params.as_str().unwrap());
+                        let x = d;
+                        let f  = Field::from_field_id(0);
+                        let s = params.as_str().unwrap();
+                        info!("add_text: name = {}", s);
+                        x.add_text(f,s);
                     },
                     &_ => {}
                 };
             },
-            "schema_builder" => {
-                let sb = match &mut self.builder{
-                    Some(x) => x,
-                    None => return make_json_error("schema_builder not created", self.id)
-                };
+            "builder" => {
+                info!("SchemaBuilder");
                 match method {
                     "add_text_field" => {
+                        let sb = match &mut self.builder{
+                            Some(x) => x,
+                            None => {
+                                let isb = SchemaBuilder::default();
+                                let bisb = Box::new(isb);
+                                self.builder = Some(bisb);
+                                let tb = self.builder.as_mut();
+                                tb.unwrap()
+                            }
+                        };
                         let m = match params.as_object(){
                             Some(x)=> x,
                             None => return make_json_error("parameters are not a json object", self.id),
@@ -64,9 +87,18 @@ impl<'a> TantivyEntry<'a>{
                             Some(x) => x.as_str().unwrap(),
                             None  => return make_json_error("name param not found", self.id),
                         };
-                        let _ = sb.add_text_field(name, TextOptions::default());
+                        info!("add_text_field: name = {}", &name);
+                        let f = sb.add_text_field(name, TextOptions::default());
+                        info!("field = {:?}", &f);
                     },
                     "build" => {
+                        let sb = match self.builder.take(){
+                            Some(x) => x,
+                            None => return make_json_error("schema_builder not created", self.id)
+                        };
+                        let schema:Schema = sb.build();
+                        info!("new schema {:?}", schema);
+                        self.schema = Some(schema)
                     },
                     &_ => {}
                 };
@@ -155,6 +187,12 @@ impl From<std::str::Utf8Error> for ErrorKinds {
 
 pub type CallResult = std::result::Result<Vec<u8>, ErrorKinds>;
 
+
+#[no_mangle]
+pub unsafe extern "C" fn init() -> u8{
+    env_logger::init();
+    0
+}
 /**
 jpc is the main entry point into a wasm bitcode for the web assembly procedure calls
 this function will
@@ -168,7 +206,6 @@ this function will
 */
 #[no_mangle]
 pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize) -> *const u8 {
-  env_logger::init();
   info!("In jpc");
   let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)){
       Ok(x) => x,
