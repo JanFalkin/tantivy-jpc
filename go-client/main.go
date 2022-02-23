@@ -48,11 +48,12 @@ func main() {
 	if err != nil {
 		panic("failed to get UUID")
 	}
-	callTantivy(u.String(), "builder", "add_text_field", msi{
+	id := u.String()
+	callTantivy(id, "builder", "add_text_field", msi{
 		"name": "kewlness",
 	})
-	callTantivy(u.String(), "builder", "add_text_field", msi{
+	callTantivy(id, "builder", "add_text_field", msi{
 		"name": "superKewlness",
 	})
-	callTantivy(u.String(), "builder", "build", msi{})
+	callTantivy(id, "builder", "build", msi{})
 }

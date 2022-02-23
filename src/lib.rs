@@ -27,6 +27,8 @@ struct TantivyEntry<'a>{
     pub(crate) doc:Option<Box<tantivy::Document>>,
     pub(crate) builder:Option<Box<tantivy::schema::SchemaBuilder>>,
     pub(crate) schema:Option<tantivy::schema::Schema>,
+    pub(crate) index:Option<Box<tantivy::Index>>,
+    pub(crate) indexwriter:Option<Box<tantivy::IndexWriter>>,
 }
 
 impl<'a> TantivyEntry<'a>{
@@ -36,22 +38,56 @@ impl<'a> TantivyEntry<'a>{
             doc:None,
             builder:None,
             schema:None,
+            index:None,
+            indexwriter:None,
         }
     }
     pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> *const u8{
         info!("In do_method");
         match obj {
+            "index" =>{
+                info!("Index");
+                match self.index.as_mut().take(){
+                    Some(x) => x,
+                    None => {
+                        if method == "create"{
+                            let rschema= match self.schema.take() {
+                                Some(s) => s,
+                                None => return  make_json_error("A schema must be created before an index", self.id)
+                            };
+                            self.index = Some(Box::new(tantivy::Index::create_in_ram(rschema)));
+                            self.index.as_mut().unwrap()
+                        }else {
+                            return  make_json_error("index must first be created", self.id);
+                        }
+                    },
+                };
+
+            },
+            "indexwriter" => {
+                info!("IndexWriter");
+                let writer = match self.indexwriter.as_mut().take(){
+                    Some(x) => x,
+                    None => return make_json_error("need an indexwriter", self.id),
+                };
+                let doc = self.doc.take();
+                let d = match doc{
+                    Some(x) => x,
+                    None => {
+                        return make_json_error("document needs to be created", self.id)
+                    },
+                };
+                writer.add_document(*d);
+
+            },
             "document" => {
-                info!("SchemaBuilder");
+                info!("Document");
                 let doc = self.doc.as_mut().take();
                 let d = match doc{
                     Some(x) => x,
                     None => {
-                        let dt: Document = Document::new();
-                        let bt = Box::new(dt);
-                        self.doc = Some(bt);
-                        let t = self.doc.as_mut();
-                        t.unwrap()
+                        self.doc = Some(Box::new(Document::new()));
+                        self.doc.as_mut().unwrap()
                     },
                 };
                 match method {
@@ -72,11 +108,8 @@ impl<'a> TantivyEntry<'a>{
                         let sb = match &mut self.builder{
                             Some(x) => x,
                             None => {
-                                let isb = SchemaBuilder::default();
-                                let bisb = Box::new(isb);
-                                self.builder = Some(bisb);
-                                let tb = self.builder.as_mut();
-                                tb.unwrap()
+                                self.builder = Some(Box::new(SchemaBuilder::default()));
+                                self.builder.as_mut().unwrap()
                             }
                         };
                         let m = match params.as_object(){
