@@ -2,6 +2,7 @@ extern crate cbindgen;
 use std::env;
 use std::path::PathBuf;
 use cbindgen::{Config,Language,ParseConfig, ParseExpandConfig,Profile, ExportConfig, ItemType, MangleConfig,RenameRule};
+use std::os::unix::fs;
 
 
 fn main() {
@@ -50,6 +51,26 @@ fn main() {
     cbindgen::generate_with_config(&crate_dir, config)
       .unwrap()
       .write_to_file(&output_file);
+
+    let output_link_source = target_dir()
+      .join(format!("{}/lib{}.so", env::var("PROFILE").unwrap_or("release".to_string()), package_name))
+      .display()
+      .to_string();
+
+    let output_link_dest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
+      .join(format!("go-client/lib{}.so", package_name))
+      .display()
+      .to_string();
+
+    match std::fs::remove_file(output_link_dest.clone()){
+        Ok(_) => {},
+        Err(err) => println!("link probably doesn't exist {}", err)
+    }
+
+    match fs::symlink(output_link_source, output_link_dest){
+        Ok(_) => {},
+        Err(err) => {panic!("{}", err)}
+    }
 }
 
 /// Find the location of the `target/` directory. Note that this may be
