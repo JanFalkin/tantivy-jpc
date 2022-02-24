@@ -24,7 +24,7 @@ lazy_static! {
 
 struct TantivyEntry<'a>{
     pub(crate) id:&'a str,
-    pub(crate) doc:Option<Box<tantivy::Document>>,
+    pub(crate) doc:Option<Box<Vec<tantivy::Document>>>,
     pub(crate) builder:Option<Box<tantivy::schema::SchemaBuilder>>,
     pub(crate) schema:Option<tantivy::schema::Schema>,
     pub(crate) index:Option<Box<tantivy::Index>>,
@@ -42,7 +42,7 @@ impl<'a> TantivyEntry<'a>{
             indexwriter:None,
         }
     }
-    pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> *const u8{
+    pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> (*const u8, usize){
         info!("In do_method");
         match obj {
             "index" =>{
@@ -62,7 +62,6 @@ impl<'a> TantivyEntry<'a>{
                         }
                     },
                 };
-
             },
             "indexwriter" => {
                 info!("IndexWriter");
@@ -86,7 +85,10 @@ impl<'a> TantivyEntry<'a>{
                                 return make_json_error("document needs to be created", self.id)
                             },
                         };
-                        let os = writer.add_document(*d);
+                        let mut docs = *(d);
+                        let new_doc = Document::new();
+                        docs.append(&mut vec![new_doc.clone()]);
+                        let os = writer.add_document(new_doc);
                         info!("add document opstamp = {}", os)
                     },
                     "commit" => {
@@ -108,18 +110,21 @@ impl<'a> TantivyEntry<'a>{
                 let d = match doc{
                     Some(x) => x,
                     None => {
-                        self.doc = Some(Box::new(Document::new()));
+                        let nd= Document::new();
+                        self.doc = Some(Box::new(vec![nd]));
                         self.doc.as_mut().unwrap()
                     },
                 };
                 match method {
                     "add_text" => {
-                        let x = d;
-                        let f  = Field::from_field_id(0);
                         let m = match params.as_object(){
                             Some(m)=> m,
                             None => return make_json_error("invalid parameters pass to Document add_text", self.id)
                         };
+                        let doc_idx = m.get("id").unwrap_or(&json!{i32::from(0)}).as_u64().unwrap_or(0) as usize;
+                        let field_idx = m.get("id").unwrap_or(&json!{i32::from(0)}).as_u64().unwrap_or(0) as u32;
+                        let x = d;
+                        let f  = Field::from_field_id(field_idx);
                         info!("add_text: name = {:?}", m);
                         match m.get("field"){
                             Some(f) => {f.as_i64()},
@@ -131,7 +136,11 @@ impl<'a> TantivyEntry<'a>{
                             },
                             None => {return make_json_error("field text required for document", self.id)}
                         };
-                        x.add_text(f,field_val);
+                        let cur_doc = match x.get_mut(doc_idx){
+                            Some(d) => d,
+                            None => {return make_json_error(&format!("document at index {} does not exist", doc_idx), self.id)}
+                        };
+                        cur_doc.add_text(f,field_val);
                     },
                     &_ => {}
                 };
@@ -177,7 +186,8 @@ impl<'a> TantivyEntry<'a>{
         }
         let _ = &self.doc;
         let _ = &self.builder;
-        vec![].as_ptr() as *const u8
+        let s = "This sortof worked";
+        (s.as_ptr() as *const u8, s.len())
     }
 }
 /// Bitcode representation of a incomming client request
@@ -193,7 +203,7 @@ pub struct Request<'a> {
 /// make_json_error translates the bitcode [ElvError<T>] to an error response to the client
 /// # Arguments
 /// * `err`- the error to be translated to a response
-pub fn make_json_error(err:&str, id:&str) -> *const u8{
+pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize){
     info!("error={}", err);
     let msg = json!(
         {
@@ -217,7 +227,8 @@ pub fn make_json_error(err:&str, id:&str) -> *const u8{
             t.insert(id.to_string(), vec![err.to_string()]);
         }
     };
-    vr.as_bytes().as_ptr() as *const u8
+    let buf = vr.as_bytes();
+    (buf.as_ptr() as *const u8, buf.len())
 }
 
 #[repr(C)]
@@ -272,17 +283,24 @@ this function will
 
 */
 #[no_mangle]
-pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize) -> *const u8 {
+pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*mut usize) -> i64 {
   info!("In jpc");
   let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)){
       Ok(x) => x,
-      Err(err) => return err.to_string().as_ptr() as *const u8
+      Err(err) => {
+          *ret_len  = err.to_string().len();
+          std::ptr::copy(err.to_string().as_ptr(), ret, *ret_len);
+          return -1;
+      }
   };
   info!("parameters = {}", input_string);
   let json_params: Request = match serde_json::from_str(input_string){
     Ok(m) => {m},
     Err(_err) => {
-      return make_json_error("parse failed for http", "ID not found");
+          let (r,sz) = make_json_error("parse failed for http", "ID not found");
+          *ret_len = sz;
+          std::ptr::copy(r, ret, sz);
+          return -1;
     }
   };
   info!("Request parsed");
@@ -298,9 +316,16 @@ pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize) -> *const u8 {
                 },
             }
         }
-        _ => return ErrorKinds::UnRecognizedCommand(json_params.method).to_string().as_ptr() as *const u8
+        _ =>  {
+            let msg = ErrorKinds::UnRecognizedCommand(json_params.method).to_string();
+            std::ptr::copy(msg.as_ptr() as *const u8, ret, msg.len());
+            return -1;
+        }
     };
-    entity.do_method(json_params.method, json_params.obj, json_params.params)
+    let (return_val, ret_sz) = entity.do_method(json_params.method, json_params.obj, json_params.params);
+    std::ptr::copy(return_val, ret, ret_sz);
+    *ret_len = ret_sz;
+    0
 }
 #[cfg(test)]
 mod tests {

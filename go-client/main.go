@@ -36,8 +36,14 @@ func callTantivy(u, object, method string, params msi) error {
 		return err
 	}
 	p := C.CString(string(b))
+	rb := make([]byte, 500)
+	csrb := C.CString(string(rb))
+	crb := (*C.uchar)(unsafe.Pointer(csrb))
 	cs := (*C.uchar)(unsafe.Pointer(p))
-	C.jpc(cs, C.ulong(uint64(len(string(b)))))
+	rbl := len(rb)
+	prbl := (*C.ulong)(unsafe.Pointer(&rbl))
+	r := C.jpc(cs, C.ulong(uint64(len(string(b)))), crb, prbl)
+	fmt.Printf("return value %v ret buffer %v\n", r, C.GoString(csrb))
 	return nil
 }
 
