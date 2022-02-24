@@ -2,7 +2,7 @@ package main
 
 /*
 #cgo CFLAGS: -I../target
-#cgo LDFLAGS: -ltantivy_jrpc -L../target/release
+#cgo LDFLAGS: -ltantivy_jrpc -L.
 #include "tantivy_jrpc.h"
 */
 import "C"
@@ -62,16 +62,27 @@ func main() {
 		"name": "superKewlness",
 	})
 	callTantivy(id, "builder", "build", msi{})
+	callTantivy(id, "document", "create", msi{})
+	callTantivy(id, "document", "create", msi{})
 	callTantivy(id, "document", "add_text", msi{
-		"field": 0,
-		"value": "Something to index with some random KLJBDfLBFLSEbfebgrfiwfqwhuvac vnasdjbgfn",
+		"field":  0,
+		"value":  "Something to index with some random KLJBDfLBFLSEbfebgrfiwfqwhuvac vnasdjbgfn",
+		"id":     0,
+		"doc_id": 1,
 	})
 	callTantivy(id, "document", "add_text", msi{
-		"field": 1,
-		"value": "Another value that is different than the first YSDLJFLSKfioSGYU",
+		"field":  1,
+		"value":  "Another value that is different than the first YSDLJFLSKfioSGYU",
+		"id":     0,
+		"doc_id": 2,
 	})
 	callTantivy(id, "index", "create", msi{})
-	callTantivy(id, "indexwriter", "add_document", msi{})
+	callTantivy(id, "indexwriter", "add_document", msi{
+		"id": 1,
+	})
+	callTantivy(id, "indexwriter", "add_document", msi{
+		"id": 2,
+	})
 	callTantivy(id, "indexwriter", "commit", msi{})
 
 }

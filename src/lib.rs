@@ -20,6 +20,7 @@ lazy_static! {
   static ref ERRORS: Mutex<HashMap<String, Vec<String>>> = Mutex::new(HashMap::new());
 }
 
+static mut RETURN_MSG:String = String::new();
 
 
 struct TantivyEntry<'a>{
@@ -78,17 +79,20 @@ impl<'a> TantivyEntry<'a>{
                 };
                 match method {
                     "add_document" => {
-                        let doc = self.doc.take();
+                        let doc = self.doc.clone();
                         let d = match doc{
                             Some(x) => x,
                             None => {
                                 return make_json_error("document needs to be created", self.id)
                             },
                         };
-                        let mut docs = *(d);
-                        let new_doc = Document::new();
-                        docs.append(&mut vec![new_doc.clone()]);
-                        let os = writer.add_document(new_doc);
+                        let m = match params.as_object(){
+                            Some(m)=> m,
+                            None => return make_json_error("invalid parameters pass to Document add_text", self.id)
+                        };
+                        let doc_idx = m.get("id").unwrap_or(&json!{i32::from(0)}).as_u64().unwrap_or(0) as usize;
+                        let docs = *(d);
+                        let os = writer.add_document(docs[doc_idx].clone());
                         info!("add document opstamp = {}", os)
                     },
                     "commit" => {
@@ -106,22 +110,25 @@ impl<'a> TantivyEntry<'a>{
             },
             "document" => {
                 info!("Document");
-                let doc = self.doc.as_mut().take();
-                let d = match doc{
-                    Some(x) => x,
-                    None => {
-                        let nd= Document::new();
-                        self.doc = Some(Box::new(vec![nd]));
-                        self.doc.as_mut().unwrap()
-                    },
-                };
                 match method {
                     "add_text" => {
+                        let doc = self.doc.as_mut().take();
+                        let d = match doc{
+                            Some(x) => {
+                                let v = x;
+                                v.append(&mut vec![Document::new()]);
+                                self.doc = Some(Box::new((**v).clone()));
+                                self.doc.as_mut().unwrap()
+                            },
+                            None => {
+                                return make_json_error("add_text with no doucments created", self.id)
+                            }
+                        };
                         let m = match params.as_object(){
                             Some(m)=> m,
                             None => return make_json_error("invalid parameters pass to Document add_text", self.id)
                         };
-                        let doc_idx = m.get("id").unwrap_or(&json!{i32::from(0)}).as_u64().unwrap_or(0) as usize;
+                        let doc_idx = m.get("doc_id").unwrap_or(&json!{i32::from(0)}).as_u64().unwrap_or(0) as usize;
                         let field_idx = m.get("id").unwrap_or(&json!{i32::from(0)}).as_u64().unwrap_or(0) as u32;
                         let x = d;
                         let f  = Field::from_field_id(field_idx);
@@ -141,6 +148,25 @@ impl<'a> TantivyEntry<'a>{
                             None => {return make_json_error(&format!("document at index {} does not exist", doc_idx), self.id)}
                         };
                         cur_doc.add_text(f,field_val);
+                    },
+                    "create" => {
+                        let doc = self.doc.as_mut().take();
+                        match doc{
+                            Some(x) => {
+                                let mut v = (**x).clone();
+                                v.append(&mut vec![Document::new()]);
+                                self.doc = Some(Box::new(v));
+                            },
+                            None => {
+                                let nd= Document::new();
+                                self.doc = Some(Box::new(vec![nd]));
+                                self.doc.as_mut().unwrap();
+                            },
+                        };
+                        let v = *self.doc.clone().unwrap();
+                        unsafe{
+                        RETURN_MSG = json!({"id" : v.len()}).to_string()
+                        }
                     },
                     &_ => {}
                 };
@@ -183,11 +209,12 @@ impl<'a> TantivyEntry<'a>{
             "schema" => {
             },
             &_ => {}
-        }
+        };
         let _ = &self.doc;
         let _ = &self.builder;
-        let s = "This sortof worked";
-        (s.as_ptr() as *const u8, s.len())
+        unsafe {
+            (RETURN_MSG.as_str().as_ptr() as *const u8, RETURN_MSG.len())
+        }
     }
 }
 /// Bitcode representation of a incomming client request
