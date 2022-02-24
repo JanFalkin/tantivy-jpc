@@ -68,16 +68,38 @@ impl<'a> TantivyEntry<'a>{
                 info!("IndexWriter");
                 let writer = match self.indexwriter.as_mut().take(){
                     Some(x) => x,
-                    None => return make_json_error("need an indexwriter", self.id),
-                };
-                let doc = self.doc.take();
-                let d = match doc{
-                    Some(x) => x,
                     None => {
-                        return make_json_error("document needs to be created", self.id)
+                        let bi = match self.index.as_mut().take(){
+                            Some(x) => x,
+                            None => return make_json_error("need index created for writer", self.id),
+                        };
+                        self.indexwriter = Some(Box::new((*bi).writer(150000000).unwrap()));
+                        self.indexwriter.as_mut().unwrap()
                     },
                 };
-                writer.add_document(*d);
+                match method {
+                    "add_document" => {
+                        let doc = self.doc.take();
+                        let d = match doc{
+                            Some(x) => x,
+                            None => {
+                                return make_json_error("document needs to be created", self.id)
+                            },
+                        };
+                        let os = writer.add_document(*d);
+                        info!("add document opstamp = {}", os)
+                    },
+                    "commit" => {
+                        match writer.commit(){
+                            Ok(x)=>{
+                                info!("commit hash = {}", x);
+                                x
+                            },
+                            Err(err) => return make_json_error(&format!("failed to commit indexwriter, {}", err), self.id)
+                        };
+                    },
+                    _ => {}
+                }
 
             },
             "document" => {
@@ -94,9 +116,22 @@ impl<'a> TantivyEntry<'a>{
                     "add_text" => {
                         let x = d;
                         let f  = Field::from_field_id(0);
-                        let s = params.as_str().unwrap();
-                        info!("add_text: name = {}", s);
-                        x.add_text(f,s);
+                        let m = match params.as_object(){
+                            Some(m)=> m,
+                            None => return make_json_error("invalid parameters pass to Document add_text", self.id)
+                        };
+                        info!("add_text: name = {:?}", m);
+                        match m.get("field"){
+                            Some(f) => {f.as_i64()},
+                            None => {return make_json_error("field must contain integer id", self.id)}
+                        };
+                        let field_val = match m.get("value") {
+                            Some(v) => {
+                                v.as_str().unwrap_or("empty")
+                            },
+                            None => {return make_json_error("field text required for document", self.id)}
+                        };
+                        x.add_text(f,field_val);
                     },
                     &_ => {}
                 };
@@ -226,14 +261,13 @@ pub unsafe extern "C" fn init() -> u8{
     env_logger::init();
     0
 }
+
 /**
-jpc is the main entry point into a wasm bitcode for the web assembly procedure calls
+jpc is the main entry point into a translation layer from Rust to Go for Tantivy
 this function will
 # Steps
   * parse the input for the appropriately formatted json
-  * construct a BitcodeContext from the json
-  * attempt to call the method using the incomming path
-  * return results to the caller
+  * Modify internal state to reflect json requests
 # Safety
 
 */
@@ -254,17 +288,7 @@ pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize) -> *const u8 {
   info!("Request parsed");
   let mut tm = TANTIVY_MAP.lock().unwrap();
   let entity:&mut TantivyEntry<'static> = match json_params.obj {
-        "document" => {
-            match tm.get_mut(json_params.id){
-                Some(x) => x,
-                None => {
-                    let te = TantivyEntry::new(json_params.id);
-                    tm.insert(json_params.id.to_owned(), te);
-                    tm.get_mut(json_params.id).unwrap()
-                },
-            }
-        }
-        "builder" => {
+        "document" | "builder" | "index" | "indexwriter" => {
             match tm.get_mut(json_params.id){
                 Some(x) => x,
                 None => {

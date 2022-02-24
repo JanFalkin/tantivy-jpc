@@ -56,4 +56,16 @@ func main() {
 		"name": "superKewlness",
 	})
 	callTantivy(id, "builder", "build", msi{})
+	callTantivy(id, "document", "add_text", msi{
+		"field": 0,
+		"value": "Something to index with some random KLJBDfLBFLSEbfebgrfiwfqwhuvac vnasdjbgfn",
+	})
+	callTantivy(id, "document", "add_text", msi{
+		"field": 1,
+		"value": "Another value that is different than the first YSDLJFLSKfioSGYU",
+	})
+	callTantivy(id, "index", "create", msi{})
+	callTantivy(id, "indexwriter", "add_document", msi{})
+	callTantivy(id, "indexwriter", "commit", msi{})
+
 }
