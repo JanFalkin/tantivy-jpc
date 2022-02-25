@@ -53,7 +53,7 @@ fn main() {
       .write_to_file(&output_file);
 
     let output_link_source = target_dir()
-      .join(format!("{}/lib{}.so", env::var("PROFILE").unwrap_or("release".to_string()), package_name))
+      .join(format!("{}/lib{}.so", env::var("PROFILE").unwrap_or_else(|_| "release".to_string()), package_name))
       .display()
       .to_string();
 

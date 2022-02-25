@@ -30,6 +30,7 @@ struct TantivyEntry<'a>{
     pub(crate) schema:Option<tantivy::schema::Schema>,
     pub(crate) index:Option<Box<tantivy::Index>>,
     pub(crate) indexwriter:Option<Box<tantivy::IndexWriter>>,
+    pub(crate) index_reader_builder:Option<Box<tantivy::IndexReaderBuilder>>,
 }
 
 impl<'a> TantivyEntry<'a>{
@@ -41,6 +42,7 @@ impl<'a> TantivyEntry<'a>{
             schema:None,
             index:None,
             indexwriter:None,
+            index_reader_builder:None,
         }
     }
     pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> (*const u8, usize){
@@ -48,7 +50,7 @@ impl<'a> TantivyEntry<'a>{
         match obj {
             "index" =>{
                 info!("Index");
-                match self.index.as_mut().take(){
+                match self.index.as_mut(){
                     Some(x) => x,
                     None => {
                         if method == "create"{
@@ -90,7 +92,7 @@ impl<'a> TantivyEntry<'a>{
                             Some(m)=> m,
                             None => return make_json_error("invalid parameters pass to Document add_text", self.id)
                         };
-                        let doc_idx = m.get("id").unwrap_or(&json!{i32::from(0)}).as_u64().unwrap_or(0) as usize;
+                        let doc_idx = m.get("id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as usize;
                         let docs = *(d);
                         let os = writer.add_document(docs[doc_idx].clone());
                         info!("add document opstamp = {}", os)
@@ -128,8 +130,8 @@ impl<'a> TantivyEntry<'a>{
                             Some(m)=> m,
                             None => return make_json_error("invalid parameters pass to Document add_text", self.id)
                         };
-                        let doc_idx = m.get("doc_id").unwrap_or(&json!{i32::from(0)}).as_u64().unwrap_or(0) as usize;
-                        let field_idx = m.get("id").unwrap_or(&json!{i32::from(0)}).as_u64().unwrap_or(0) as u32;
+                        let doc_idx = m.get("doc_id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as usize;
+                        let field_idx = m.get("id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as u32;
                         let x = d;
                         let f  = Field::from_field_id(field_idx);
                         info!("add_text: name = {:?}", m);
@@ -294,6 +296,8 @@ impl From<std::str::Utf8Error> for ErrorKinds {
 pub type CallResult = std::result::Result<Vec<u8>, ErrorKinds>;
 
 
+/// # Safety
+///
 #[no_mangle]
 pub unsafe extern "C" fn init() -> u8{
     env_logger::init();
@@ -306,9 +310,9 @@ this function will
 # Steps
   * parse the input for the appropriately formatted json
   * Modify internal state to reflect json requests
-# Safety
-
 */
+/// # Safety
+///
 #[no_mangle]
 pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*mut usize) -> i64 {
   info!("In jpc");
