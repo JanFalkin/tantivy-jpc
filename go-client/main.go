@@ -9,6 +9,7 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"unsafe"
 
 	uuid "github.com/nu7hatch/gouuid"
@@ -76,7 +77,11 @@ func main() {
 		"id":     0,
 		"doc_id": 2,
 	})
-	callTantivy(id, "index", "create", msi{})
+	td, err := ioutil.TempDir("", "tantivy_idx")
+	if err != nil {
+		panic(err)
+	}
+	callTantivy(id, "index", "create", msi{"directory": td})
 	callTantivy(id, "indexwriter", "add_document", msi{
 		"id": 1,
 	})

@@ -2,6 +2,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate lazy_static;
+extern crate tempdir;
 use log::{info};
 use serde_json::json;
 use serde_derive::{Serialize, Deserialize};
@@ -50,20 +51,59 @@ impl<'a> TantivyEntry<'a>{
         match obj {
             "index" =>{
                 info!("Index");
-                match self.index.as_mut(){
-                    Some(x) => x,
-                    None => {
-                        if method == "create"{
-                            let rschema= match self.schema.take() {
-                                Some(s) => s,
-                                None => return  make_json_error("A schema must be created before an index", self.id)
+                let m = if let Some(m) = params.as_object() {
+                    m
+                } else {
+                    return make_json_error("invalid parameters pass to Document add_text", self.id)
+                };
+                if let Some(x) = self.index.as_mut() {
+                    x
+                } else {
+                    if method == "create"{
+                        let def_json = &json!("");
+                        let dir_to_use = {
+                            let this = m.get("directory");
+                            if let Some(x) = this {
+                                x
+                            } else {
+                                def_json
+                            }
+                        }.as_str().unwrap_or("");
+                        if dir_to_use != ""{
+                            let idx = match tantivy::Index::create_in_dir(dir_to_use, (match self.schema.take() {
+                            Some(s) => s,
+                            None => return  make_json_error("A schema must be created before an index", self.id)
+                        }).clone()){
+                                Ok(p) => p,
+                                Err(_) => {
+                                    let td = match tempdir::TempDir::new("indexer"){
+                                        Ok(tmp) => {
+                                            tantivy::Index::create_in_dir(tmp, if let Some(s) = self.schema.take() {
+                                                s
+                                            } else {
+                                                return  make_json_error("A schema must be created before an index", self.id)
+                                            }).unwrap()
+                                        },
+                                        Err(err) => return make_json_error(&format!("failed to create, error = {}",err) , self.id)
+                                    };
+                                    td
+                                },
                             };
-                            self.index = Some(Box::new(tantivy::Index::create_in_ram(rschema)));
+                            self.index = Some(Box::new(idx));
                             self.index.as_mut().unwrap()
-                        }else {
-                            return  make_json_error("index must first be created", self.id);
+
+                        }else{
+                            info!("Creating index in RAM");
+                            self.index = Some(Box::new(tantivy::Index::create_in_ram(match self.schema.take() {
+                            Some(s) => s,
+                            None => return  make_json_error("A schema must be created before an index", self.id)
+                        })));
+                            self.index.as_mut().unwrap()
+
                         }
-                    },
+                    }else {
+                        return  make_json_error("index must first be created", self.id);
+                    }
                 };
             },
             "indexwriter" => {
@@ -175,15 +215,16 @@ impl<'a> TantivyEntry<'a>{
             },
             "builder" => {
                 info!("SchemaBuilder");
+                let sb = match &mut self.builder{
+                    Some(x) => x,
+                    None => {
+                        self.builder = Some(Box::new(SchemaBuilder::default()));
+                        self.builder.as_mut().unwrap()
+                    }
+                };
                 match method {
                     "add_text_field" => {
-                        let sb = match &mut self.builder{
-                            Some(x) => x,
-                            None => {
-                                self.builder = Some(Box::new(SchemaBuilder::default()));
-                                self.builder.as_mut().unwrap()
-                            }
-                        };
+
                         let m = match params.as_object(){
                             Some(x)=> x,
                             None => return make_json_error("parameters are not a json object", self.id),
