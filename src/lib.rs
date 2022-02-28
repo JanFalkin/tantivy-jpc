@@ -46,64 +46,85 @@ impl<'a> TantivyEntry<'a>{
             index_reader_builder:None,
         }
     }
+    fn create_index(&mut self, params:serde_json::Value) -> InternalCallResult<Box<tantivy::Index>>{
+        let def_json = &json!("");
+        let dir_to_use = {
+            let this = (if let Some(m) = params.as_object() {
+                m
+            } else {
+                return make_internal_json_error(ErrorKinds::BadHttpParams("invalid parameters pass to Document add_text"));
+            }).get("directory");
+            if let Some(x) = this {
+                x
+            } else {
+                def_json
+            }
+        }.as_str().unwrap_or("");
+        if dir_to_use != ""{
+            let idx = match tantivy::Index::create_in_dir(dir_to_use, (match self.schema.take() {
+            Some(s) => s,
+            None => return  make_internal_json_error(ErrorKinds::BadHttpParams("A schema must be created before an index"))
+        }).clone()){
+                Ok(p) => p,
+                Err(_) => {
+                    let td = match tempdir::TempDir::new("indexer"){
+                        Ok(tmp) => {
+                            tantivy::Index::create_in_dir(tmp, if let Some(s) = self.schema.take() {
+                                s
+                            } else {
+                                return  make_internal_json_error(ErrorKinds::BadInitialization("A schema must be created before an index"));
+                            }).unwrap()
+                        },
+                        Err(_) => return make_internal_json_error(ErrorKinds::IO("failed to create TempDir"))
+                    };
+                    td
+                },
+            };
+            self.index = Some(Box::new(idx));
+            Ok(self.index.clone().unwrap())
+
+        }else{
+            info!("Creating index in RAM");
+            self.index = Some(Box::new(tantivy::Index::create_in_ram(match self.schema.take() {
+            Some(s) => s,
+            None => return  make_internal_json_error(ErrorKinds::BadInitialization("A schema must be created before an index"))
+        })));
+            Ok(self.index.clone().unwrap())
+
+        }
+    }
     pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> (*const u8, usize){
         info!("In do_method");
         match obj {
             "index" =>{
                 info!("Index");
-                let m = if let Some(m) = params.as_object() {
-                    m
-                } else {
-                    return make_json_error("invalid parameters pass to Document add_text", self.id)
-                };
-                if let Some(x) = self.index.as_mut() {
-                    x
-                } else {
-                    if method == "create"{
-                        let def_json = &json!("");
-                        let dir_to_use = {
-                            let this = m.get("directory");
-                            if let Some(x) = this {
-                                x
-                            } else {
-                                def_json
-                            }
-                        }.as_str().unwrap_or("");
-                        if dir_to_use != ""{
-                            let idx = match tantivy::Index::create_in_dir(dir_to_use, (match self.schema.take() {
-                            Some(s) => s,
-                            None => return  make_json_error("A schema must be created before an index", self.id)
-                        }).clone()){
-                                Ok(p) => p,
-                                Err(_) => {
-                                    let td = match tempdir::TempDir::new("indexer"){
-                                        Ok(tmp) => {
-                                            tantivy::Index::create_in_dir(tmp, if let Some(s) = self.schema.take() {
-                                                s
-                                            } else {
-                                                return  make_json_error("A schema must be created before an index", self.id)
-                                            }).unwrap()
-                                        },
-                                        Err(err) => return make_json_error(&format!("failed to create, error = {}",err) , self.id)
-                                    };
-                                    td
-                                },
-                            };
-                            self.index = Some(Box::new(idx));
-                            self.index.as_mut().unwrap()
-
-                        }else{
-                            info!("Creating index in RAM");
-                            self.index = Some(Box::new(tantivy::Index::create_in_ram(match self.schema.take() {
-                            Some(s) => s,
-                            None => return  make_json_error("A schema must be created before an index", self.id)
-                        })));
-                            self.index.as_mut().unwrap()
-
+                match self.index.as_mut() {
+                    Some(x) => x,
+                    None if method == "create" => &mut {
+                        match self.create_index(params){
+                            Ok(idx) => {
+                                idx
+                            },
+                            Err(err) => {
+                                let buf = format!("{}", err);
+                                return (buf.as_ptr() as *const u8, buf.len());
+                            },
                         }
-                    }else {
-                        return  make_json_error("index must first be created", self.id);
-                    }
+                    },
+                    None if method == "reader_builder" => {
+                            match self.create_index(params){
+                                Ok(_) => {},
+                                Err(err) => {
+                                    let buf = format!("{}", err);
+                                    return (buf.as_ptr() as *const u8, buf.len());
+                                },
+                            }
+                            self.index_reader_builder = Some(Box::new(self.index.clone().unwrap().reader_builder()));
+                            self.index.as_mut().unwrap()
+                        }
+                    None => {
+                            return  make_json_error("index must first be created", self.id);
+                        }
                 };
             },
             "indexwriter" => {
@@ -301,6 +322,11 @@ pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize){
     (buf.as_ptr() as *const u8, buf.len())
 }
 
+pub fn make_internal_json_error<T>(ek:ErrorKinds) -> InternalCallResult<T>{
+    info!("error={}", ek);
+    Err(ek)
+}
+
 #[repr(C)]
 #[derive(Error, Debug, Clone, Copy)]
 pub enum ErrorKinds {
@@ -321,7 +347,7 @@ pub enum ErrorKinds {
   #[error("NotDir : `{0}`")]
   NotDir(&'static str),
   #[error("Finalized : `{0}`")]
-  Finalized(&'static str),
+  BadInitialization(&'static str),
   #[error("NotFinalized : `{0}`")]
   NotFinalized(&'static str),
   #[error("BadHttpParams : `{0}`")]
@@ -334,7 +360,7 @@ impl From<std::str::Utf8Error> for ErrorKinds {
     }
 }
 
-pub type CallResult = std::result::Result<Vec<u8>, ErrorKinds>;
+pub type InternalCallResult<T> = std::result::Result<T, ErrorKinds>;
 
 
 /// # Safety
