@@ -6,10 +6,11 @@ extern crate tempdir;
 use log::{info};
 use serde_json::json;
 use serde_derive::{Serialize, Deserialize};
+use tantivy::collector::TopDocs;
 use std::str;
 use std::collections::HashMap;
 use tantivy::Document;
-use tantivy::schema::{Field, TextOptions, Schema, SchemaBuilder};
+use tantivy::schema::{Field, TextOptions, Schema, SchemaBuilder, STRING, TEXT, STORED};
 use tantivy::{LeasedItem, Searcher};
 use tantivy::query::{Query, QueryParser};
 
@@ -70,7 +71,7 @@ impl<'a> TantivyEntry<'a>{
             }
         }.as_str().unwrap_or("");
         if dir_to_use != ""{
-            let idx = match tantivy::Index::create_in_dir(dir_to_use, (match self.schema.take() {
+            let idx = match tantivy::Index::create_in_dir(dir_to_use, (match self.schema.clone() {
             Some(s) => s,
             None => return  make_internal_json_error(ErrorKinds::BadHttpParams("A schema must be created before an index"))
         }).clone()){
@@ -78,7 +79,7 @@ impl<'a> TantivyEntry<'a>{
                 Err(_) => {
                     let td = match tempdir::TempDir::new("indexer"){
                         Ok(tmp) => {
-                            tantivy::Index::create_in_dir(tmp, if let Some(s) = self.schema.take() {
+                            tantivy::Index::create_in_dir(tmp, if let Some(s) = self.schema.clone() {
                                 s
                             } else {
                                 return  make_internal_json_error(ErrorKinds::BadInitialization("A schema must be created before an index"));
@@ -94,7 +95,7 @@ impl<'a> TantivyEntry<'a>{
 
         }else{
             info!("Creating index in RAM");
-            self.index = Some(Box::new(tantivy::Index::create_in_ram(match self.schema.take() {
+            self.index = Some(Box::new(tantivy::Index::create_in_ram(match self.schema.clone() {
             Some(s) => s,
             None => return  make_internal_json_error(ErrorKinds::BadInitialization("A schema must be created before an index"))
         })));
@@ -113,48 +114,64 @@ impl<'a> TantivyEntry<'a>{
                         None => {return make_json_error("index is None", self.id)}
                     };
                     info!("QueryParser aquired");
-                    self.query_parser = Some(Box::new(QueryParser::for_index(&idx, vec![Field::from_field_id(0), Field::from_field_id(1)])));
+                    self.query_parser = Some(Box::new(QueryParser::for_index(&idx, vec![Field::from_field_id(0)])));
                 }
                 if method == "parse_query"{
                     let qp = match &self.query_parser{
                         Some(qp) => {qp},
                         None => {return make_json_error("index is None", self.id)}
                     };
-                    self.dyn_q = match qp.parse_query("Something"){
+                    self.dyn_q = match qp.parse_query("random"){
                         Ok(qp) => Some(qp),
                         Err(_e) => return make_json_error(&format!("query parser error {}", _e), self.id)
                     };
                 }
             },
+            "searcher" =>{
+                info!("Searcher");
+                let query = self.dyn_q.as_ref().unwrap();
+                let li = match self.leased_item.as_ref(){
+                    Some(li) => li,
+                    None => return make_json_error("leased item not found", self.id),
+                };
+                let td = match li.search(&*query, &TopDocs::with_limit(10)){
+                    Ok(td) => td,
+                    Err(e) => return make_json_error(&format!("tantivy error = {}", e), self.id),
+                };
+                info!("search complete len = {}, td = {:?}", td.len(), td);
+
+                for (_score, doc_address) in td {
+                    let retrieved_doc = li.doc(doc_address).unwrap();
+                    let schema = self.schema.as_ref().unwrap();
+                    //unsafe{RETURN_MSG += &format!("{}", schema.to_json(&retrieved_doc));}
+                    info!("{} n={} vals={:?}", schema.to_json(&retrieved_doc), retrieved_doc.len(), retrieved_doc.field_values());
+                }
+            }
             "index" =>{
                 info!("Index");
-                match self.index.as_mut() {
+                let idx = match &self.index {
                     Some(x) => x,
-                    None if method == "create" => &mut {
+                    None => {
                         match self.create_index(params){
-                            Ok(idx) => {
-                                idx
+                            Ok(_) => {
+                                self.index.as_ref().unwrap()
                             },
                             Err(err) => {
                                 let buf = format!("{}", err);
                                 return (buf.as_ptr() as *const u8, buf.len());
                             },
                         }
+                    }
+                };
+                match method {
+                    "reader_builder" => {
+                        info!("Reader Builder");
+                        self.index_reader_builder = Some(Box::new(idx.reader_builder()));
+                        idx
                     },
-                    None if method == "reader_builder" => {
-                            match self.create_index(params){
-                                Ok(_) => {},
-                                Err(err) => {
-                                    let buf = format!("{}", err);
-                                    return (buf.as_ptr() as *const u8, buf.len());
-                                },
-                            }
-                            self.index_reader_builder = Some(Box::new(self.index.clone().unwrap().reader_builder()));
-                            self.index.as_mut().unwrap()
-                        }
-                    None => {
-                            return  make_json_error("index must first be created", self.id);
-                        }
+                    &_ => {
+                        return make_json_error(&format!("unknown method {}", method) , self.id)
+                    }
                 };
             },
             "indexwriter" => {
@@ -202,13 +219,14 @@ impl<'a> TantivyEntry<'a>{
 
             },
             "index_reader" => {
-                info!("Document");
+                info!("IndexReader");
                 match method {
                     "searcher" => {
-                        if let Some(idx) = self.index_reader_builder.clone() {
-                            let f = (*idx).reload_policy(tantivy::ReloadPolicy::OnCommit).try_into();
-                            match f {
+                        if let Some(idx) = self.index_reader_builder.as_ref() {
+                            info!("got index reader@@@@@@");
+                            match (*idx).clone().reload_policy(tantivy::ReloadPolicy::OnCommit).try_into() {
                                 Ok(idx_read) => {
+                                    info!("Got leased item");
                                     self.leased_item = Some(Box::new(idx_read.searcher()))
                                 },
                                 Err(_err) => {return make_json_error("tantivy error", self.id);}
@@ -302,7 +320,21 @@ impl<'a> TantivyEntry<'a>{
                             None  => return make_json_error("name param not found", self.id),
                         };
                         info!("add_text_field: name = {}", &name);
-                        let f = sb.add_text_field(name, TextOptions::default());
+                        let indexed = match m.get("index"){
+                            Some(v) => match v.as_bool() {
+                                Some(b) => b,
+                                None => return make_json_error("index must be a boolean value", self.id),
+                            }
+                            None => false,
+                        };
+                        let ti: TextOptions;
+                        if indexed{
+                            info!("Indexed!!!!!!");
+                            ti = STRING
+                        }else {
+                            ti = TEXT | STORED
+                        }
+                        let f = sb.add_text_field(name,ti);
                         info!("field = {:?}", &f);
                     },
                     "build" => {
@@ -451,7 +483,7 @@ pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*
   info!("Request parsed");
   let mut tm = TANTIVY_MAP.lock().unwrap();
   let entity:&mut TantivyEntry<'static> = match json_params.obj {
-        "document" | "builder" | "index" | "indexwriter" | "query_parser" => {
+        "document" | "builder" | "index" | "indexwriter" | "query_parser" | "searcher" | "index_reader" => {
             match tm.get_mut(json_params.id){
                 Some(x) => x,
                 None => {

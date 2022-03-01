@@ -57,17 +57,19 @@ func main() {
 	}
 	id := u.String()
 	callTantivy(id, "builder", "add_text_field", msi{
-		"name": "kewlness",
+		"name":  "kewlness",
+		"index": false,
 	})
 	callTantivy(id, "builder", "add_text_field", msi{
-		"name": "superKewlness",
+		"name":  "superKewlness",
+		"index": false,
 	})
 	callTantivy(id, "builder", "build", msi{})
 	callTantivy(id, "document", "create", msi{})
 	callTantivy(id, "document", "create", msi{})
 	callTantivy(id, "document", "add_text", msi{
 		"field":  0,
-		"value":  "Something to index with some random KLJBDfLBFLSEbfebgrfiwfqwhuvac vnasdjbgfn",
+		"value":  "Something to index with some the random KLJBDfLBFLSEbfebgrfiwfqwhuvac vnasdjbgfn",
 		"id":     0,
 		"doc_id": 1,
 	})
@@ -92,8 +94,11 @@ func main() {
 
 	callTantivy(id, "index", "reader_builder", msi{})
 
+	callTantivy(id, "index_reader", "searcher", msi{})
+
 	callTantivy(id, "query_parser", "for_index", msi{})
 
 	callTantivy(id, "query_parser", "parse_query", msi{})
+	callTantivy(id, "searcher", "search", msi{})
 
 }
