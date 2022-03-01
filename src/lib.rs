@@ -10,6 +10,9 @@ use std::str;
 use std::collections::HashMap;
 use tantivy::Document;
 use tantivy::schema::{Field, TextOptions, Schema, SchemaBuilder};
+use tantivy::{LeasedItem, Searcher};
+use tantivy::query::{Query, QueryParser};
+
 use lazy_static::lazy_static;
 use std::sync::Mutex;
 
@@ -32,6 +35,9 @@ struct TantivyEntry<'a>{
     pub(crate) index:Option<Box<tantivy::Index>>,
     pub(crate) indexwriter:Option<Box<tantivy::IndexWriter>>,
     pub(crate) index_reader_builder:Option<Box<tantivy::IndexReaderBuilder>>,
+    pub(crate) leased_item:Option<Box<LeasedItem<Searcher>>>,
+    pub(crate) query_parser:Option<Box<QueryParser>>,
+    pub(crate) dyn_q:Option<Box<dyn Query>>,
 }
 
 impl<'a> TantivyEntry<'a>{
@@ -44,6 +50,9 @@ impl<'a> TantivyEntry<'a>{
             index:None,
             indexwriter:None,
             index_reader_builder:None,
+            leased_item:None,
+            query_parser:None,
+            dyn_q: None,
         }
     }
     fn create_index(&mut self, params:serde_json::Value) -> InternalCallResult<Box<tantivy::Index>>{
@@ -96,6 +105,27 @@ impl<'a> TantivyEntry<'a>{
     pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> (*const u8, usize){
         info!("In do_method");
         match obj {
+            "query_parser" => {
+                info!("QueryParser");
+                if method == "for_index"{
+                    let idx = match &self.index{
+                        Some(idx) => {idx},
+                        None => {return make_json_error("index is None", self.id)}
+                    };
+                    info!("QueryParser aquired");
+                    self.query_parser = Some(Box::new(QueryParser::for_index(&idx, vec![Field::from_field_id(0), Field::from_field_id(1)])));
+                }
+                if method == "parse_query"{
+                    let qp = match &self.query_parser{
+                        Some(qp) => {qp},
+                        None => {return make_json_error("index is None", self.id)}
+                    };
+                    self.dyn_q = match qp.parse_query("Something"){
+                        Ok(qp) => Some(qp),
+                        Err(_e) => return make_json_error(&format!("query parser error {}", _e), self.id)
+                    };
+                }
+            },
             "index" =>{
                 info!("Index");
                 match self.index.as_mut() {
@@ -170,6 +200,23 @@ impl<'a> TantivyEntry<'a>{
                     _ => {}
                 }
 
+            },
+            "index_reader" => {
+                info!("Document");
+                match method {
+                    "searcher" => {
+                        if let Some(idx) = self.index_reader_builder.clone() {
+                            let f = (*idx).reload_policy(tantivy::ReloadPolicy::OnCommit).try_into();
+                            match f {
+                                Ok(idx_read) => {
+                                    self.leased_item = Some(Box::new(idx_read.searcher()))
+                                },
+                                Err(_err) => {return make_json_error("tantivy error", self.id);}
+                            }
+                        }
+                    }
+                    &_ => {}
+                }
             },
             "document" => {
                 info!("Document");
@@ -404,7 +451,7 @@ pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*
   info!("Request parsed");
   let mut tm = TANTIVY_MAP.lock().unwrap();
   let entity:&mut TantivyEntry<'static> = match json_params.obj {
-        "document" | "builder" | "index" | "indexwriter" => {
+        "document" | "builder" | "index" | "indexwriter" | "query_parser" => {
             match tm.get_mut(json_params.id){
                 Some(x) => x,
                 None => {

@@ -90,4 +90,10 @@ func main() {
 	})
 	callTantivy(id, "indexwriter", "commit", msi{})
 
+	callTantivy(id, "index", "reader_builder", msi{})
+
+	callTantivy(id, "query_parser", "for_index", msi{})
+
+	callTantivy(id, "query_parser", "parse_query", msi{})
+
 }
