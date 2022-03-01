@@ -98,7 +98,9 @@ func main() {
 
 	callTantivy(id, "query_parser", "for_index", msi{})
 
-	callTantivy(id, "query_parser", "parse_query", msi{})
+	callTantivy(id, "query_parser", "parse_query", msi{
+		"query": "the",
+	})
 	callTantivy(id, "searcher", "search", msi{})
 
 }

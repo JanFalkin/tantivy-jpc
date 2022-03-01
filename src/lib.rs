@@ -62,7 +62,7 @@ impl<'a> TantivyEntry<'a>{
             let this = (if let Some(m) = params.as_object() {
                 m
             } else {
-                return make_internal_json_error(ErrorKinds::BadHttpParams("invalid parameters pass to Document add_text"));
+                return make_internal_json_error(ErrorKinds::BadParams(format!("invalid parameters pass to Document add_text")));
             }).get("directory");
             if let Some(x) = this {
                 x
@@ -73,7 +73,7 @@ impl<'a> TantivyEntry<'a>{
         if dir_to_use != ""{
             let idx = match tantivy::Index::create_in_dir(dir_to_use, (match self.schema.clone() {
             Some(s) => s,
-            None => return  make_internal_json_error(ErrorKinds::BadHttpParams("A schema must be created before an index"))
+            None => return  make_internal_json_error(ErrorKinds::BadParams(format!("A schema must be created before an index")))
         }).clone()){
                 Ok(p) => p,
                 Err(_) => {
@@ -82,10 +82,10 @@ impl<'a> TantivyEntry<'a>{
                             tantivy::Index::create_in_dir(tmp, if let Some(s) = self.schema.clone() {
                                 s
                             } else {
-                                return  make_internal_json_error(ErrorKinds::BadInitialization("A schema must be created before an index"));
+                                return  make_internal_json_error(ErrorKinds::BadInitialization(format!("A schema must be created before an index")));
                             }).unwrap()
                         },
-                        Err(_) => return make_internal_json_error(ErrorKinds::IO("failed to create TempDir"))
+                        Err(_) => return make_internal_json_error(ErrorKinds::IO(format!("failed to create TempDir")))
                     };
                     td
                 },
@@ -97,256 +97,312 @@ impl<'a> TantivyEntry<'a>{
             info!("Creating index in RAM");
             self.index = Some(Box::new(tantivy::Index::create_in_ram(match self.schema.clone() {
             Some(s) => s,
-            None => return  make_internal_json_error(ErrorKinds::BadInitialization("A schema must be created before an index"))
+            None => return  make_internal_json_error(ErrorKinds::BadInitialization(format!("A schema must be created before an index")))
         })));
             Ok(self.index.clone().unwrap())
 
         }
     }
+    fn handle_query_parser(&mut self, method:&str, _obj: &str, params:serde_json::Value)  -> InternalCallResult<u32>{
+        let m = match params.as_object(){
+            Some(m)=> m,
+            None => return make_internal_json_error::<u32>(ErrorKinds::BadParams(format!("invalid parameters pass to query_parser add_text")))
+        };
+        info!("QueryParser");
+        if method == "for_index"{
+            let idx = match &self.index{
+                Some(idx) => {idx},
+                None => {return make_internal_json_error::<u32>(ErrorKinds::NotExist(format!("index is None")))}
+            };
+            info!("QueryParser aquired");
+            self.query_parser = Some(Box::new(QueryParser::for_index(&idx, vec![Field::from_field_id(0)])));
+        }
+        if method == "parse_query"{
+            let qp = match &self.query_parser{
+                Some(qp) => {qp},
+                None => {return make_internal_json_error::<u32>(ErrorKinds::NotExist(format!("index is None")))}
+            };
+            let query = match m.get("query"){
+                Some(q)=> match q.as_str(){
+                    Some(s) => s,
+                    None => return make_internal_json_error::<u32>(ErrorKinds::BadParams(format!("query parameter must be a string")))
+                },
+                None=> {return make_internal_json_error::<u32>(ErrorKinds::BadParams(format!("parameter 'query' missing")))}
+            };
+            self.dyn_q = match qp.parse_query(query){
+                Ok(qp) => Some(qp),
+                Err(_e) => {
+                    return make_internal_json_error::<u32>(ErrorKinds::BadParams(format!("query parser error : {}", _e)))
+                }
+            };
+        }
+        Ok(0)
+    }
+    fn handle_searcher(&mut self, _method:&str, _obj: &str, _params:serde_json::Value)  -> InternalCallResult<u32>{
+        info!("Searcher");
+        let query = self.dyn_q.as_ref().unwrap();
+        let li = match self.leased_item.as_ref(){
+            Some(li) => li,
+            None => return make_internal_json_error(ErrorKinds::NotExist(format!("leased item not found"))),
+        };
+        let td = match li.search(&*query, &TopDocs::with_limit(10)){
+            Ok(td) => td,
+            Err(e) => return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {}", e))),
+        };
+        info!("search complete len = {}, td = {:?}", td.len(), td);
+
+        for (_score, doc_address) in td {
+            let retrieved_doc = li.doc(doc_address).unwrap();
+            let schema = self.schema.as_ref().unwrap();
+            //unsafe{RETURN_MSG += &format!("{}", schema.to_json(&retrieved_doc));}
+            info!("{} n={} vals={:?}", schema.to_json(&retrieved_doc), retrieved_doc.len(), retrieved_doc.field_values());
+        }
+        Ok(0)
+    }
+    fn handle_index(&mut self, method:&str, _obj: &str, params:serde_json::Value)  -> InternalCallResult<u32>{
+        info!("Index");
+        let idx = match &self.index {
+            Some(x) => x,
+            None => {
+                match self.create_index(params){
+                    Ok(_) => {
+                        self.index.as_ref().unwrap()
+                    },
+                    Err(err) => {
+                        let buf = format!("{}", err);
+                        return make_internal_json_error(ErrorKinds::BadParams(buf));
+                    },
+                }
+            }
+        };
+        match method {
+            "reader_builder" => {
+                info!("Reader Builder");
+                self.index_reader_builder = Some(Box::new(idx.reader_builder()));
+                idx
+            },
+            &_ => {
+                return make_internal_json_error(ErrorKinds::UnRecognizedCommand(format!("unknown method {}", method)))
+            }
+        };
+        Ok(0)
+    }
+    fn handle_index_writer(&mut self, method:&str, _obj: &str, params:serde_json::Value)  -> InternalCallResult<u32>{
+        info!("IndexWriter");
+        let writer = match self.indexwriter.as_mut().take(){
+            Some(x) => x,
+            None => {
+                let bi = match self.index.as_mut().take(){
+                    Some(x) => x,
+                    None => return make_internal_json_error(ErrorKinds::BadInitialization(format!("need index created for writer"))),
+                };
+                self.indexwriter = Some(Box::new((*bi).writer(150000000).unwrap()));
+                self.indexwriter.as_mut().unwrap()
+            },
+        };
+        match method {
+            "add_document" => {
+                let doc = self.doc.clone();
+                let d = match doc{
+                    Some(x) => x,
+                    None => {
+                        return make_internal_json_error(ErrorKinds::NotExist(format!("document needs to be created")))
+                    },
+                };
+                let m = match params.as_object(){
+                    Some(m)=> m,
+                    None => return make_internal_json_error(ErrorKinds::BadParams(format!("invalid parameters pass to Document add_text")))
+                };
+                let doc_idx = m.get("id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as usize;
+                let docs = *(d);
+                let os = writer.add_document(docs[doc_idx].clone());
+                info!("add document opstamp = {}", os)
+            },
+            "commit" => {
+                match writer.commit(){
+                    Ok(x)=>{
+                        info!("commit hash = {}", x);
+                        x
+                    },
+                    Err(err) => return make_internal_json_error(ErrorKinds::NotFinalized(format!("failed to commit indexwriter, {}", err)))
+                };
+            },
+            _ => {}
+        }
+
+        Ok(0)
+    }
+    fn handle_index_reader(&mut self, method:&str, _obj: &str, _params:serde_json::Value)  -> InternalCallResult<u32>{
+        info!("IndexReader");
+        match method {
+            "searcher" => {
+                if let Some(idx) = self.index_reader_builder.as_ref() {
+                    info!("got index reader@@@@@@");
+                    match (*idx).clone().reload_policy(tantivy::ReloadPolicy::OnCommit).try_into() {
+                        Ok(idx_read) => {
+                            info!("Got leased item");
+                            self.leased_item = Some(Box::new(idx_read.searcher()))
+                        },
+                        Err(err) => {return make_internal_json_error(ErrorKinds::Other(format!("tantivy error {}", err)))}
+                    }
+                }
+            }
+            &_ => {}
+        }
+        Ok(0)
+    }
+    fn handle_document(&mut self, method:&str, _obj: &str, params:serde_json::Value)  -> InternalCallResult<u32>{
+        info!("Document");
+        match method {
+            "add_text" => {
+                let doc = self.doc.as_mut().take();
+                let d = match doc{
+                    Some(x) => {
+                        let v = x;
+                        v.append(&mut vec![Document::new()]);
+                        self.doc = Some(Box::new((**v).clone()));
+                        self.doc.as_mut().unwrap()
+                    },
+                    None => {
+                        return make_internal_json_error(ErrorKinds::BadInitialization(format!("add_text with no doucments created")))
+                    }
+                };
+                let m = match params.as_object(){
+                    Some(m)=> m,
+                    None => return make_internal_json_error(ErrorKinds::BadParams(format!("invalid parameters pass to Document add_text")))
+                };
+                let doc_idx = m.get("doc_id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as usize;
+                let field_idx = m.get("id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as u32;
+                let x = d;
+                let f  = Field::from_field_id(field_idx);
+                info!("add_text: name = {:?}", m);
+                match m.get("field"){
+                    Some(f) => {f.as_i64()},
+                    None => {return make_internal_json_error(ErrorKinds::BadParams(format!("field must contain integer id")))}
+                };
+                let field_val = match m.get("value") {
+                    Some(v) => {
+                        v.as_str().unwrap_or("empty")
+                    },
+                    None => {return make_internal_json_error(ErrorKinds::BadInitialization(format!("field text required for document")))}
+                };
+                let cur_doc = match x.get_mut(doc_idx){
+                    Some(d) => d,
+                    None => {return make_internal_json_error(ErrorKinds::BadInitialization(format!("document at index {} does not exist", doc_idx)))}
+                };
+                cur_doc.add_text(f,field_val);
+            },
+            "create" => {
+                let doc = self.doc.as_mut().take();
+                match doc{
+                    Some(x) => {
+                        let mut v = (**x).clone();
+                        v.append(&mut vec![Document::new()]);
+                        self.doc = Some(Box::new(v));
+                    },
+                    None => {
+                        let nd= Document::new();
+                        self.doc = Some(Box::new(vec![nd]));
+                        self.doc.as_mut().unwrap();
+                    },
+                };
+                let v = *self.doc.clone().unwrap();
+                unsafe{
+                RETURN_MSG = json!({"id" : v.len()}).to_string()
+                }
+            },
+            &_ => {}
+        };
+        Ok(0)
+    }
+    fn handler_builder(&mut self, method:&str, _obj: &str, params:serde_json::Value)  -> InternalCallResult<u32>{
+        info!("SchemaBuilder");
+        let sb = match &mut self.builder{
+            Some(x) => x,
+            None => {
+                self.builder = Some(Box::new(SchemaBuilder::default()));
+                self.builder.as_mut().unwrap()
+            }
+        };
+        match method {
+            "add_text_field" => {
+
+                let m = match params.as_object(){
+                    Some(x)=> x,
+                    None => return make_internal_json_error(ErrorKinds::BadParams(format!("parameters are not a json object"))),
+                };
+                let name = match m.get("name"){
+                    Some(x) => x.as_str().unwrap(),
+                    None  => return make_internal_json_error(ErrorKinds::BadParams(format!("name param not found"))),
+                };
+                info!("add_text_field: name = {}", &name);
+                let indexed = match m.get("index"){
+                    Some(v) => match v.as_bool() {
+                        Some(b) => b,
+                        None => return make_internal_json_error(ErrorKinds::BadParams(format!("index must be a boolean value"))),
+                    }
+                    None => false,
+                };
+                let ti: TextOptions;
+                if indexed{
+                    info!("Indexed!!!!!!");
+                    ti = STRING
+                }else {
+                    ti = TEXT | STORED
+                }
+                let f = sb.add_text_field(name,ti);
+                info!("field = {:?}", &f);
+            },
+            "build" => {
+                let sb = match self.builder.take(){
+                    Some(x) => x,
+                    None => return make_internal_json_error(ErrorKinds::BadInitialization(format!("schema_builder not created")))
+                };
+                let schema:Schema = sb.build();
+                info!("new schema {:?}", schema);
+                self.schema = Some(schema)
+            },
+            &_ => {}
+        };
+
+        return Ok(0)
+    }
     pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> (*const u8, usize){
         info!("In do_method");
         match obj {
             "query_parser" => {
-                info!("QueryParser");
-                if method == "for_index"{
-                    let idx = match &self.index{
-                        Some(idx) => {idx},
-                        None => {return make_json_error("index is None", self.id)}
-                    };
-                    info!("QueryParser aquired");
-                    self.query_parser = Some(Box::new(QueryParser::for_index(&idx, vec![Field::from_field_id(0)])));
-                }
-                if method == "parse_query"{
-                    let qp = match &self.query_parser{
-                        Some(qp) => {qp},
-                        None => {return make_json_error("index is None", self.id)}
-                    };
-                    self.dyn_q = match qp.parse_query("random"){
-                        Ok(qp) => Some(qp),
-                        Err(_e) => return make_json_error(&format!("query parser error {}", _e), self.id)
-                    };
-                }
+                if let Err(e) = self.handle_query_parser(method,obj,params) {
+                    return make_json_error(&format!("handle query parser error={}", e), self.id)
+                };
             },
             "searcher" =>{
-                info!("Searcher");
-                let query = self.dyn_q.as_ref().unwrap();
-                let li = match self.leased_item.as_ref(){
-                    Some(li) => li,
-                    None => return make_json_error("leased item not found", self.id),
+                if let Err(e) = self.handle_searcher(method,obj,params) {
+                    return make_json_error(&format!("handle searcher error={}", e), self.id)
                 };
-                let td = match li.search(&*query, &TopDocs::with_limit(10)){
-                    Ok(td) => td,
-                    Err(e) => return make_json_error(&format!("tantivy error = {}", e), self.id),
-                };
-                info!("search complete len = {}, td = {:?}", td.len(), td);
-
-                for (_score, doc_address) in td {
-                    let retrieved_doc = li.doc(doc_address).unwrap();
-                    let schema = self.schema.as_ref().unwrap();
-                    //unsafe{RETURN_MSG += &format!("{}", schema.to_json(&retrieved_doc));}
-                    info!("{} n={} vals={:?}", schema.to_json(&retrieved_doc), retrieved_doc.len(), retrieved_doc.field_values());
-                }
             }
             "index" =>{
-                info!("Index");
-                let idx = match &self.index {
-                    Some(x) => x,
-                    None => {
-                        match self.create_index(params){
-                            Ok(_) => {
-                                self.index.as_ref().unwrap()
-                            },
-                            Err(err) => {
-                                let buf = format!("{}", err);
-                                return (buf.as_ptr() as *const u8, buf.len());
-                            },
-                        }
-                    }
-                };
-                match method {
-                    "reader_builder" => {
-                        info!("Reader Builder");
-                        self.index_reader_builder = Some(Box::new(idx.reader_builder()));
-                        idx
-                    },
-                    &_ => {
-                        return make_json_error(&format!("unknown method {}", method) , self.id)
-                    }
+                if let Err(e) = self.handle_index(method,obj,params) {
+                    return make_json_error(&format!("handle index error={}", e), self.id)
                 };
             },
             "indexwriter" => {
-                info!("IndexWriter");
-                let writer = match self.indexwriter.as_mut().take(){
-                    Some(x) => x,
-                    None => {
-                        let bi = match self.index.as_mut().take(){
-                            Some(x) => x,
-                            None => return make_json_error("need index created for writer", self.id),
-                        };
-                        self.indexwriter = Some(Box::new((*bi).writer(150000000).unwrap()));
-                        self.indexwriter.as_mut().unwrap()
-                    },
+                if let Err(e) = self.handle_index_writer(method,obj,params) {
+                    return make_json_error(&format!("handle index writer error={}", e), self.id)
                 };
-                match method {
-                    "add_document" => {
-                        let doc = self.doc.clone();
-                        let d = match doc{
-                            Some(x) => x,
-                            None => {
-                                return make_json_error("document needs to be created", self.id)
-                            },
-                        };
-                        let m = match params.as_object(){
-                            Some(m)=> m,
-                            None => return make_json_error("invalid parameters pass to Document add_text", self.id)
-                        };
-                        let doc_idx = m.get("id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as usize;
-                        let docs = *(d);
-                        let os = writer.add_document(docs[doc_idx].clone());
-                        info!("add document opstamp = {}", os)
-                    },
-                    "commit" => {
-                        match writer.commit(){
-                            Ok(x)=>{
-                                info!("commit hash = {}", x);
-                                x
-                            },
-                            Err(err) => return make_json_error(&format!("failed to commit indexwriter, {}", err), self.id)
-                        };
-                    },
-                    _ => {}
-                }
-
             },
             "index_reader" => {
-                info!("IndexReader");
-                match method {
-                    "searcher" => {
-                        if let Some(idx) = self.index_reader_builder.as_ref() {
-                            info!("got index reader@@@@@@");
-                            match (*idx).clone().reload_policy(tantivy::ReloadPolicy::OnCommit).try_into() {
-                                Ok(idx_read) => {
-                                    info!("Got leased item");
-                                    self.leased_item = Some(Box::new(idx_read.searcher()))
-                                },
-                                Err(_err) => {return make_json_error("tantivy error", self.id);}
-                            }
-                        }
-                    }
-                    &_ => {}
-                }
+                if let Err(e) = self.handle_index_reader(method,obj,params) {
+                    return make_json_error(&format!("handle index reader error={}", e), self.id)
+                };
             },
             "document" => {
-                info!("Document");
-                match method {
-                    "add_text" => {
-                        let doc = self.doc.as_mut().take();
-                        let d = match doc{
-                            Some(x) => {
-                                let v = x;
-                                v.append(&mut vec![Document::new()]);
-                                self.doc = Some(Box::new((**v).clone()));
-                                self.doc.as_mut().unwrap()
-                            },
-                            None => {
-                                return make_json_error("add_text with no doucments created", self.id)
-                            }
-                        };
-                        let m = match params.as_object(){
-                            Some(m)=> m,
-                            None => return make_json_error("invalid parameters pass to Document add_text", self.id)
-                        };
-                        let doc_idx = m.get("doc_id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as usize;
-                        let field_idx = m.get("id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as u32;
-                        let x = d;
-                        let f  = Field::from_field_id(field_idx);
-                        info!("add_text: name = {:?}", m);
-                        match m.get("field"){
-                            Some(f) => {f.as_i64()},
-                            None => {return make_json_error("field must contain integer id", self.id)}
-                        };
-                        let field_val = match m.get("value") {
-                            Some(v) => {
-                                v.as_str().unwrap_or("empty")
-                            },
-                            None => {return make_json_error("field text required for document", self.id)}
-                        };
-                        let cur_doc = match x.get_mut(doc_idx){
-                            Some(d) => d,
-                            None => {return make_json_error(&format!("document at index {} does not exist", doc_idx), self.id)}
-                        };
-                        cur_doc.add_text(f,field_val);
-                    },
-                    "create" => {
-                        let doc = self.doc.as_mut().take();
-                        match doc{
-                            Some(x) => {
-                                let mut v = (**x).clone();
-                                v.append(&mut vec![Document::new()]);
-                                self.doc = Some(Box::new(v));
-                            },
-                            None => {
-                                let nd= Document::new();
-                                self.doc = Some(Box::new(vec![nd]));
-                                self.doc.as_mut().unwrap();
-                            },
-                        };
-                        let v = *self.doc.clone().unwrap();
-                        unsafe{
-                        RETURN_MSG = json!({"id" : v.len()}).to_string()
-                        }
-                    },
-                    &_ => {}
+                if let Err(e) = self.handle_document(method,obj,params) {
+                    return make_json_error(&format!("handle document error={}", e), self.id)
                 };
             },
             "builder" => {
-                info!("SchemaBuilder");
-                let sb = match &mut self.builder{
-                    Some(x) => x,
-                    None => {
-                        self.builder = Some(Box::new(SchemaBuilder::default()));
-                        self.builder.as_mut().unwrap()
-                    }
-                };
-                match method {
-                    "add_text_field" => {
-
-                        let m = match params.as_object(){
-                            Some(x)=> x,
-                            None => return make_json_error("parameters are not a json object", self.id),
-                        };
-                        let name = match m.get("name"){
-                            Some(x) => x.as_str().unwrap(),
-                            None  => return make_json_error("name param not found", self.id),
-                        };
-                        info!("add_text_field: name = {}", &name);
-                        let indexed = match m.get("index"){
-                            Some(v) => match v.as_bool() {
-                                Some(b) => b,
-                                None => return make_json_error("index must be a boolean value", self.id),
-                            }
-                            None => false,
-                        };
-                        let ti: TextOptions;
-                        if indexed{
-                            info!("Indexed!!!!!!");
-                            ti = STRING
-                        }else {
-                            ti = TEXT | STORED
-                        }
-                        let f = sb.add_text_field(name,ti);
-                        info!("field = {:?}", &f);
-                    },
-                    "build" => {
-                        let sb = match self.builder.take(){
-                            Some(x) => x,
-                            None => return make_json_error("schema_builder not created", self.id)
-                        };
-                        let schema:Schema = sb.build();
-                        info!("new schema {:?}", schema);
-                        self.schema = Some(schema)
-                    },
-                    &_ => {}
+                if let Err(e) = self.handler_builder(method,obj,params) {
+                    return make_json_error(&format!("handle builder error={}", e), self.id)
                 };
             },
             "schema" => {
@@ -406,31 +462,32 @@ pub fn make_internal_json_error<T>(ek:ErrorKinds) -> InternalCallResult<T>{
     Err(ek)
 }
 
-#[repr(C)]
-#[derive(Error, Debug, Clone, Copy)]
+#[derive(Error, Debug, Clone)]
 pub enum ErrorKinds {
   #[error("Other Error : `{0}`")]
-  Other(&'static str),
+  Other(String),
   #[error("Not Recognized : `{0}`")]
-  UnRecognizedCommand(&'static str),
+  UnRecognizedCommand(String),
   #[error("Permission : `{0}`")]
-  Permission(&'static str),
+  Permission(String),
   #[error("IO : `{0}`")]
-  IO(&'static str),
+  IO(String),
   #[error("Exist : `{0}`")]
   Utf8Error(std::str::Utf8Error),
   #[error("NotExist : `{0}`")]
-  NotExist(&'static str),
+  NotExist(String),
   #[error("IsDir : `{0}`")]
-  IsDir(&'static str),
+  IsDir(String),
   #[error("NotDir : `{0}`")]
-  NotDir(&'static str),
+  NotDir(String),
   #[error("Finalized : `{0}`")]
-  BadInitialization(&'static str),
+  BadInitialization(String),
   #[error("NotFinalized : `{0}`")]
-  NotFinalized(&'static str),
-  #[error("BadHttpParams : `{0}`")]
-  BadHttpParams(&'static str),
+  NotFinalized(String),
+  #[error("BadParams : `{0}`")]
+  BadParams(String),
+  #[error("Search : `{0}`")]
+  Search(String),
 }
 
 impl From<std::str::Utf8Error> for ErrorKinds {
@@ -494,7 +551,7 @@ pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*
             }
         }
         _ =>  {
-            let msg = ErrorKinds::UnRecognizedCommand(json_params.method).to_string();
+            let msg = ErrorKinds::UnRecognizedCommand(json_params.method.to_string()).to_string();
             std::ptr::copy(msg.as_ptr() as *const u8, ret, msg.len());
             return -1;
         }
