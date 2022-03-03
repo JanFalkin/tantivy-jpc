@@ -37,7 +37,7 @@ func callTantivy(u, object, method string, params msi) error {
 		return err
 	}
 	p := C.CString(string(b))
-	rb := make([]byte, 500)
+	rb := make([]byte, 5000000)
 	csrb := C.CString(string(rb))
 	crb := (*C.uchar)(unsafe.Pointer(csrb))
 	cs := (*C.uchar)(unsafe.Pointer(p))
@@ -57,11 +57,11 @@ func main() {
 	}
 	id := u.String()
 	callTantivy(id, "builder", "add_text_field", msi{
-		"name":  "kewlness",
+		"name":  "title",
 		"index": false,
 	})
 	callTantivy(id, "builder", "add_text_field", msi{
-		"name":  "superKewlness",
+		"name":  "body",
 		"index": false,
 	})
 	callTantivy(id, "builder", "build", msi{})
@@ -69,13 +69,32 @@ func main() {
 	callTantivy(id, "document", "create", msi{})
 	callTantivy(id, "document", "add_text", msi{
 		"field":  0,
-		"value":  "Something to index with some the random KLJBDfLBFLSEbfebgrfiwfqwhuvac vnasdjbgfn",
+		"value":  "The Old Man and the Sea",
 		"id":     0,
 		"doc_id": 1,
 	})
 	callTantivy(id, "document", "add_text", msi{
 		"field":  1,
-		"value":  "Another value that is different than the first YSDLJFLSKfioSGYU",
+		"value":  "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish.",
+		"id":     0,
+		"doc_id": 1,
+	})
+	callTantivy(id, "document", "add_text", msi{
+		"field":  0,
+		"value":  "Of Mice and Men",
+		"id":     0,
+		"doc_id": 2,
+	})
+	callTantivy(id, "document", "add_text", msi{
+		"field": 1,
+		"value": `A few miles south of Soledad, the Salinas River drops in close to the hillside
+		bank and runs deep and green. The water is warm too, for it has slipped twinkling
+		over the yellow sands in the sunlight before reaching the narrow pool. On one
+		side of the river the golden foothill slopes curve up to the strong and rocky
+		Gabilan Mountains, but on the valley side the water is lined with trees—willows
+		fresh and green with every spring, carrying in their lower leaf junctures the
+		debris of the winter's flooding; and sycamores with mottled, white, recumbent
+		limbs and branches that arch over the pool`,
 		"id":     0,
 		"doc_id": 2,
 	})
@@ -96,10 +115,12 @@ func main() {
 
 	callTantivy(id, "index_reader", "searcher", msi{})
 
-	callTantivy(id, "query_parser", "for_index", msi{})
+	callTantivy(id, "query_parser", "for_index", msi{
+		"fields": []string{"title", "body"},
+	})
 
 	callTantivy(id, "query_parser", "parse_query", msi{
-		"query": "the",
+		"query": "sea ",
 	})
 	callTantivy(id, "searcher", "search", msi{})
 

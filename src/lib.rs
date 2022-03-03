@@ -110,12 +110,25 @@ impl<'a> TantivyEntry<'a>{
         };
         info!("QueryParser");
         if method == "for_index"{
+            let mut v_out:Vec<Field> = Vec::<Field>::new();
             let idx = match &self.index{
                 Some(idx) => {idx},
                 None => {return make_internal_json_error::<u32>(ErrorKinds::NotExist(format!("index is None")))}
             };
             info!("QueryParser aquired");
-            self.query_parser = Some(Box::new(QueryParser::for_index(&idx, vec![Field::from_field_id(0)])));
+            let schema = match self.schema.as_ref(){
+                Some(s) => s,
+                None => return make_internal_json_error(ErrorKinds::BadInitialization(format!("schema not available during for_index")))
+            };
+            let request_fields = m.get("fields").ok_or(ErrorKinds::BadParams(format!("fields not present")))?.as_array().ok_or(ErrorKinds::BadParams(format!("fields not present")))?;
+            for v in request_fields{
+                let v_str = v.as_str().unwrap_or_default();
+                match schema.get_field(v_str){
+                    Some(f) => v_out.append(vec![f].as_mut()),
+                    None => {},
+                }
+            }
+            self.query_parser = Some(Box::new(QueryParser::for_index(&idx, v_out)));
         }
         if method == "parse_query"{
             let qp = match &self.query_parser{
