@@ -25,7 +25,6 @@ lazy_static! {
   static ref ERRORS: Mutex<HashMap<String, Vec<String>>> = Mutex::new(HashMap::new());
 }
 
-static mut RETURN_MSG:String = String::new();
 
 
 struct TantivyEntry<'a>{
@@ -39,6 +38,7 @@ struct TantivyEntry<'a>{
     pub(crate) leased_item:Option<Box<LeasedItem<Searcher>>>,
     pub(crate) query_parser:Option<Box<QueryParser>>,
     pub(crate) dyn_q:Option<Box<dyn Query>>,
+    return_buffer:String,
 }
 
 impl<'a> TantivyEntry<'a>{
@@ -54,6 +54,7 @@ impl<'a> TantivyEntry<'a>{
             leased_item:None,
             query_parser:None,
             dyn_q: None,
+            return_buffer:String::new(),
         }
     }
     fn create_index(&mut self, params:serde_json::Value) -> InternalCallResult<Box<tantivy::Index>>{
@@ -167,7 +168,7 @@ impl<'a> TantivyEntry<'a>{
         for (_score, doc_address) in td {
             let retrieved_doc = li.doc(doc_address).unwrap();
             let schema = self.schema.as_ref().unwrap();
-            //unsafe{RETURN_MSG += &format!("{}", schema.to_json(&retrieved_doc));}
+            self.return_buffer += &format!("{}", schema.to_json(&retrieved_doc));
             info!("{} n={} vals={:?}", schema.to_json(&retrieved_doc), retrieved_doc.len(), retrieved_doc.field_values());
         }
         Ok(0)
@@ -320,9 +321,7 @@ impl<'a> TantivyEntry<'a>{
                     },
                 };
                 let v = *self.doc.clone().unwrap();
-                unsafe{
-                RETURN_MSG = json!({"id" : v.len()}).to_string()
-                }
+                self.return_buffer = json!({"document_count" : v.len()}).to_string()
             },
             &_ => {}
         };
@@ -364,7 +363,8 @@ impl<'a> TantivyEntry<'a>{
                     ti = TEXT | STORED
                 }
                 let f = sb.add_text_field(name,ti);
-                info!("field = {:?}", &f);
+                self.return_buffer = json!({"field" : f}).to_string();
+                info!("{}", self.return_buffer);
             },
             "build" => {
                 let sb = match self.builder.take(){
@@ -372,7 +372,8 @@ impl<'a> TantivyEntry<'a>{
                     None => return make_internal_json_error(ErrorKinds::BadInitialization(format!("schema_builder not created")))
                 };
                 let schema:Schema = sb.build();
-                info!("new schema {:?}", schema);
+                self.return_buffer = json!({ "schema" : schema}).to_string();
+                info!("{}", self.return_buffer);
                 self.schema = Some(schema)
             },
             &_ => {}
@@ -424,9 +425,7 @@ impl<'a> TantivyEntry<'a>{
         };
         let _ = &self.doc;
         let _ = &self.builder;
-        unsafe {
-            (RETURN_MSG.as_str().as_ptr() as *const u8, RETURN_MSG.len())
-        }
+            (self.return_buffer.as_ptr() as *const u8, self.return_buffer.len())
     }
 }
 /// Bitcode representation of a incomming client request
