@@ -2,4 +2,5 @@
 Cargo.lock
 /go-client/*.so
 go-client/go-tantivy
+/.vscode
 
