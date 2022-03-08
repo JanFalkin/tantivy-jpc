@@ -230,12 +230,14 @@ impl<'a> TantivyEntry<'a>{
                 let doc_idx = m.get("id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as usize;
                 let docs = *(d);
                 let os = writer.add_document(docs[doc_idx].clone());
-                info!("add document opstamp = {}", os)
+                self.return_buffer = json!({"opstamp": os}).to_string();
+                info!("{}", self.return_buffer);
             },
             "commit" => {
                 match writer.commit(){
                     Ok(x)=>{
-                        info!("commit hash = {}", x);
+                        self.return_buffer = json!({"id": x}).to_string();
+                        info!("{}", self.return_buffer);
                         x
                     },
                     Err(err) => return make_internal_json_error(ErrorKinds::NotFinalized(format!("failed to commit indexwriter, {}", err)))

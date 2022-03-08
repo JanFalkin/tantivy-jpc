@@ -27,10 +27,123 @@ type msi map[string]interface{}
 type JRPCId struct {
 	id string
 }
+type TSearcher struct {
+	*TQueryParser
+}
+
+func (s *TSearcher) Search() (string, error) {
+	return callTantivy(s.JRPCId.id, "searcher", "search", msi{})
+}
+
+type TQueryParser struct {
+	*TIndex
+}
+
+func (qp *TQueryParser) forIndex(fields []string) (uint, error) {
+	_, err := callTantivy(qp.JRPCId.id, "query_parser", "for_index", msi{
+		"fields": fields,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return 0, nil
+}
+
+func (qp *TQueryParser) parseQuery(query string) (*TSearcher, error) {
+	_, err := callTantivy(qp.JRPCId.id, "query_parser", "parse_query", msi{
+		"query": query,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &TSearcher{qp}, nil
+}
+
+type TIndexReader struct {
+	*TIndex
+}
+
+func (idr *TIndexReader) Searcher() (*TQueryParser, error) {
+	_, err := callTantivy(idr.JRPCId.id, "index_reader", "searcher", msi{})
+	if err != nil {
+		return nil, err
+	}
+	return &TQueryParser{idr.TIndex}, nil
+}
+
+type TIndexWriter struct {
+	*TIndex
+}
+
+func (idw *TIndexWriter) Commit() (uint64, error) {
+	s, err := callTantivy(idw.JRPCId.id, "indexwriter", "commit", msi{})
+	if err != nil {
+		return 0, err
+	}
+	var data msi
+	err = json.Unmarshal([]byte(s), &data)
+	if err != nil {
+		panic(err)
+	}
+	c, ok := data["id"]
+	if !ok {
+		return 0, fmt.Errorf("document_count element not found in data %v or data not able to be type asserted to uint", data)
+	}
+	return uint64(c.(float64)), nil
+}
+
+func (idw *TIndexWriter) AddDocument(docid uint) (uint, error) {
+	s, err := callTantivy(idw.JRPCId.id, "indexwriter", "add_document", msi{
+		"id": docid,
+	})
+	if err != nil {
+		return 0, err
+	}
+	var data msi
+	err = json.Unmarshal([]byte(s), &data)
+	if err != nil {
+		panic(err)
+	}
+	c, ok := data["opstamp"]
+	if !ok {
+		return 0, fmt.Errorf("document_count element not found in data %v or data not able to be type asserted to uint", data)
+	}
+	return uint(c.(float64)), nil
+}
+
+type TIndex struct {
+	*JRPCId
+}
+
+func (idx *TIndex) CreateIndexWriter() (*TIndexWriter, error) {
+	return &TIndexWriter{idx}, nil
+}
+
+func (idx *TIndex) ReaderBuilder() (*TIndexReader, error) {
+	_, err := callTantivy(idx.JRPCId.id, "index", "reader_builder", msi{})
+	if err != nil {
+		return nil, err
+	}
+	return &TIndexReader{idx}, nil
+}
 
 type TDocument struct {
 	*JRPCId
 	schema []interface{}
+}
+
+func (td *TDocument) CreateIndex() (*TIndex, error) {
+	tempDir, err := ioutil.TempDir("", "tantivy_idx")
+	if err != nil {
+		panic(err)
+	}
+	_, err = callTantivy(td.JRPCId.id, "index", "create", msi{"directory": tempDir})
+	if err != nil {
+		return nil, err
+	}
+	return &TIndex{
+		JRPCId: &JRPCId{td.JRPCId.id},
+	}, nil
 }
 
 func (td *TDocument) Create() (uint, error) {
@@ -199,30 +312,48 @@ func main() {
 	debris of the winter's flooding; and sycamores with mottled, white, recumbent
 	limbs and branches that arch over the pool`, doc2)
 
-	td, err := ioutil.TempDir("", "tantivy_idx")
+	idx, err := doc.CreateIndex()
 	if err != nil {
 		panic(err)
 	}
-	callTantivy(doc.JRPCId.id, "index", "create", msi{"directory": td})
-	callTantivy(doc.JRPCId.id, "indexwriter", "add_document", msi{
-		"id": 1,
-	})
-	callTantivy(doc.JRPCId.id, "indexwriter", "add_document", msi{
-		"id": 2,
-	})
-	callTantivy(doc.JRPCId.id, "indexwriter", "commit", msi{})
+	idw, err := idx.CreateIndexWriter()
+	if err != nil {
+		panic(err)
+	}
+	opst1, err := idw.AddDocument(doc1)
+	if err != nil {
+		panic(err)
+	}
+	opst2, err := idw.AddDocument(doc2)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("op1 = %v op2 = %v\n", opst1, opst2)
 
-	callTantivy(doc.JRPCId.id, "index", "reader_builder", msi{})
+	idCommit, err := idw.Commit()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("commit id = %v", idCommit)
 
-	callTantivy(doc.JRPCId.id, "index_reader", "searcher", msi{})
+	rb, err := idx.ReaderBuilder()
+	if err != nil {
+		panic(err)
+	}
 
-	callTantivy(doc.JRPCId.id, "query_parser", "for_index", msi{
-		"fields": []string{"title", "body"},
-	})
+	qp, err := rb.Searcher()
+	if err != nil {
+		panic(err)
+	}
 
-	callTantivy(doc.JRPCId.id, "query_parser", "parse_query", msi{
-		"query": "sea ",
-	})
-	callTantivy(doc.JRPCId.id, "searcher", "search", msi{})
+	_, err = qp.forIndex([]string{"title", "body"})
+	if err != nil {
+		panic(err)
+	}
 
+	searcher, err := qp.parseQuery("sea")
+	if err != nil {
+		panic(err)
+	}
+	searcher.Search()
 }
