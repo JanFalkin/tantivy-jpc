@@ -58,6 +58,11 @@ fn main() {
       .to_string();
 
     let output_link_dest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
+      .join(format!("go-client/tantivy/lib{}.so", package_name))
+      .display()
+      .to_string();
+
+    let output_link_dest_primary = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
       .join(format!("go-client/lib{}.so", package_name))
       .display()
       .to_string();
@@ -67,7 +72,15 @@ fn main() {
         Err(err) => println!("link probably doesn't exist {}", err)
     }
 
-    match fs::symlink(output_link_source, output_link_dest){
+    match fs::symlink(&output_link_source, output_link_dest){
+        Ok(_) => {},
+        Err(err) => {panic!("{}", err)}
+    }
+    match std::fs::remove_file(&output_link_dest_primary){
+        Ok(_) => {},
+        Err(err) => println!("link probably doesn't exist {}", err)
+    }
+    match fs::symlink(&output_link_source, &output_link_dest_primary){
         Ok(_) => {},
         Err(err) => {panic!("{}", err)}
     }

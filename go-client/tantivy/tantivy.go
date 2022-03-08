@@ -15,6 +15,10 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+func LibInit() {
+	C.init()
+}
+
 type msi map[string]interface{}
 
 type JRPCId struct {
