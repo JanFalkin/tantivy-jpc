@@ -1,7 +1,7 @@
 package tantivy
 
 /*
-#cgo CFLAGS: -I../../target
+#cgo CFLAGS: -I..
 #cgo LDFLAGS: -ltantivy_jrpc -L..
 #include "tantivy_jrpc.h"
 */

@@ -14,6 +14,11 @@ fn main() {
         .display()
         .to_string();
 
+    let output_secondary_header = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
+        .join(format!("go-client/{}.h", package_name))
+        .display()
+        .to_string();
+
     let config = Config {
         namespace: Some(String::from("ffi")),
         language: Language::C,
@@ -51,6 +56,10 @@ fn main() {
     cbindgen::generate_with_config(&crate_dir, config)
       .unwrap()
       .write_to_file(&output_file);
+    // make a copy for go get
+    if !std::fs::copy(&output_file, &output_secondary_header).is_ok(){
+        panic!("header file copy {} to {} FAILED", &output_file, &output_secondary_header);
+    }
 
     let output_link_source = target_dir()
       .join(format!("{}/lib{}.so", env::var("PROFILE").unwrap_or_else(|_| "release".to_string()), package_name))
