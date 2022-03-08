@@ -26,7 +26,12 @@ This will create a symbolic link inside the go-client directory to assist in lin
 
 ```
 cd go-client
+go test ./...
+
+the same basic sample builds and runs
+
 RUST_LOG=info go run ./...
+
 
 ```
 
