@@ -164,7 +164,6 @@ impl<'a> TantivyEntry<'a>{
             Err(e) => return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {}", e))),
         };
         info!("search complete len = {}, td = {:?}", td.len(), td);
-
         for (_score, doc_address) in td {
             let retrieved_doc = li.doc(doc_address).unwrap();
             let schema = self.schema.as_ref().unwrap();
@@ -573,6 +572,7 @@ pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*
     let (return_val, ret_sz) = entity.do_method(json_params.method, json_params.obj, json_params.params);
     std::ptr::copy(return_val, ret, ret_sz);
     *ret_len = ret_sz;
+    entity.return_buffer.clear();
     0
 }
 #[cfg(test)]
