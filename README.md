@@ -6,7 +6,7 @@
 
 https://go.dev/dl/
 
-## Changing or updating build targets for tantivy_jrpc.so(dll/dynlib)
+## Changing or updating build targets for tantivy_jpc.so(dll/dynlib)
 ### Install Rust
 
 ```
@@ -25,7 +25,7 @@ cargo build
 ### Via go get
 
 ```
-go get github.com/JanFalkin/tantivy_jrpc/go-client/tantivy
+go get github.com/JanFalkin/tantivy_jpc/go-client/tantivy
 
 ```
 
@@ -36,7 +36,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/JanFalkin/tantivy_jrpc/go-client/tantivy"
+	"github.com/JanFalkin/tantivy_jpc/go-client/tantivy"
 )
 
 func main() {

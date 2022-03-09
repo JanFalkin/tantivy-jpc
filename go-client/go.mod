@@ -1,8 +1,8 @@
-module github.com/JanFalkin/tantivy_jrpc/go-client
+module github.com/JanFalkin/tantivy_jpc/go-client
 
 go 1.17
 
-replace github.com/JanFalkin/tantivy_jrpc/go-client/tantivy => ./go-client/tantivy
+replace github.com/JanFalkin/tantivy_jpc/go-client/tantivy => ./go-client/tantivy
 
 require (
 	github.com/satori/go.uuid v1.2.0

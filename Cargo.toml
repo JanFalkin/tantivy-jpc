@@ -1,5 +1,5 @@
 [package]
-name = "tantivy_jrpc"
+name = "tantivy_jpc"
 version = "0.1.0"
 edition = "2021"
 

@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/JanFalkin/tantivy_jrpc/go-client/tantivy"
+	"github.com/JanFalkin/tantivy_jpc/go-client/tantivy"
 )
 
 func main() {

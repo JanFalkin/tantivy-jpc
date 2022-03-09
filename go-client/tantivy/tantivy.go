@@ -4,9 +4,9 @@ package tantivy
 // #cgo darwin,amd64 LDFLAGS: -Wl,-rpath,${SRCDIR}/packaged/lib/darwin-amd64 -L${SRCDIR}/packaged/lib/darwin-amd64
 // #cgo darwin,arm64 LDFLAGS: -Wl,-rpath,${SRCDIR}/packaged/lib/darwin-aarch64 -L${SRCDIR}/packaged/lib/darwin-aarch64
 // #cgo CFLAGS: -I${SRCDIR}/packaged/include
-// #cgo LDFLAGS: -ltantivy_jrpc
+// #cgo LDFLAGS: -ltantivy_jpc
 //
-// #include "tantivy_jrpc.h"
+// #include "tantivy_jpc.h"
 import "C"
 import (
 	"encoding/json"
@@ -23,7 +23,7 @@ func LibInit() {
 
 type msi map[string]interface{}
 
-type JRPCId struct {
+type JPCId struct {
 	id string
 }
 type TSearcher struct {
@@ -31,7 +31,7 @@ type TSearcher struct {
 }
 
 func (s *TSearcher) Search() (string, error) {
-	return callTantivy(s.JRPCId.id, "searcher", "search", msi{})
+	return callTantivy(s.JPCId.id, "searcher", "search", msi{})
 }
 
 type TQueryParser struct {
@@ -39,7 +39,7 @@ type TQueryParser struct {
 }
 
 func (qp *TQueryParser) ForIndex(fields []string) (uint, error) {
-	_, err := callTantivy(qp.JRPCId.id, "query_parser", "for_index", msi{
+	_, err := callTantivy(qp.JPCId.id, "query_parser", "for_index", msi{
 		"fields": fields,
 	})
 	if err != nil {
@@ -49,7 +49,7 @@ func (qp *TQueryParser) ForIndex(fields []string) (uint, error) {
 }
 
 func (qp *TQueryParser) ParseQuery(query string) (*TSearcher, error) {
-	_, err := callTantivy(qp.JRPCId.id, "query_parser", "parse_query", msi{
+	_, err := callTantivy(qp.JPCId.id, "query_parser", "parse_query", msi{
 		"query": query,
 	})
 	if err != nil {
@@ -63,7 +63,7 @@ type TIndexReader struct {
 }
 
 func (idr *TIndexReader) Searcher() (*TQueryParser, error) {
-	_, err := callTantivy(idr.JRPCId.id, "index_reader", "searcher", msi{})
+	_, err := callTantivy(idr.JPCId.id, "index_reader", "searcher", msi{})
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ type TIndexWriter struct {
 }
 
 func (idw *TIndexWriter) Commit() (uint64, error) {
-	s, err := callTantivy(idw.JRPCId.id, "indexwriter", "commit", msi{})
+	s, err := callTantivy(idw.JPCId.id, "indexwriter", "commit", msi{})
 	if err != nil {
 		return 0, err
 	}
@@ -92,7 +92,7 @@ func (idw *TIndexWriter) Commit() (uint64, error) {
 }
 
 func (idw *TIndexWriter) AddDocument(docid uint) (uint, error) {
-	s, err := callTantivy(idw.JRPCId.id, "indexwriter", "add_document", msi{
+	s, err := callTantivy(idw.JPCId.id, "indexwriter", "add_document", msi{
 		"id": docid,
 	})
 	if err != nil {
@@ -111,7 +111,7 @@ func (idw *TIndexWriter) AddDocument(docid uint) (uint, error) {
 }
 
 type TIndex struct {
-	*JRPCId
+	*JPCId
 }
 
 func (idx *TIndex) CreateIndexWriter() (*TIndexWriter, error) {
@@ -119,7 +119,7 @@ func (idx *TIndex) CreateIndexWriter() (*TIndexWriter, error) {
 }
 
 func (idx *TIndex) ReaderBuilder() (*TIndexReader, error) {
-	_, err := callTantivy(idx.JRPCId.id, "index", "reader_builder", msi{})
+	_, err := callTantivy(idx.JPCId.id, "index", "reader_builder", msi{})
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func (idx *TIndex) ReaderBuilder() (*TIndexReader, error) {
 }
 
 type TDocument struct {
-	*JRPCId
+	*JPCId
 	schema []interface{}
 }
 
@@ -136,12 +136,12 @@ func (td *TDocument) CreateIndex() (*TIndex, error) {
 	if err != nil {
 		panic(err)
 	}
-	_, err = callTantivy(td.JRPCId.id, "index", "create", msi{"directory": tempDir})
+	_, err = callTantivy(td.JPCId.id, "index", "create", msi{"directory": tempDir})
 	if err != nil {
 		return nil, err
 	}
 	return &TIndex{
-		JRPCId: &JRPCId{td.JRPCId.id},
+		JPCId: &JPCId{td.JPCId.id},
 	}, nil
 }
 
@@ -166,7 +166,7 @@ func (td *TDocument) AddText(field int, value string, doc_id uint) (int, error) 
 	_, err := callTantivy(td.id, "document", "add_text", msi{
 		"field":  field,
 		"value":  value,
-		"id":     td.JRPCId.id,
+		"id":     td.JPCId.id,
 		"doc_id": doc_id,
 	})
 	if err != nil {
@@ -176,13 +176,13 @@ func (td *TDocument) AddText(field int, value string, doc_id uint) (int, error) 
 }
 
 type TBuilder struct {
-	*JRPCId
+	*JPCId
 }
 
 func NewBuilder() (*TBuilder, error) {
 	u := uuid.NewV4()
 	tb := TBuilder{
-		JRPCId: &JRPCId{
+		JPCId: &JPCId{
 			id: u.String(),
 		},
 	}
@@ -193,7 +193,7 @@ func (td *TBuilder) AddTextField(name string, indexed bool) (int, error) {
 	s, err := callTantivy(td.id, "builder", "add_text_field", msi{
 		"name":  name,
 		"index": indexed,
-		"id":    td.JRPCId.id,
+		"id":    td.JPCId.id,
 	})
 
 	if err != nil {
@@ -217,7 +217,7 @@ func (td *TBuilder) AddTextField(name string, indexed bool) (int, error) {
 }
 
 func (td *TBuilder) Build() (*TDocument, error) {
-	s, err := callTantivy(td.JRPCId.id, "builder", "build", msi{})
+	s, err := callTantivy(td.JPCId.id, "builder", "build", msi{})
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +234,7 @@ func (td *TBuilder) Build() (*TDocument, error) {
 	}
 
 	return &TDocument{
-		JRPCId: &JRPCId{
+		JPCId: &JPCId{
 			id: td.id,
 		},
 		schema: schema.([]interface{}),
