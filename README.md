@@ -6,6 +6,7 @@
 
 https://go.dev/dl/
 
+## Changing or updating build targets for tantivy_jrpc.so(dll/dynlib)
 ### Install Rust
 
 ```
@@ -14,13 +15,10 @@ source $HOME/.cargo/env
 ```
 ## Building
 
-
-### Rust
 ```
 cargo build
 
 ```
-This will create a symbolic link inside the go-client directory to assist in linking the sample
 
 ### Golang
 
