@@ -24,14 +24,14 @@ This will create a symbolic link inside the go-client directory to assist in lin
 
 ### Golang
 
-# Via go get
+### Via go get
 
 ```
 go get github.com/JanFalkin/tantivy_jrpc/go-client/tantivy
 
 ```
 
-# For now
+### For now
 ```
 cd go-client
 go test ./...
