@@ -32,6 +32,10 @@ the same basic sample builds and runs
 
 RUST_LOG=info go run ./...
 
+Finally the package is directly go get-able
+
+go get -v github.com/JanFalkin/tantivy_jrpc/go-client/tantivy
+
 
 ```
 
