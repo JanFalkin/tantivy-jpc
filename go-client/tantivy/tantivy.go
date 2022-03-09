@@ -1,15 +1,12 @@
 package tantivy
 
-/*
-#cgo CFLAGS: -I${SRCDIR}/packaged/include
-#cgo LDFLAGS: -ltantivy_jrpc
-
-#cgo linux,amd64 LDFLAGS: -Wl,-rpath,${SRCDIR}/packaged/lib/linux-amd64 -L${SRCDIR}/packaged/lib/linux-amd64
-#cgo darwin,amd64 LDFLAGS: -Wl,-rpath,${SRCDIR}/packaged/lib/darwin-amd64 -L${SRCDIR}/packaged/lib/darwin-amd64
-#cgo darwin,arm64 LDFLAGS: -Wl,-rpath,${SRCDIR}/packaged/lib/darwin-aarch64 -L${SRCDIR}/packaged/lib/darwin-aarch64
-
-#include "tantivy_jrpc.h"
-*/
+// #cgo linux,amd64 LDFLAGS: -Wl,-rpath,${SRCDIR}/packaged/lib/linux-amd64 -L${SRCDIR}/packaged/lib/linux-amd64
+// #cgo darwin,amd64 LDFLAGS: -Wl,-rpath,${SRCDIR}/packaged/lib/darwin-amd64 -L${SRCDIR}/packaged/lib/darwin-amd64
+// #cgo darwin,arm64 LDFLAGS: -Wl,-rpath,${SRCDIR}/packaged/lib/darwin-aarch64 -L${SRCDIR}/packaged/lib/darwin-aarch64
+// #cgo CFLAGS: -I${SRCDIR}/packaged/include
+// #cgo LDFLAGS: -ltantivy_jrpc
+//
+// #include "tantivy_jrpc.h"
 import "C"
 import (
 	"encoding/json"
