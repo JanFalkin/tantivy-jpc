@@ -73,8 +73,8 @@ impl<'a> TantivyEntry<'a>{
         }.as_str().unwrap_or("");
         if dir_to_use != ""{
             let idx = match tantivy::Index::create_in_dir(dir_to_use, (match self.schema.clone() {
-            Some(s) => s,
-            None => return  make_internal_json_error(ErrorKinds::BadParams(format!("A schema must be created before an index")))
+                Some(s) => s,
+                None => return  make_internal_json_error(ErrorKinds::BadParams(format!("A schema must be created before an index")))
         }).clone()){
                 Ok(p) => p,
                 Err(_) => {
