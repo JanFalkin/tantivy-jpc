@@ -1,13 +1,5 @@
 package main
 
-// #cgo linux,amd64 LDFLAGS: -Wl,-rpath,${SRCDIR}/tantivy/packaged/lib/linux-amd64 -L${SRCDIR}/tantivy/packaged/lib/linux-amd64
-// #cgo darwin,amd64 LDFLAGS: -Wl,-rpath,${SRCDIR}/tantivy/packaged/lib/darwin-amd64 -L${SRCDIR}/tantivy/packaged/lib/darwin-amd64
-// #cgo darwin,arm64 LDFLAGS: -Wl,-rpath,${SRCDIR}/tantivy/packaged/lib/darwin-aarch64 -L${SRCDIR}/tantivy/packaged/lib/darwin-aarch64
-// #cgo CFLAGS: -I${SRCDIR}/tantivy/packaged/include
-// #cgo LDFLAGS: -ltantivy_jrpc
-//
-// #include "tantivy_jrpc.h"
-import "C"
 import (
 	"fmt"
 
@@ -16,7 +8,7 @@ import (
 
 func main() {
 	fmt.Println("Hello World")
-	C.init()
+	tantivy.LibInit()
 	builder, err := tantivy.NewBuilder()
 	if err != nil {
 		panic(err)
