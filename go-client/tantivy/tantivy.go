@@ -26,6 +26,11 @@ type msi map[string]interface{}
 type JPCId struct {
 	id string
 }
+
+func (j *JPCId) ID() string {
+	return j.id
+}
+
 type TSearcher struct {
 	*TQueryParser
 }

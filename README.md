@@ -40,7 +40,6 @@ import (
 )
 
 func main() {
-	fmt.Println("Hello World")
 	tantivy.LibInit()
 	builder, err := tantivy.NewBuilder()
 	if err != nil {
