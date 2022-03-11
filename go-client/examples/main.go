@@ -2,18 +2,24 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 
 	"github.com/JanFalkin/tantivy_jpc/go-client/tantivy"
 )
 
 func main() {
-	fmt.Println("Hello World")
 	tantivy.LibInit()
-	builder, err := tantivy.NewBuilder()
+	td, err := ioutil.TempDir("", "tindex")
+	defer func() {
+		if err == nil {
+			os.RemoveAll(td)
+		}
+	}()
+	builder, err := tantivy.NewBuilder(td)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Here")
 	idxFieldTitle, err := builder.AddTextField("title", false)
 	if err != nil {
 		panic(err)

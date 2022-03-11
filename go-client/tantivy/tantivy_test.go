@@ -2,9 +2,12 @@ package tantivy
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"testing"
 
+	"github.com/eluv-io/log-go"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,7 +20,16 @@ func TestTantivyBasic(t *testing.T) {
 	fmt.Printf("WD = %s", wd)
 	t.Setenv("LD_LIBRARY_PATH", ".")
 	LibInit()
-	builder, err := NewBuilder()
+	td, err := ioutil.TempDir("", "tindex")
+	defer func() {
+		if err == nil {
+			if os.RemoveAll(td) != nil {
+				log.Error("unable to cleanup temp dir", "val", td)
+			}
+		}
+	}()
+	assert.NoError(t, err)
+	builder, err := NewBuilder(td)
 	require.NoError(t, err)
 	idxFieldTitle, err := builder.AddTextField("title", false)
 	require.NoError(t, err)

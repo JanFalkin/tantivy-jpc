@@ -45,7 +45,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Here")
 	idxFieldTitle, err := builder.AddTextField("title", false)
 	if err != nil {
 		panic(err)

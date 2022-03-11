@@ -182,14 +182,16 @@ func (td *TDocument) AddText(field int, value string, doc_id uint) (int, error) 
 
 type TBuilder struct {
 	*JPCId
+	TempDir string
 }
 
-func NewBuilder() (*TBuilder, error) {
+func NewBuilder(td string) (*TBuilder, error) {
 	u := uuid.NewV4()
 	tb := TBuilder{
 		JPCId: &JPCId{
 			id: u.String(),
 		},
+		TempDir: td,
 	}
 	return &tb, nil
 }
