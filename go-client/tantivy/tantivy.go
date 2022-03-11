@@ -12,13 +12,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"sync"
 	"unsafe"
 
 	uuid "github.com/satori/go.uuid"
 )
 
+var doOnce sync.Once
+
 func LibInit() {
-	C.init()
+	doOnce.Do(func() {
+		C.init()
+	})
 }
 
 type msi map[string]interface{}
