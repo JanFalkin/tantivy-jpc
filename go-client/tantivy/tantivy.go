@@ -93,7 +93,7 @@ func (idw *TIndexWriter) Commit() (uint64, error) {
 	var data msi
 	err = json.Unmarshal([]byte(s), &data)
 	if err != nil {
-		panic(err)
+		return 0, err
 	}
 	c, ok := data["id"]
 	if !ok {
@@ -112,7 +112,7 @@ func (idw *TIndexWriter) AddDocument(docid uint) (uint, error) {
 	var data msi
 	err = json.Unmarshal([]byte(s), &data)
 	if err != nil {
-		panic(err)
+		return 0, err
 	}
 	c, ok := data["opstamp"]
 	if !ok {
@@ -143,11 +143,14 @@ type TDocument struct {
 }
 
 func (td *TDocument) CreateIndex() (*TIndex, error) {
-	tempDir, err := ioutil.TempDir("", "tantivy_idx")
-	if err != nil {
-		panic(err)
+	if td.TempDir == "" {
+		tempDir, err := ioutil.TempDir("", "tantivy_idx")
+		if err != nil {
+			return nil, err
+		}
+		td.TempDir = tempDir
 	}
-	_, err = callTantivy(td.JPCId.id, "index", "create", msi{"directory": tempDir})
+	_, err := callTantivy(td.JPCId.id, "index", "create", msi{"directory": td.TempDir})
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +170,7 @@ func (td *TDocument) Create() (uint, error) {
 	var data msi
 	err = json.Unmarshal([]byte(s), &data)
 	if err != nil {
-		panic(err)
+		return 0, err
 	}
 	c, ok := data["document_count"]
 	if !ok {
@@ -219,14 +222,13 @@ func (td *TBuilder) AddTextField(name string, indexed bool) (int, error) {
 	var fieldData msi
 	err = json.Unmarshal([]byte(s), &fieldData)
 	if err != nil {
-		panic(err)
+		return -1, err
 	}
 
 	c, ok := fieldData["field"]
 	if !ok {
 		return 0, fmt.Errorf("field element not found in data %v or data not able to be type asserted to int", fieldData)
 	}
-	fmt.Println("Here3")
 
 	return int(c.(float64)), nil
 }
