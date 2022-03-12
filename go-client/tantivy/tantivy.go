@@ -29,7 +29,8 @@ func LibInit() {
 type msi map[string]interface{}
 
 type JPCId struct {
-	id string
+	id      string
+	TempDir string
 }
 
 func (j *JPCId) ID() string {
@@ -151,7 +152,10 @@ func (td *TDocument) CreateIndex() (*TIndex, error) {
 		return nil, err
 	}
 	return &TIndex{
-		JPCId: &JPCId{td.JPCId.id},
+		JPCId: &JPCId{
+			id:      td.id,
+			TempDir: td.TempDir,
+		},
 	}, nil
 }
 
@@ -187,16 +191,15 @@ func (td *TDocument) AddText(field int, value string, doc_id uint) (int, error) 
 
 type TBuilder struct {
 	*JPCId
-	TempDir string
 }
 
 func NewBuilder(td string) (*TBuilder, error) {
 	u := uuid.NewV4()
 	tb := TBuilder{
 		JPCId: &JPCId{
-			id: u.String(),
+			id:      u.String(),
+			TempDir: td,
 		},
-		TempDir: td,
 	}
 	return &tb, nil
 }
@@ -247,7 +250,8 @@ func (td *TBuilder) Build() (*TDocument, error) {
 
 	return &TDocument{
 		JPCId: &JPCId{
-			id: td.id,
+			id:      td.id,
+			TempDir: td.TempDir,
 		},
 		schema: schema.([]interface{}),
 	}, nil
