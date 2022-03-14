@@ -20,11 +20,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	idxFieldTitle, err := builder.AddTextField("title", false)
+	idxFieldTitle, err := builder.AddTextField("title", tantivy.STRING, false)
 	if err != nil {
 		panic(err)
 	}
-	idxFieldBody, err := builder.AddTextField("body", false)
+	idxFieldBody, err := builder.AddTextField("body", tantivy.TEXT, true)
 	if err != nil {
 		panic(err)
 	}

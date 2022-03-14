@@ -196,6 +196,13 @@ type TBuilder struct {
 	*JPCId
 }
 
+type StorageKind uint
+
+const (
+	STRING StorageKind = 1
+	TEXT               = 2
+)
+
 func NewBuilder(td string) (*TBuilder, error) {
 	u := uuid.NewV4()
 	tb := TBuilder{
@@ -207,11 +214,12 @@ func NewBuilder(td string) (*TBuilder, error) {
 	return &tb, nil
 }
 
-func (td *TBuilder) AddTextField(name string, indexed bool) (int, error) {
+func (td *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool) (int, error) {
 	s, err := callTantivy(td.id, "builder", "add_text_field", msi{
-		"name":  name,
-		"index": indexed,
-		"id":    td.JPCId.id,
+		"name":   name,
+		"type":   fieldType,
+		"stored": true,
+		"id":     td.JPCId.id,
 	})
 
 	if err != nil {

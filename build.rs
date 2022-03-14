@@ -56,7 +56,7 @@ fn main() {
       .unwrap()
       .write_to_file(&output_file);
     // make a copy for go get
-    if !std::fs::copy(&output_file, &output_secondary_header).is_ok(){
+    if std::fs::copy(&output_file, &output_secondary_header).is_err(){
         panic!("header file copy {} to {} FAILED", &output_file, &output_secondary_header);
     }
 

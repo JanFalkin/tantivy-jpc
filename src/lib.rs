@@ -63,7 +63,7 @@ impl<'a> TantivyEntry<'a>{
             let this = (if let Some(m) = params.as_object() {
                 m
             } else {
-                return make_internal_json_error(ErrorKinds::BadParams(format!("invalid parameters pass to Document add_text")));
+                return make_internal_json_error(ErrorKinds::BadParams("invalid parameters pass to Document add_text".to_string()));
             }).get("directory");
             if let Some(x) = this {
                 x
@@ -71,11 +71,11 @@ impl<'a> TantivyEntry<'a>{
                 def_json
             }
         }.as_str().unwrap_or("");
-        if dir_to_use != ""{
-            let idx = match tantivy::Index::create_in_dir(dir_to_use, (match self.schema.clone() {
+        if !dir_to_use.is_empty(){
+            let idx = match tantivy::Index::create_in_dir(dir_to_use, match self.schema.clone() {
                 Some(s) => s,
-                None => return  make_internal_json_error(ErrorKinds::BadParams(format!("A schema must be created before an index")))
-        }).clone()){
+                None => return  make_internal_json_error(ErrorKinds::BadParams("A schema must be created before an index".to_string()))
+             }){
                 Ok(p) => p,
                 Err(_) => {
                     let td = match tempdir::TempDir::new("indexer"){
@@ -83,10 +83,10 @@ impl<'a> TantivyEntry<'a>{
                             tantivy::Index::create_in_dir(tmp, if let Some(s) = self.schema.clone() {
                                 s
                             } else {
-                                return  make_internal_json_error(ErrorKinds::BadInitialization(format!("A schema must be created before an index")));
+                                return  make_internal_json_error(ErrorKinds::BadInitialization("A schema must be created before an index".to_string()));
                             }).unwrap()
                         },
-                        Err(_) => return make_internal_json_error(ErrorKinds::IO(format!("failed to create TempDir")))
+                        Err(_) => return make_internal_json_error(ErrorKinds::IO("failed to create TempDir".to_string()))
                     };
                     td
                 },
@@ -98,7 +98,7 @@ impl<'a> TantivyEntry<'a>{
             info!("Creating index in RAM");
             self.index = Some(Box::new(tantivy::Index::create_in_ram(match self.schema.clone() {
             Some(s) => s,
-            None => return  make_internal_json_error(ErrorKinds::BadInitialization(format!("A schema must be created before an index")))
+            None => return  make_internal_json_error(ErrorKinds::BadInitialization("A schema must be created before an index".to_string()))
         })));
             Ok(self.index.clone().unwrap())
 
@@ -107,21 +107,21 @@ impl<'a> TantivyEntry<'a>{
     fn handle_query_parser(&mut self, method:&str, _obj: &str, params:serde_json::Value)  -> InternalCallResult<u32>{
         let m = match params.as_object(){
             Some(m)=> m,
-            None => return make_internal_json_error::<u32>(ErrorKinds::BadParams(format!("invalid parameters pass to query_parser add_text")))
+            None => return make_internal_json_error::<u32>(ErrorKinds::BadParams("invalid parameters pass to query_parser add_text".to_string()))
         };
         info!("QueryParser");
         if method == "for_index"{
             let mut v_out:Vec<Field> = Vec::<Field>::new();
             let idx = match &self.index{
                 Some(idx) => {idx},
-                None => {return make_internal_json_error::<u32>(ErrorKinds::NotExist(format!("index is None")))}
+                None => {return make_internal_json_error::<u32>(ErrorKinds::NotExist("index is None".to_string()))}
             };
             info!("QueryParser aquired");
             let schema = match self.schema.as_ref(){
                 Some(s) => s,
-                None => return make_internal_json_error(ErrorKinds::BadInitialization(format!("schema not available during for_index")))
+                None => return make_internal_json_error(ErrorKinds::BadInitialization("schema not available during for_index".to_string()))
             };
-            let request_fields = m.get("fields").ok_or(ErrorKinds::BadParams(format!("fields not present")))?.as_array().ok_or(ErrorKinds::BadParams(format!("fields not present")))?;
+            let request_fields = m.get("fields").ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?.as_array().ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?;
             for v in request_fields{
                 let v_str = v.as_str().unwrap_or_default();
                 match schema.get_field(v_str){
@@ -129,19 +129,19 @@ impl<'a> TantivyEntry<'a>{
                     None => {},
                 }
             }
-            self.query_parser = Some(Box::new(QueryParser::for_index(&idx, v_out)));
+            self.query_parser = Some(Box::new(QueryParser::for_index(idx, v_out)));
         }
         if method == "parse_query"{
             let qp = match &self.query_parser{
                 Some(qp) => {qp},
-                None => {return make_internal_json_error::<u32>(ErrorKinds::NotExist(format!("index is None")))}
+                None => {return make_internal_json_error::<u32>(ErrorKinds::NotExist("index is None".to_string()))}
             };
             let query = match m.get("query"){
                 Some(q)=> match q.as_str(){
                     Some(s) => s,
-                    None => return make_internal_json_error::<u32>(ErrorKinds::BadParams(format!("query parameter must be a string")))
+                    None => return make_internal_json_error::<u32>(ErrorKinds::BadParams("query parameter must be a string".to_string()))
                 },
-                None=> {return make_internal_json_error::<u32>(ErrorKinds::BadParams(format!("parameter 'query' missing")))}
+                None=> {return make_internal_json_error::<u32>(ErrorKinds::BadParams("parameter 'query' missing".to_string()))}
             };
             self.dyn_q = match qp.parse_query(query){
                 Ok(qp) => Some(qp),
@@ -157,7 +157,7 @@ impl<'a> TantivyEntry<'a>{
         let query = self.dyn_q.as_ref().unwrap();
         let li = match self.leased_item.as_ref(){
             Some(li) => li,
-            None => return make_internal_json_error(ErrorKinds::NotExist(format!("leased item not found"))),
+            None => return make_internal_json_error(ErrorKinds::NotExist("leased item not found".to_string())),
         };
         let td = match li.search(&*query, &TopDocs::with_limit(10)){
             Ok(td) => td,
@@ -167,7 +167,7 @@ impl<'a> TantivyEntry<'a>{
         for (_score, doc_address) in td {
             let retrieved_doc = li.doc(doc_address).unwrap();
             let schema = self.schema.as_ref().unwrap();
-            self.return_buffer += &format!("{}", schema.to_json(&retrieved_doc));
+            self.return_buffer += &schema.to_json(&retrieved_doc).to_string();
             info!("{} n={} vals={:?}", schema.to_json(&retrieved_doc), retrieved_doc.len(), retrieved_doc.field_values());
         }
         Ok(0)
@@ -207,7 +207,7 @@ impl<'a> TantivyEntry<'a>{
             None => {
                 let bi = match self.index.as_mut().take(){
                     Some(x) => x,
-                    None => return make_internal_json_error(ErrorKinds::BadInitialization(format!("need index created for writer"))),
+                    None => return make_internal_json_error(ErrorKinds::BadInitialization("need index created for writer".to_string())),
                 };
                 self.indexwriter = Some(Box::new((*bi).writer(150000000).unwrap()));
                 self.indexwriter.as_mut().unwrap()
@@ -219,17 +219,17 @@ impl<'a> TantivyEntry<'a>{
                 let d = match doc{
                     Some(x) => x,
                     None => {
-                        return make_internal_json_error(ErrorKinds::NotExist(format!("document needs to be created")))
+                        return make_internal_json_error(ErrorKinds::NotExist("document needs to be created".to_string()))
                     },
                 };
                 let m = match params.as_object(){
                     Some(m)=> m,
-                    None => return make_internal_json_error(ErrorKinds::BadParams(format!("invalid parameters pass to Document add_text")))
+                    None => return make_internal_json_error(ErrorKinds::BadParams("invalid parameters pass to Document add_text".to_string()))
                 };
-                let doc_idx = m.get("id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as usize;
+                let doc_idx = m.get("id").unwrap_or(&json!{0_i32}).as_u64().unwrap_or(0) as usize;
                 let docs = *(d);
                 let os = writer.add_document(docs[doc_idx].clone());
-                self.return_buffer = json!({"opstamp": os}).to_string();
+                self.return_buffer = json!({"opstamp": os.unwrap_or(0)}).to_string();
                 info!("{}", self.return_buffer);
             },
             "commit" => {
@@ -279,12 +279,12 @@ impl<'a> TantivyEntry<'a>{
                         self.doc.as_mut().unwrap()
                     },
                     None => {
-                        return make_internal_json_error(ErrorKinds::BadInitialization(format!("add_text with no doucments created")))
+                        return make_internal_json_error(ErrorKinds::BadInitialization("add_text with no doucments created".to_string()))
                     }
                 };
                 let m = match params.as_object(){
                     Some(m)=> m,
-                    None => return make_internal_json_error(ErrorKinds::BadParams(format!("invalid parameters pass to Document add_text")))
+                    None => return make_internal_json_error(ErrorKinds::BadParams("invalid parameters pass to Document add_text".to_string()))
                 };
                 let doc_idx = m.get("doc_id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as usize;
                 let field_idx = m.get("id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as u32;
@@ -293,13 +293,13 @@ impl<'a> TantivyEntry<'a>{
                 info!("add_text: name = {:?}", m);
                 match m.get("field"){
                     Some(f) => {f.as_i64()},
-                    None => {return make_internal_json_error(ErrorKinds::BadParams(format!("field must contain integer id")))}
+                    None => {return make_internal_json_error(ErrorKinds::BadParams("field must contain integer id".to_string()))}
                 };
                 let field_val = match m.get("value") {
                     Some(v) => {
                         v.as_str().unwrap_or("empty")
                     },
-                    None => {return make_internal_json_error(ErrorKinds::BadInitialization(format!("field text required for document")))}
+                    None => {return make_internal_json_error(ErrorKinds::BadInitialization("field text required for document".to_string()))}
                 };
                 let cur_doc = match x.get_mut(doc_idx){
                     Some(d) => d,
@@ -342,27 +342,44 @@ impl<'a> TantivyEntry<'a>{
 
                 let m = match params.as_object(){
                     Some(x)=> x,
-                    None => return make_internal_json_error(ErrorKinds::BadParams(format!("parameters are not a json object"))),
+                    None => return make_internal_json_error(ErrorKinds::BadParams("parameters are not a json object".to_string())),
                 };
                 let name = match m.get("name"){
                     Some(x) => x.as_str().unwrap(),
-                    None  => return make_internal_json_error(ErrorKinds::BadParams(format!("name param not found"))),
+                    None  => return make_internal_json_error(ErrorKinds::BadParams("name param not found".to_string())),
                 };
-                info!("add_text_field: name = {}", &name);
-                let indexed = match m.get("index"){
+                let field_type = match m.get("type"){
+                    Some(v) => match v.as_u64() {
+                        Some(b) => b,
+                        None => return make_internal_json_error(ErrorKinds::BadParams("field type must be either 1 or 2 for STRING or TEXT".to_string())),
+                    }
+                    None => return make_internal_json_error(ErrorKinds::BadParams("type must be specified".to_string())),
+                };
+                let stored = match m.get("stored"){
                     Some(v) => match v.as_bool() {
                         Some(b) => b,
-                        None => return make_internal_json_error(ErrorKinds::BadParams(format!("index must be a boolean value"))),
+                        None => return make_internal_json_error(ErrorKinds::BadParams("field stored must be true or false".to_string())),
                     }
                     None => false,
                 };
-                let ti: TextOptions;
-                if indexed{
-                    info!("Indexed!!!!!!");
-                    ti = STRING
-                }else {
-                    ti = TEXT | STORED
+                let mut ti: TextOptions;
+                match field_type{
+                    1 => {
+                        info!("Found STRING");
+                        ti = STRING
+                    },
+                    2 => {
+                        info!("Found TEXT");
+                        ti = TEXT
+                    },
+                    _ => {
+                        return make_internal_json_error(ErrorKinds::BadParams("index must be a boolean value".to_string()))
+                    },
+                };
+                if stored{
+                    ti = ti | STORED;
                 }
+                info!("add_text_field: name = {}, field_type = {} stored = {}", &name, &field_type, &stored);
                 let f = sb.add_text_field(name,ti);
                 self.return_buffer = json!({"field" : f}).to_string();
                 info!("{}", self.return_buffer);
@@ -370,7 +387,7 @@ impl<'a> TantivyEntry<'a>{
             "build" => {
                 let sb = match self.builder.take(){
                     Some(x) => x,
-                    None => return make_internal_json_error(ErrorKinds::BadInitialization(format!("schema_builder not created")))
+                    None => return make_internal_json_error(ErrorKinds::BadInitialization("schema_builder not created".to_string()))
                 };
                 let schema:Schema = sb.build();
                 self.return_buffer = json!({ "schema" : schema}).to_string();
@@ -380,7 +397,7 @@ impl<'a> TantivyEntry<'a>{
             &_ => {}
         };
 
-        return Ok(0)
+        Ok(0)
     }
     pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> (*const u8, usize){
         info!("In do_method");
