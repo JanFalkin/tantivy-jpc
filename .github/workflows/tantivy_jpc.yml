@@ -21,4 +21,4 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
     - name: Test Go
-      run: "${GITHUB_WORKSPACE}/.github/run_go.sh
+      run: "${GITHUB_WORKSPACE}/.github/run_go.sh"
