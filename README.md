@@ -12,11 +12,12 @@ https://go.dev/dl/
 ```
 curl https://sh.rustup.rs -sSf | sh -s -- -y
 source $HOME/.cargo/env
+cargo install cargo-post
 ```
 ## Building
 
 ```
-cargo build
+cargo post build --release
 
 ```
 
