@@ -194,6 +194,9 @@ impl<'a> TantivyEntry<'a>{
                 self.index_reader_builder = Some(Box::new(idx.reader_builder()));
                 idx
             },
+            "create" => {
+                idx
+            }
             &_ => {
                 return make_internal_json_error(ErrorKinds::UnRecognizedCommand(format!("unknown method {}", method)))
             }

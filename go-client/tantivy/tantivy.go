@@ -144,7 +144,7 @@ type TDocument struct {
 
 func (td *TDocument) CreateIndex() (*TIndex, error) {
 	if td.TempDir == "" {
-		tempDir, err := ioutil.TempDir("", "tantivy_idx")
+		tempDir, err := ioutil.TempDir("", "tindex*")
 		if err != nil {
 			return nil, err
 		}
