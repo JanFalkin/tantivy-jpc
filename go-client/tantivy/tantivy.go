@@ -225,8 +225,6 @@ func (td *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool
 	if err != nil {
 		return -1, err
 	}
-	fmt.Println("s={}", s)
-
 	var fieldData msi
 	err = json.Unmarshal([]byte(s), &fieldData)
 	if err != nil {

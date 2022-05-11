@@ -597,9 +597,63 @@ pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*
 }
 #[cfg(test)]
 mod tests {
+    use uuid::Uuid;
+
+    use super::*;
+    use serde_json::Map;
+
+    struct FakeContext{
+        pub id:String,
+        pub buf:Vec<u8>,
+        pub ret_len:usize,
+    }
+
+    impl FakeContext {
+        fn new() -> FakeContext{
+            FakeContext{
+                id: Uuid::new_v4().to_string(),
+                buf: vec![0; 5000000],
+                ret_len:0,
+
+            }
+        }
+        fn call_jpc(&mut self, object:String, method:String, params:serde_json::Value)-> i64{
+            let my_ret_ptr = &mut self.ret_len as *mut usize;
+            let call_p = json!({
+                "id":     self.id,
+                "jpc":    "1.0",
+                "obj":    object,
+                "method": method,
+                "params": params,
+            });
+            let sp = call_p.to_string();
+            let ar = sp.as_ptr();
+            let p = self.buf.as_mut_ptr();
+            let r = unsafe{jpc(ar, sp.len(), p, my_ret_ptr)};
+            return r;
+        }
+        fn add_text_field(&mut self, name:String, a_type:i32, stored:bool) -> i32{
+            let j_param = json!({
+                "name":   name,
+                "type":   a_type,
+                "stored": stored,
+                "id":     self.id,
+            });
+            let i = self.call_jpc("builder".to_string(), "add_text_field".to_string(), j_param);
+            assert_eq!(i,0);
+            let mut ret_buf = vec![0;self.ret_len];
+            unsafe{std::ptr::copy(self.buf.as_ptr(), ret_buf.as_mut_ptr(), ret_buf.len())};
+            let m:Map<String, serde_json::Value> = serde_json::from_slice(&ret_buf).unwrap();
+            m["field"].as_i64().unwrap() as i32
+        }
+    }
+
     #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+    fn basic_index() {
+        unsafe{init()};
+        let mut ctx = FakeContext::new();
+        assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
+        assert_eq!(ctx.add_text_field("body".to_string(), 2, true), 1);
+
     }
 }
