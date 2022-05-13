@@ -23,17 +23,16 @@ jobs:
           default: true
           override: true
       - name: Build
-        run: cargo build --release && mv target/release/PROJECT_NAME go-client/tantivy/packaged/lib/linux-amd64/
+        run: cargo build --release && mv target/release/libtantivy_jpc.so go-client/tantivy/packaged/lib/linux-amd64/
       - name: Run tests
         run: cargo test --verbose
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
         with:
-          files: |
-           target/release/PROJECT_NAME
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: update linux binary
+          title: Update libtantivy_jpc.so
+          body: Credit new contributors by updating libtantivy_jpc.so
+          branch: update-linux-binary
   build-mac:
     runs-on: macos-latest
 
@@ -50,13 +49,12 @@ jobs:
           override: true
 
       - name: Build for mac
-        run: cargo build --release && mv target/release/PROJECT_NAME go-client/tantivy/packaged/lib/darwin-amd64/
+        run: cargo build --release && mv target/release/libtantivy_jpc.dylib go-client/tantivy/packaged/lib/darwin-amd64/
 
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
         with:
-          files: |
-            target/release/PROJECT_NAME
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: update darwin binary
+          title: Update libtantivy_jpc.dylib
+          body: Credit new contributors by updating libtantivy_jpc.dylib
+          branch: update-darwin-binary
