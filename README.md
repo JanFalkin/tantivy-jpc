@@ -17,7 +17,7 @@ cargo install cargo-post
 ## Building
 
 ```
-cargo post build --release
+cargo build --release
 
 ```
 

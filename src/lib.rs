@@ -597,7 +597,7 @@ pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*
 }
 #[cfg(test)]
 mod tests {
-    use uuid::Uuid;
+    use uuid::{Uuid};
 
     use super::*;
     use serde_json::Map;
