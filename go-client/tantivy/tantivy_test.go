@@ -20,18 +20,18 @@ func TestTantivyBasic(t *testing.T) {
 	fmt.Printf("WD = %s", wd)
 	t.Setenv("LD_LIBRARY_PATH", ".")
 	LibInit()
-	td, err := ioutil.TempDir("", "tindex")
-	defer func() {
+	td, err := ioutil.TempDir("", "tindex*")
+	defer func(err error) {
 		if err == nil {
 			if os.RemoveAll(td) != nil {
 				log.Error("unable to cleanup temp dir", "val", td)
 			}
 		}
-	}()
+	}(err)
 	assert.NoError(t, err)
 	builder, err := NewBuilder(td)
 	require.NoError(t, err)
-	idxFieldTitle, err := builder.AddTextField("title", STRING, false)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true)
 	require.NoError(t, err)
 	require.EqualValues(t, 0, idxFieldTitle)
 	idxFieldBody, err := builder.AddTextField("body", TEXT, true)
@@ -86,7 +86,7 @@ func TestTantivyBasic(t *testing.T) {
 	_, err = qp.ForIndex([]string{"title", "body"})
 	require.NoError(t, err)
 
-	searcher, err := qp.ParseQuery("sea")
+	searcher, err := qp.ParseQuery("Sea")
 	require.NoError(t, err)
 	s, err := searcher.Search()
 	require.NoError(t, err)

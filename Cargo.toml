@@ -24,4 +24,5 @@ tantivy = "*"
 lazy_static = "*"
 env_logger = "*"
 tempdir = "*"
+uuid = "*"
 
