@@ -33,6 +33,7 @@ jobs:
           title: Update libtantivy_jpc.so
           body: Credit new contributors by updating libtantivy_jpc.so
           branch: update-linux-binary
+          delete-branch: true
           base: master
   build-mac:
     runs-on: macos-latest
@@ -62,4 +63,5 @@ jobs:
           title: Update libtantivy_jpc.dylib
           body: Credit new contributors by updating libtantivy_jpc.dylib
           branch: update-darwin-binary
+          delete-branch: true
           base: master
