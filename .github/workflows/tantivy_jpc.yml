@@ -36,7 +36,7 @@ jobs:
           delete-branch: true
           base: master
   build-mac:
-    runs-on: macos-latest
+    runs-on: macos-11
 
     steps:
       - name: Checkout
