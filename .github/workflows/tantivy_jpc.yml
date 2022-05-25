@@ -34,7 +34,7 @@ jobs:
           body: Credit new contributors by updating libtantivy_jpc.a
           branch: update-linux-binary
           delete-branch: true
-          base: static-lib
+          base: master
   build-mac:
     runs-on: macos-11
 
@@ -64,4 +64,4 @@ jobs:
           body: Credit new contributors by updating libtantivy_jpc.a
           branch: update-darwin-lib
           delete-branch: true
-          base: static-lib
+          base: master
