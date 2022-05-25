@@ -23,15 +23,15 @@ jobs:
           default: true
           override: true
       - name: Build
-        run: cargo build --release && mv target/release/libtantivy_jpc.so go-client/tantivy/packaged/lib/linux-amd64/ && cp -u target/tantivy_jpc.h go-client/tantivy/packaged/include/
+        run: cargo build --release && mv target/release/libtantivy_jpc.a go-client/tantivy/packaged/lib/linux-amd64/ && cp -u target/tantivy_jpc.h go-client/tantivy/packaged/include/
       - name: Run tests
         run: cargo test --verbose
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v4
         with:
           commit-message: update linux binary
-          title: Update libtantivy_jpc.so
-          body: Credit new contributors by updating libtantivy_jpc.so
+          title: Update libtantivy_jpc.a
+          body: Credit new contributors by updating libtantivy_jpc.a
           branch: update-linux-binary
           delete-branch: true
           base: master
@@ -51,7 +51,7 @@ jobs:
           override: true
 
       - name: Build for mac
-        run: cargo build --release && mv target/release/libtantivy_jpc.dylib go-client/tantivy/packaged/lib/darwin-amd64/
+        run: cargo build --release && mv target/release/libtantivy_jpc.a go-client/tantivy/packaged/lib/darwin-amd64/
 
       - name: Run tests
         run: cargo test --verbose
@@ -59,9 +59,9 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v4
         with:
-          commit-message: update darwin binary
-          title: Update libtantivy_jpc.dylib
-          body: Credit new contributors by updating libtantivy_jpc.dylib
-          branch: update-darwin-binary
+          commit-message: update darwin lib
+          title: Update libtantivy_jpc.a
+          body: Credit new contributors by updating libtantivy_jpc.a
+          branch: update-darwin-lib
           delete-branch: true
           base: master
