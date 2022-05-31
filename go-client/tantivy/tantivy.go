@@ -5,6 +5,7 @@ package tantivy
 // #cgo darwin,arm64 LDFLAGS:-L${SRCDIR}/packaged/lib/darwin-aarch64
 // #cgo CFLAGS: -I${SRCDIR}/packaged/include
 // #cgo LDFLAGS: -ltantivy_jpc -lm -ldl
+// #cgo LDFLAGS: -Wl,--allow-multiple-definition
 //
 // #include "tantivy_jpc.h"
 import "C"
