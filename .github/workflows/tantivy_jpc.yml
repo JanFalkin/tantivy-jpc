@@ -65,3 +65,34 @@ jobs:
           branch: update-darwin-lib
           delete-branch: true
           base: master
+
+  build-mac-arm:
+    runs-on: macos-11
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Install latest rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          target: aarch64-apple-darwin
+          default: true
+          override: true
+
+      - name: Build for mac
+        run: cargo build --release && mv target/release/libtantivy_jpc.a go-client/tantivy/packaged/lib/darwin-aarch64/
+
+      - name: Run tests
+        run: cargo test --verbose
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          commit-message: update darwin aarch lib
+          title: Update libtantivy_jpc.a
+          body: Credit new contributors by updating libtantivy_jpc.a
+          branch: update-darwin-aarch-lib
+          delete-branch: true
+          base: master
