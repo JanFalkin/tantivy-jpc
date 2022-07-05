@@ -67,7 +67,7 @@ jobs:
           base: master
 
   build-mac-arm:
-    runs-on: macos-11
+    runs-on: macos-12
 
     steps:
       - name: Checkout
@@ -82,7 +82,7 @@ jobs:
           override: true
 
       - name: Build for mac
-        run: cargo build --release && mv target/release/libtantivy_jpc.a go-client/tantivy/packaged/lib/darwin-aarch64/
+        run: cargo build --release --target aarch64-apple-darwin && mv target/aarch64-apple-darwin/release/libtantivy_jpc.a go-client/tantivy/packaged/lib/darwin-aarch64/
 
       - name: Run tests
         run: cargo test --verbose
