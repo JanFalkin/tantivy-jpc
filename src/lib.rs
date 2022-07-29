@@ -550,7 +550,7 @@ pub unsafe extern "C" fn init() -> u8{
 }
 
 /**
-jpc is the main entry point into a translation layer from Rust to Go for Tantivy
+tantivy_jpc is the main entry point into a translation layer from Rust to Go for Tantivy
 this function will
 # Steps
   * parse the input for the appropriately formatted json
@@ -559,8 +559,8 @@ this function will
 /// # Safety
 ///
 #[no_mangle]
-pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*mut usize) -> i64 {
-  info!("In jpc");
+pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*mut usize) -> i64 {
+  info!("In tantivy_jpc");
   let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)){
       Ok(x) => x,
       Err(err) => {
@@ -604,8 +604,7 @@ pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*
     entity.return_buffer.clear();
     0
 }
-#[cfg(test)]
-mod tests {
+pub mod tests {
     extern crate tempdir;
     use tempdir::TempDir;
     use uuid::{Uuid};
@@ -614,8 +613,8 @@ mod tests {
     use serde_json::Map;
 
 
-    #[derive(Clone)]
-    struct FakeContext{
+    #[derive(Clone, Serialize, Deserialize, Debug)]
+    pub struct FakeContext{
         pub id:String,
         pub buf:Vec<u8>,
         pub ret_len:usize,
@@ -729,7 +728,7 @@ mod tests {
     }
 
     impl FakeContext {
-        fn new() -> FakeContext{
+        pub fn new() -> FakeContext{
             FakeContext{
                 id: Uuid::new_v4().to_string(),
                 buf: vec![0; 5000000],
@@ -749,9 +748,9 @@ mod tests {
             let sp = call_p.to_string();
             let ar = sp.as_ptr();
             let p = self.buf.as_mut_ptr();
-            info!("calling jpc json = {}", call_p);
+            info!("calling tantivy_jpc json = {}", call_p);
             unsafe{
-            jpc(ar, sp.len(), p, my_ret_ptr);
+            tantivy_jpc(ar, sp.len(), p, my_ret_ptr);
             let sl = std::slice::from_raw_parts(p, self.ret_len);
             if do_ret{
                 let v:serde_json::Value = serde_json::from_slice(sl).unwrap();

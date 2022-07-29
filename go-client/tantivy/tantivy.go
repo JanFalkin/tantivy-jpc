@@ -286,7 +286,7 @@ func callTantivy(u, object, method string, params msi) (string, error) {
 	cs := (*C.uchar)(unsafe.Pointer(p))
 	rbl := len(rb)
 	prbl := (*C.ulong)(unsafe.Pointer(&rbl))
-	r := C.jpc(cs, C.ulong(uint64(len(string(b)))), crb, prbl)
+	r := C.tantivy_jpc(cs, C.ulong(uint64(len(string(b)))), crb, prbl)
 	returnData := C.GoString(csrb)
 	fmt.Printf("return value %v \n", r)
 	return returnData, nil
