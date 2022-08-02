@@ -619,7 +619,7 @@ pub mod tests {
         pub buf:Vec<u8>,
         pub ret_len:usize,
     }
-    struct TestDocument{
+    pub struct TestDocument{
         pub     temp_dir:String,
         td:     TempDir,
         ctx:    FakeContext,
@@ -644,20 +644,20 @@ pub mod tests {
     }
 
 
-    struct TestIndex{
+    pub struct TestIndex{
         ctx:    FakeContext,
         temp_dir: String,
     }
 
-    struct TestIndexReader{
+    pub struct TestIndexReader{
         ctx:    FakeContext,
     }
 
-    struct TestQueryParser{
+    pub struct TestQueryParser{
         ctx:    FakeContext,
     }
 
-    struct TestSearcher{
+    pub struct TestSearcher{
         ctx:    FakeContext,
     }
 
@@ -766,7 +766,7 @@ pub mod tests {
             }
         }
         }
-        fn add_text_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
+        pub fn add_text_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
             let j_param = json!({
                 "name":   name,
                 "type":   a_type,
@@ -780,7 +780,7 @@ pub mod tests {
         }
 
 
-        fn build(&mut self)  -> InternalCallResult<TestDocument> {
+        pub fn build(&mut self)  -> InternalCallResult<TestDocument> {
             let td = TempDir::new("TantivyBitcodeTest")?;
             let s = self.call_jpc("builder".to_string(), "build".to_string(), json!({}), false);
             info!("build returned={:?}", s);
