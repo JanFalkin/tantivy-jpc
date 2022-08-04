@@ -612,17 +612,22 @@ pub mod tests {
     use super::*;
     use serde_json::Map;
 
+    pub static mut TEMPDIRS: Vec<TempDir> = vec![];
+
+
 
     #[derive(Clone, Serialize, Deserialize, Debug)]
     pub struct FakeContext{
         pub id:String,
         pub buf:Vec<u8>,
         pub ret_len:usize,
+
     }
+    #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct TestDocument{
         pub     temp_dir:String,
-        td:     TempDir,
-        ctx:    FakeContext,
+        pub ctx:    FakeContext,
+
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -710,7 +715,6 @@ pub mod tests {
 
     impl TestDocument{
         pub fn create(&mut self) -> Result<usize, i32>{
-            let _ = self.td;
             let tdc:TestCreateDocumentResult = serde_json::from_slice(&self.ctx.call_jpc("document".to_string(), "create".to_string(), json!({}), true)).unwrap();
             Ok(tdc.document_count)
         }
@@ -782,12 +786,18 @@ pub mod tests {
 
         pub fn build(&mut self)  -> InternalCallResult<TestDocument> {
             let td = TempDir::new("TantivyBitcodeTest")?;
+            let td_ref:&TempDir;
+            let mut v:Vec<TempDir> = vec![td];
+            unsafe{
+                TEMPDIRS.append(v.as_mut());
+                td_ref = TEMPDIRS.last().unwrap();
+            }
+
             let s = self.call_jpc("builder".to_string(), "build".to_string(), json!({}), false);
             info!("build returned={:?}", s);
             Ok(TestDocument{
                 ctx:self.clone(),
-                temp_dir: td.path().to_owned().to_str().unwrap().to_string(),
-                td:td,
+                temp_dir: td_ref.path().to_owned().to_str().unwrap().to_string(),
             })
         }
     }
