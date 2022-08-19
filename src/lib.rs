@@ -550,7 +550,7 @@ pub unsafe extern "C" fn init() -> u8{
 }
 
 /**
-jpc is the main entry point into a translation layer from Rust to Go for Tantivy
+tantivy_jpc is the main entry point into a translation layer from Rust to Go for Tantivy
 this function will
 # Steps
   * parse the input for the appropriately formatted json
@@ -559,8 +559,8 @@ this function will
 /// # Safety
 ///
 #[no_mangle]
-pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*mut usize) -> i64 {
-  info!("In jpc");
+pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*mut usize) -> i64 {
+  info!("In tantivy_jpc");
   let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)){
       Ok(x) => x,
       Err(err) => {
@@ -604,8 +604,7 @@ pub unsafe extern "C" fn jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*
     entity.return_buffer.clear();
     0
 }
-#[cfg(test)]
-mod tests {
+pub mod tests {
     extern crate tempdir;
     use tempdir::TempDir;
     use uuid::{Uuid};
@@ -613,17 +612,22 @@ mod tests {
     use super::*;
     use serde_json::Map;
 
+    pub static mut TEMPDIRS: Vec<TempDir> = vec![];
 
-    #[derive(Clone)]
-    struct FakeContext{
+
+
+    #[derive(Clone, Serialize, Deserialize, Debug)]
+    pub struct FakeContext{
         pub id:String,
         pub buf:Vec<u8>,
         pub ret_len:usize,
+
     }
-    struct TestDocument{
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    pub struct TestDocument{
         pub     temp_dir:String,
-        td:     TempDir,
-        ctx:    FakeContext,
+        pub ctx:    FakeContext,
+
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -645,20 +649,20 @@ mod tests {
     }
 
 
-    struct TestIndex{
+    pub struct TestIndex{
         ctx:    FakeContext,
         temp_dir: String,
     }
 
-    struct TestIndexReader{
+    pub struct TestIndexReader{
         ctx:    FakeContext,
     }
 
-    struct TestQueryParser{
+    pub struct TestQueryParser{
         ctx:    FakeContext,
     }
 
-    struct TestSearcher{
+    pub struct TestSearcher{
         ctx:    FakeContext,
     }
 
@@ -711,7 +715,6 @@ mod tests {
 
     impl TestDocument{
         pub fn create(&mut self) -> Result<usize, i32>{
-            let _ = self.td;
             let tdc:TestCreateDocumentResult = serde_json::from_slice(&self.ctx.call_jpc("document".to_string(), "create".to_string(), json!({}), true)).unwrap();
             Ok(tdc.document_count)
         }
@@ -729,7 +732,7 @@ mod tests {
     }
 
     impl FakeContext {
-        fn new() -> FakeContext{
+        pub fn new() -> FakeContext{
             FakeContext{
                 id: Uuid::new_v4().to_string(),
                 buf: vec![0; 5000000],
@@ -749,9 +752,9 @@ mod tests {
             let sp = call_p.to_string();
             let ar = sp.as_ptr();
             let p = self.buf.as_mut_ptr();
-            info!("calling jpc json = {}", call_p);
+            info!("calling tantivy_jpc json = {}", call_p);
             unsafe{
-            jpc(ar, sp.len(), p, my_ret_ptr);
+            tantivy_jpc(ar, sp.len(), p, my_ret_ptr);
             let sl = std::slice::from_raw_parts(p, self.ret_len);
             if do_ret{
                 let v:serde_json::Value = serde_json::from_slice(sl).unwrap();
@@ -767,7 +770,7 @@ mod tests {
             }
         }
         }
-        fn add_text_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
+        pub fn add_text_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
             let j_param = json!({
                 "name":   name,
                 "type":   a_type,
@@ -781,14 +784,20 @@ mod tests {
         }
 
 
-        fn build(&mut self)  -> InternalCallResult<TestDocument> {
+        pub fn build(&mut self)  -> InternalCallResult<TestDocument> {
             let td = TempDir::new("TantivyBitcodeTest")?;
+            let td_ref:&TempDir;
+            let mut v:Vec<TempDir> = vec![td];
+            unsafe{
+                TEMPDIRS.append(v.as_mut());
+                td_ref = TEMPDIRS.last().unwrap();
+            }
+
             let s = self.call_jpc("builder".to_string(), "build".to_string(), json!({}), false);
             info!("build returned={:?}", s);
             Ok(TestDocument{
                 ctx:self.clone(),
-                temp_dir: td.path().to_owned().to_str().unwrap().to_string(),
-                td:td,
+                temp_dir: td_ref.path().to_owned().to_str().unwrap().to_string(),
             })
         }
     }
