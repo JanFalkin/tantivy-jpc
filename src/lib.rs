@@ -21,15 +21,17 @@ extern crate thiserror;
 use thiserror::Error;
 
 lazy_static! {
-  static ref TANTIVY_MAP: Mutex<HashMap<String, TantivyEntry<'static>>> = Mutex::new(HashMap::new());
+  static ref TANTIVY_MAP: Mutex<HashMap<String, TantivySession<'static>>> = Mutex::new(HashMap::new());
   static ref ERRORS: Mutex<HashMap<String, Vec<String>>> = Mutex::new(HashMap::new());
 }
 
 
-
-struct TantivyEntry<'a>{
+// TantivySession provides a point of access to all Tantivy functionality on and for an Index.
+// each TantivySession will maintain a given Option for it's lifetime and each will be a unique
+// conversation based on the TantivySession::id.
+struct TantivySession<'a>{
     pub(crate) id:&'a str,
-    pub(crate) doc:Option<Box<Vec<tantivy::Document>>>,
+    pub(crate) doc:Option<Vec<tantivy::Document>>,
     pub(crate) builder:Option<Box<tantivy::schema::SchemaBuilder>>,
     pub(crate) schema:Option<tantivy::schema::Schema>,
     pub(crate) index:Option<Box<tantivy::Index>>,
@@ -41,9 +43,9 @@ struct TantivyEntry<'a>{
     return_buffer:String,
 }
 
-impl<'a> TantivyEntry<'a>{
-    fn new(id:&'a str) -> TantivyEntry<'a>{
-        TantivyEntry{
+impl<'a> TantivySession<'a>{
+    fn new(id:&'a str) -> TantivySession<'a>{
+        TantivySession{
             id,
             doc:None,
             builder:None,
@@ -79,7 +81,7 @@ impl<'a> TantivyEntry<'a>{
                 Ok(p) => p,
                 Err(err) => {
                     info!("error={}\n", err);
-                    let td = match tempdir::TempDir::new("indexer"){
+                    match tempdir::TempDir::new("indexer"){
                         Ok(tmp) => {
                             tantivy::Index::create_in_dir(tmp, if let Some(s) = self.schema.clone() {
                                 s
@@ -88,8 +90,7 @@ impl<'a> TantivyEntry<'a>{
                             }).unwrap()
                         },
                         Err(_) => return make_internal_json_error(ErrorKinds::IO("failed to create TempDir".to_string()))
-                    };
-                    td
+                    }
                 },
             };
             self.index = Some(Box::new(idx));
@@ -125,10 +126,7 @@ impl<'a> TantivyEntry<'a>{
             let request_fields = m.get("fields").ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?.as_array().ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?;
             for v in request_fields{
                 let v_str = v.as_str().unwrap_or_default();
-                match schema.get_field(v_str){
-                    Some(f) => v_out.append(vec![f].as_mut()),
-                    None => {},
-                }
+                if let Some(f) = schema.get_field(v_str) { v_out.append(vec![f].as_mut()) }
             }
             self.query_parser = Some(Box::new(QueryParser::for_index(idx, v_out)));
         }
@@ -160,7 +158,7 @@ impl<'a> TantivyEntry<'a>{
             Some(li) => li,
             None => return make_internal_json_error(ErrorKinds::NotExist("leased item not found".to_string())),
         };
-        let td = match li.search(&*query, &TopDocs::with_limit(10)){
+        let td = match li.search(query, &TopDocs::with_limit(10)){
             Ok(td) => td,
             Err(e) => return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {}", e))),
         };
@@ -231,8 +229,7 @@ impl<'a> TantivyEntry<'a>{
                     None => return make_internal_json_error(ErrorKinds::BadParams("invalid parameters pass to Document add_text".to_string()))
                 };
                 let doc_idx = m.get("id").unwrap_or(&json!{0_i32}).as_u64().unwrap_or(0) as usize;
-                let docs = *(d);
-                let os = writer.add_document(docs[doc_idx].clone());
+                let os = writer.add_document(d[doc_idx].clone());
                 self.return_buffer = json!({"opstamp": os.unwrap_or(0)}).to_string();
                 info!("{}", self.return_buffer);
             },
@@ -279,7 +276,7 @@ impl<'a> TantivyEntry<'a>{
                     Some(x) => {
                         let v = x;
                         v.append(&mut vec![Document::new()]);
-                        self.doc = Some(Box::new((**v).clone()));
+                        self.doc = Some(v.to_vec());
                         self.doc.as_mut().unwrap()
                     },
                     None => {
@@ -313,20 +310,22 @@ impl<'a> TantivyEntry<'a>{
             },
             "create" => {
                 let doc = self.doc.as_mut().take();
+                let length:usize;
                 match doc{
                     Some(x) => {
-                        let mut v = (**x).clone();
+                        let mut v = x.to_vec();
                         v.append(&mut vec![Document::new()]);
-                        self.doc = Some(Box::new(v));
+                        length = v.len();
+                        self.doc = Some(v);
                     },
                     None => {
                         let nd= Document::new();
-                        self.doc = Some(Box::new(vec![nd]));
+                        self.doc = Some(vec![nd]);
+                        length = 1;
                         self.doc.as_mut().unwrap();
                     },
                 };
-                let v = *self.doc.clone().unwrap();
-                self.return_buffer = json!({"document_count" : v.len()}).to_string()
+                self.return_buffer = json!({"document_count" : length}).to_string()
             },
             &_ => {}
         };
@@ -403,6 +402,8 @@ impl<'a> TantivyEntry<'a>{
 
         Ok(0)
     }
+
+    // do_method is a translation from a string json method to an actual call.  All json params are passed
     pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> (*const u8, usize){
         info!("In do_method");
         match obj {
@@ -478,7 +479,8 @@ pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize){
     };
     info!("returning  result = {}", vr);
     let mut t = ERRORS.lock().unwrap();
-    match t.get_mut(id){
+    let mt = t.get_mut(id);
+    match mt{
         Some(errs) => {
             let mut v = vec![err.to_string()];
             errs.append(& mut v)
@@ -581,12 +583,13 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
   };
   info!("Request parsed");
   let mut tm = TANTIVY_MAP.lock().unwrap();
-  let entity:&mut TantivyEntry<'static> = match json_params.obj {
+  let entity:&mut TantivySession<'static> = match json_params.obj {
         "document" | "builder" | "index" | "indexwriter" | "query_parser" | "searcher" | "index_reader" => {
-            match tm.get_mut(json_params.id){
+            let cur_session = tm.get_mut(json_params.id);
+            match cur_session{
                 Some(x) => x,
                 None => {
-                    let te = TantivyEntry::new(json_params.id);
+                    let te = TantivySession::new(json_params.id);
                     tm.insert(json_params.id.to_owned(), te);
                     tm.get_mut(json_params.id).unwrap()
                 },
@@ -729,6 +732,12 @@ pub mod tests {
                 temp_dir:self.temp_dir.clone(),
             })
         }
+    }
+
+    impl Default for FakeContext {
+       fn default() -> Self {
+            Self::new()
+       }
     }
 
     impl FakeContext {
