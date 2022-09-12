@@ -10,7 +10,7 @@ use tantivy::collector::TopDocs;
 use std::str;
 use std::collections::HashMap;
 use tantivy::Document;
-use tantivy::schema::{Field, TextOptions, Schema, SchemaBuilder, STRING, TEXT, STORED};
+use tantivy::schema::{Field, TextOptions, Schema, SchemaBuilder, STRING, TEXT, STORED, NumericOptions};
 use tantivy::{LeasedItem, Searcher};
 use tantivy::query::{Query, QueryParser};
 
@@ -331,6 +331,33 @@ impl<'a> TantivySession<'a>{
         };
         Ok(0)
     }
+
+    fn extract_params(params:serde_json::Value) -> InternalCallResult<(String,u64,bool)>{
+        let m = match params.as_object(){
+            Some(x)=> x,
+            None => return make_internal_json_error(ErrorKinds::BadParams("parameters are not a json object".to_string())),
+        };
+        let name = match m.get("name"){
+            Some(x) => x.as_str().unwrap(),
+            None  => return make_internal_json_error(ErrorKinds::BadParams("name param not found".to_string())),
+        };
+        let field_type = match m.get("type"){
+            Some(v) => match v.as_u64() {
+                Some(b) => b,
+                None => return make_internal_json_error(ErrorKinds::BadParams("field type must be either 1 or 2 for STRING or TEXT".to_string())),
+            }
+            None => return make_internal_json_error(ErrorKinds::BadParams("type must be specified".to_string())),
+        };
+        let stored = match m.get("stored"){
+            Some(v) => match v.as_bool() {
+                Some(b) => b,
+                None => return make_internal_json_error(ErrorKinds::BadParams("field stored must be true or false".to_string())),
+            }
+            None => false,
+        };
+        Ok((name.to_string(), field_type, stored))
+
+    }
     fn handler_builder(&mut self, method:&str, _obj: &str, params:serde_json::Value)  -> InternalCallResult<u32>{
         info!("SchemaBuilder");
         let sb = match &mut self.builder{
@@ -342,29 +369,8 @@ impl<'a> TantivySession<'a>{
         };
         match method {
             "add_text_field" => {
+                let (name, field_type, stored) = Self::extract_params(params)?;
 
-                let m = match params.as_object(){
-                    Some(x)=> x,
-                    None => return make_internal_json_error(ErrorKinds::BadParams("parameters are not a json object".to_string())),
-                };
-                let name = match m.get("name"){
-                    Some(x) => x.as_str().unwrap(),
-                    None  => return make_internal_json_error(ErrorKinds::BadParams("name param not found".to_string())),
-                };
-                let field_type = match m.get("type"){
-                    Some(v) => match v.as_u64() {
-                        Some(b) => b,
-                        None => return make_internal_json_error(ErrorKinds::BadParams("field type must be either 1 or 2 for STRING or TEXT".to_string())),
-                    }
-                    None => return make_internal_json_error(ErrorKinds::BadParams("type must be specified".to_string())),
-                };
-                let stored = match m.get("stored"){
-                    Some(v) => match v.as_bool() {
-                        Some(b) => b,
-                        None => return make_internal_json_error(ErrorKinds::BadParams("field stored must be true or false".to_string())),
-                    }
-                    None => false,
-                };
                 let mut ti: TextOptions;
                 match field_type{
                     1 => {
@@ -383,7 +389,51 @@ impl<'a> TantivySession<'a>{
                     ti = ti | STORED;
                 }
                 info!("add_text_field: name = {}, field_type = {} stored = {}", &name, &field_type, &stored);
-                let f = sb.add_text_field(name,ti);
+                let f = sb.add_text_field(&name,ti);
+                self.return_buffer = json!({"field" : f}).to_string();
+                info!("{}", self.return_buffer);
+            },
+            "add_date_field" => {
+                let (name, _field_type, stored) = Self::extract_params(params)?;
+                let mut ni: NumericOptions = NumericOptions::default();
+                if stored{
+                    ni = ni.set_stored();
+                }
+                info!("add_date_field: name = {}, field_type = {} stored = {}", &name, &_field_type, &stored);
+                let f = sb.add_date_field(&name,ni);
+                self.return_buffer = json!({"field" : f}).to_string();
+                info!("{}", self.return_buffer);
+            },
+            "add_u64_field" => {
+                let (name, _field_type, stored) = Self::extract_params(params)?;
+                let mut ni: NumericOptions = NumericOptions::default();
+                if stored{
+                    ni = ni.set_stored();
+                }
+                info!("add_u64_field: name = {}, field_type = {} stored = {}", &name, &_field_type, &stored);
+                let f = sb.add_u64_field(&name,ni);
+                self.return_buffer = json!({"field" : f}).to_string();
+                info!("{}", self.return_buffer);
+            },
+            "add_i64_field" => {
+                let (name, _field_type, stored) = Self::extract_params(params)?;
+                let mut ni: NumericOptions = NumericOptions::default();
+                if stored{
+                    ni = ni.set_stored();
+                }
+                info!("add_i64_field: name = {}, field_type = {} stored = {}", &name, &_field_type, &stored);
+                let f = sb.add_i64_field(&name,ni);
+                self.return_buffer = json!({"field" : f}).to_string();
+                info!("{}", self.return_buffer);
+            },
+            "add_f64_field" => {
+                let (name, _field_type, stored) = Self::extract_params(params)?;
+                let mut ni: NumericOptions = NumericOptions::default();
+                if stored{
+                    ni = ni.set_stored();
+                }
+                info!("add_f64_field: name = {}, field_type = {} stored = {}", &name, &_field_type, &stored);
+                let f = sb.add_f64_field(&name,ni);
                 self.return_buffer = json!({"field" : f}).to_string();
                 info!("{}", self.return_buffer);
             },

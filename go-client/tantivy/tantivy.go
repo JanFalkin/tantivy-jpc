@@ -215,14 +215,7 @@ func NewBuilder(td string) (*TBuilder, error) {
 	return &tb, nil
 }
 
-func (td *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool) (int, error) {
-	s, err := callTantivy(td.id, "builder", "add_text_field", msi{
-		"name":   name,
-		"type":   fieldType,
-		"stored": true,
-		"id":     td.JPCId.id,
-	})
-
+func (td *TBuilder) standardReturnHandler(s string, err error) (int, error) {
 	if err != nil {
 		return -1, err
 	}
@@ -238,6 +231,62 @@ func (td *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool
 	}
 
 	return int(c.(float64)), nil
+
+}
+
+func (td *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool) (int, error) {
+	s, err := callTantivy(td.id, "builder", "add_text_field", msi{
+		"name":   name,
+		"type":   fieldType,
+		"stored": true,
+		"id":     td.JPCId.id,
+	})
+	return td.standardReturnHandler(s, err)
+
+}
+
+func (td *TBuilder) AddDateField(name string, fieldType StorageKind, stored bool) (int, error) {
+	s, err := callTantivy(td.id, "builder", "add_date_field", msi{
+		"name":   name,
+		"type":   fieldType,
+		"stored": true,
+		"id":     td.JPCId.id,
+	})
+
+	return td.standardReturnHandler(s, err)
+}
+
+func (td *TBuilder) AddU64Field(name string, fieldType StorageKind, stored bool) (int, error) {
+	s, err := callTantivy(td.id, "builder", "add_u64_field", msi{
+		"name":   name,
+		"type":   fieldType,
+		"stored": true,
+		"id":     td.JPCId.id,
+	})
+
+	return td.standardReturnHandler(s, err)
+}
+
+func (td *TBuilder) AddI64Field(name string, fieldType StorageKind, stored bool) (int, error) {
+	s, err := callTantivy(td.id, "builder", "add_i64_field", msi{
+		"name":   name,
+		"type":   fieldType,
+		"stored": true,
+		"id":     td.JPCId.id,
+	})
+
+	return td.standardReturnHandler(s, err)
+}
+
+func (td *TBuilder) AddF64Field(name string, fieldType StorageKind, stored bool) (int, error) {
+	s, err := callTantivy(td.id, "builder", "add_f64_field", msi{
+		"name":   name,
+		"type":   fieldType,
+		"stored": true,
+		"id":     td.JPCId.id,
+	})
+
+	return td.standardReturnHandler(s, err)
 }
 
 func (td *TBuilder) Build() (*TDocument, error) {
