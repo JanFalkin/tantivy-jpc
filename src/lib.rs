@@ -74,7 +74,8 @@ impl<'a> TantivySession<'a>{
             }
         }.as_str().unwrap_or("");
         if !dir_to_use.is_empty(){
-            let idx = match tantivy::Index::create_in_dir(dir_to_use, match self.schema.clone() {
+            let mdir = tantivy::directory::MmapDirectory::open(dir_to_use)?;
+            let idx = match tantivy::Index::open_or_create(mdir, match self.schema.clone() {
                 Some(s) => s,
                 None => return  make_internal_json_error(ErrorKinds::BadParams("A schema must be created before an index".to_string()))
              }){
@@ -584,6 +585,12 @@ impl From<std::str::Utf8Error> for ErrorKinds {
 
 impl From<std::io::Error> for ErrorKinds {
     fn from(e:std::io::Error) -> Self{
+        ErrorKinds::IO(e.to_string())
+    }
+}
+
+impl From<tantivy::directory::error::OpenDirectoryError> for ErrorKinds {
+    fn from(e:tantivy::directory::error::OpenDirectoryError) -> Self{
         ErrorKinds::IO(e.to_string())
     }
 }
