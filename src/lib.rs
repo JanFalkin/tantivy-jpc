@@ -25,6 +25,20 @@ lazy_static! {
   static ref ERRORS: Mutex<HashMap<String, Vec<String>>> = Mutex::new(HashMap::new());
 }
 
+macro_rules! impl_simple_type {
+    () => {};
+    ($self:ident, $handler_params:ident, $handler_obj:ident, $handler_func:ident) => {
+        let (name, _field_type, stored) = Self::extract_params($handler_params)?;
+        let mut ni: NumericOptions = NumericOptions::default();
+        if stored{
+            ni = ni.set_stored();
+        }
+        info!("add_date_field: name = {}, field_type = {} stored = {}", &name, &_field_type, &stored);
+        let f = $handler_obj.$handler_func(&name,ni);
+        $self.return_buffer = json!({"field" : f}).to_string();
+        info!("{}", $self.return_buffer);
+    }
+ }
 
 // TantivySession provides a point of access to all Tantivy functionality on and for an Index.
 // each TantivySession will maintain a given Option for it's lifetime and each will be a unique
@@ -395,48 +409,16 @@ impl<'a> TantivySession<'a>{
                 info!("{}", self.return_buffer);
             },
             "add_date_field" => {
-                let (name, _field_type, stored) = Self::extract_params(params)?;
-                let mut ni: NumericOptions = NumericOptions::default();
-                if stored{
-                    ni = ni.set_stored();
-                }
-                info!("add_date_field: name = {}, field_type = {} stored = {}", &name, &_field_type, &stored);
-                let f = sb.add_date_field(&name,ni);
-                self.return_buffer = json!({"field" : f}).to_string();
-                info!("{}", self.return_buffer);
+                impl_simple_type!(self, params, sb, add_date_field);
             },
             "add_u64_field" => {
-                let (name, _field_type, stored) = Self::extract_params(params)?;
-                let mut ni: NumericOptions = NumericOptions::default();
-                if stored{
-                    ni = ni.set_stored();
-                }
-                info!("add_u64_field: name = {}, field_type = {} stored = {}", &name, &_field_type, &stored);
-                let f = sb.add_u64_field(&name,ni);
-                self.return_buffer = json!({"field" : f}).to_string();
-                info!("{}", self.return_buffer);
+                impl_simple_type!(self, params, sb, add_u64_field);
             },
             "add_i64_field" => {
-                let (name, _field_type, stored) = Self::extract_params(params)?;
-                let mut ni: NumericOptions = NumericOptions::default();
-                if stored{
-                    ni = ni.set_stored();
-                }
-                info!("add_i64_field: name = {}, field_type = {} stored = {}", &name, &_field_type, &stored);
-                let f = sb.add_i64_field(&name,ni);
-                self.return_buffer = json!({"field" : f}).to_string();
-                info!("{}", self.return_buffer);
+                impl_simple_type!(self, params, sb, add_i64_field);
             },
             "add_f64_field" => {
-                let (name, _field_type, stored) = Self::extract_params(params)?;
-                let mut ni: NumericOptions = NumericOptions::default();
-                if stored{
-                    ni = ni.set_stored();
-                }
-                info!("add_f64_field: name = {}, field_type = {} stored = {}", &name, &_field_type, &stored);
-                let f = sb.add_f64_field(&name,ni);
-                self.return_buffer = json!({"field" : f}).to_string();
-                info!("{}", self.return_buffer);
+                impl_simple_type!(self, params, sb, add_f64_field);
             },
             "build" => {
                 let sb = match self.builder.take(){
@@ -604,8 +586,10 @@ pub type InternalCallResult<T> = std::result::Result<T, ErrorKinds>;
 ///
 #[no_mangle]
 pub unsafe extern "C" fn init() -> u8{
-    env_logger::init();
-    0
+    if let Ok(_res) = env_logger::try_init() {
+        return 0;
+    }
+    1
 }
 
 /**
@@ -673,6 +657,18 @@ pub mod tests {
     use serde_json::Map;
 
     pub static mut TEMPDIRS: Vec<TempDir> = vec![];
+
+    macro_rules! call_simple_type {
+        //() => {};
+        ($self:ident, $j_param:ident, $method:literal) => {
+            {
+                let v = &$self.call_jpc("builder".to_string(), $method.to_string(), $j_param, true);
+                let temp_map:serde_json::Value = serde_json::from_slice(v).unwrap();
+                temp_map["field"].as_i64().unwrap()
+            }
+        }
+     }
+
 
 
 
@@ -849,7 +845,42 @@ pub mod tests {
             i["field"].as_i64().unwrap()
         }
 
-
+        pub fn add_date_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
+            let j_param = json!({
+                "name":   name,
+                "type":   a_type,
+                "stored": stored,
+                "id":     self.id,
+            });
+            call_simple_type!(self, j_param, "add_date_field")
+        }
+        pub fn add_i64_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
+            let j_param = json!({
+                "name":   name,
+                "type":   a_type,
+                "stored": stored,
+                "id":     self.id,
+            });
+            call_simple_type!(self, j_param, "add_i64_field")
+        }
+        pub fn add_u64_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
+            let j_param = json!({
+                "name":   name,
+                "type":   a_type,
+                "stored": stored,
+                "id":     self.id,
+            });
+            call_simple_type!(self, j_param, "add_u64_field")
+        }
+        pub fn add_f64_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
+            let j_param = json!({
+                "name":   name,
+                "type":   a_type,
+                "stored": stored,
+                "id":     self.id,
+            });
+            call_simple_type!(self, j_param, "add_f64_field")
+        }
         pub fn build(&mut self)  -> InternalCallResult<TestDocument> {
             let td = TempDir::new("TantivyBitcodeTest")?;
             let td_ref:&TempDir;
@@ -913,5 +944,17 @@ pub mod tests {
         let sres = &searcher.search().unwrap();
         let title_result:TestTitleResult = serde_json::from_str(sres).unwrap();
         assert_eq!(title_result.title[0], "The Old Man and the Sea".to_string());
+    }
+
+    #[test]
+    fn all_simple_fields(){
+        unsafe{init()};
+        let mut ctx = FakeContext::new();
+        assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
+        assert_eq!(ctx.add_text_field("body".to_string(), 2, true), 1);
+        assert_eq!(ctx.add_date_field("date".to_string(), 2, true), 2);
+        assert_eq!(ctx.add_u64_field("someu64".to_string(), 2, true), 3);
+        assert_eq!(ctx.add_i64_field("somei64".to_string(), 2, true), 4);
+        assert_eq!(ctx.add_f64_field("somef64".to_string(), 2, true), 5);
     }
 }
