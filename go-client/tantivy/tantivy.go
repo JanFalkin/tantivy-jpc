@@ -12,10 +12,10 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"sync"
 	"unsafe"
 
+	"github.com/eluv-io/errors-go"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -144,16 +144,14 @@ type TDocument struct {
 }
 
 func (td *TDocument) CreateIndex() (*TIndex, error) {
+	e := errors.Template("TDocument.CreateIndex", errors.K.Invalid, "TempDir", td.TempDir)
+
 	if td.TempDir == "" {
-		tempDir, err := ioutil.TempDir("", "tindex*")
-		if err != nil {
-			return nil, err
-		}
-		td.TempDir = tempDir
+		return nil, e("reason", "TempDir is empty")
 	}
 	_, err := callTantivy(td.JPCId.id, "index", "create", msi{"directory": td.TempDir})
 	if err != nil {
-		return nil, err
+		return nil, e(err, "reason", "index create failed")
 	}
 	return &TIndex{
 		JPCId: &JPCId{
@@ -213,6 +211,24 @@ func NewBuilder(td string) (*TBuilder, error) {
 		},
 	}
 	return &tb, nil
+}
+
+func (td *TBuilder) CreateIndex() (*TIndex, error) {
+	e := errors.Template("TBuilder.CreateIndex", errors.K.Invalid, "TempDir", td.TempDir)
+
+	if td.TempDir == "" {
+		return nil, e("reason", "TempDir is empty")
+	}
+	_, err := callTantivy(td.JPCId.id, "index", "create", msi{"directory": td.TempDir})
+	if err != nil {
+		return nil, e(err, "reason", "index create failed")
+	}
+	return &TIndex{
+		JPCId: &JPCId{
+			id:      td.id,
+			TempDir: td.TempDir,
+		},
+	}, nil
 }
 
 func (td *TBuilder) standardReturnHandler(s string, err error) (int, error) {
