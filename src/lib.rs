@@ -168,7 +168,12 @@ impl<'a> TantivySession<'a>{
     }
     fn handle_searcher(&mut self, _method:&str, _obj: &str, _params:serde_json::Value)  -> InternalCallResult<u32>{
         info!("Searcher");
-        let query = self.dyn_q.as_ref().unwrap();
+        let query = match self.dyn_q.as_ref(){
+            Some(dq) => dq,
+            None => {
+                return make_internal_json_error(ErrorKinds::NotExist("dyn query not created".to_string()));
+            }
+        };
         let li = match self.leased_item.as_ref(){
             Some(li) => li,
             None => return make_internal_json_error(ErrorKinds::NotExist("leased item not found".to_string())),
@@ -945,6 +950,35 @@ pub mod tests {
         let title_result:TestTitleResult = serde_json::from_str(sres).unwrap();
         assert_eq!(title_result.title[0], "The Old Man and the Sea".to_string());
     }
+    // #[test]
+    // fn from_existing(){
+    //     let mut sess = TantivySession::new("test");
+    //     match sess.handler_builder("add_text_field", "", json!({
+    //         "name":   "title",
+    //         "type":   2,
+    //         "stored": true,
+    //     })){
+    //         Ok(x) => x,
+    //         Err(e) => panic!("error={}",e),
+    //     };
+    //     match sess.handler_builder("add_text_field", "", json!({
+    //         "name":   "body",
+    //         "type":   2,
+    //         "stored": true,
+    //     })){
+    //         Ok(x) => x,
+    //         Err(e) => panic!("error={}",e),
+    //     };
+    //     match sess.handler_builder("build", "", json!({})){
+    //         Ok(x) => x,
+    //         Err(e) => panic!("error={}",e),
+    //     };
+    //     let idxO = sess.create_index(json!({"directory" : "/tmp/llvm_working_dir/140c52d6-c1a0-4e86-8422-b577a65aa7b0/hqp_JWSQEhKs5tEtc9kAPBrtKfrB3AVVc6omW8VcXgvr3p6hFbas"}));
+    //     let idx = match idxO{
+    //         Ok(i) => i,
+    //         Err(e) => panic!("error={}",e),
+    //     };
+    // }
 
     #[test]
     fn all_simple_fields(){
