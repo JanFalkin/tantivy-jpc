@@ -14,21 +14,7 @@ import (
 const resultSet1 = `{"title":["The Old Man and the Sea","He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."]}`
 const resultSet2 = `{"title":["Of Mice and Men","A few miles south of Soledad, the Salinas River drops in close to the hillside\n\tbank and runs deep and green. The water is warm too, for it has slipped twinkling\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve up to the strong and rocky\n\tGabilan Mountains, but on the valley side the water is lined with trees—willows\n\tfresh and green with every spring, carrying in their lower leaf junctures the\n\tdebris of the winter's flooding; and sycamores with mottled, white, recumbent\n\tlimbs and branches that arch over the pool"]}`
 
-func TestTantivyBasic(t *testing.T) {
-	wd, err := os.Getwd()
-	require.NoError(t, err)
-	fmt.Printf("WD = %s", wd)
-	t.Setenv("LD_LIBRARY_PATH", ".")
-	LibInit()
-	td, err := ioutil.TempDir("", "tindex*")
-	defer func(err error) {
-		if err == nil {
-			if os.RemoveAll(td) != nil {
-				log.Error("unable to cleanup temp dir", "val", td)
-			}
-		}
-	}(err)
-	assert.NoError(t, err)
+func makeIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	builder, err := NewBuilder(td)
 	require.NoError(t, err)
 	idxFieldTitle, err := builder.AddTextField("title", TEXT, true)
@@ -63,20 +49,24 @@ func TestTantivyBasic(t *testing.T) {
 
 	idx, err := doc.CreateIndex()
 	require.NoError(t, err)
-	idw, err := idx.CreateIndexWriter()
-	require.NoError(t, err)
-	opst1, err := idw.AddDocument(doc1)
-	require.NoError(t, err)
-	require.EqualValues(t, 0, opst1)
-	opst2, err := idw.AddDocument(doc2)
-	require.NoError(t, err)
-	require.EqualValues(t, 1, opst2)
-	fmt.Printf("op1 = %v op2 = %v\n", opst1, opst2)
+	if !useExisting {
+		idw, err := idx.CreateIndexWriter()
+		require.NoError(t, err)
+		opst1, err := idw.AddDocument(doc1)
+		require.NoError(t, err)
+		require.EqualValues(t, 0, opst1)
+		opst2, err := idw.AddDocument(doc2)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, opst2)
+		fmt.Printf("op1 = %v op2 = %v\n", opst1, opst2)
+		idCommit, err := idw.Commit()
+		require.NoError(t, err)
+		fmt.Printf("commit id = %v", idCommit)
+	}
+	return idx
+}
 
-	idCommit, err := idw.Commit()
-	require.NoError(t, err)
-	fmt.Printf("commit id = %v", idCommit)
-
+func testExpectedIndex(t *testing.T, idx *TIndex) {
 	rb, err := idx.ReaderBuilder()
 	require.NoError(t, err)
 
@@ -97,4 +87,43 @@ func TestTantivyBasic(t *testing.T) {
 	s, err = searcherAgain.Search()
 	require.NoError(t, err)
 	require.EqualValues(t, resultSet2, s)
+}
+func TestTantivyBasic(t *testing.T) {
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+	fmt.Printf("WD = %s", wd)
+	t.Setenv("LD_LIBRARY_PATH", ".")
+	LibInit()
+	td, err := ioutil.TempDir("", "tindex*")
+	defer func(err error) {
+		if err == nil {
+			if os.RemoveAll(td) != nil {
+				log.Error("unable to cleanup temp dir", "val", td)
+			}
+		}
+	}(err)
+	assert.NoError(t, err)
+	idx := makeIndex(t, td, false)
+	testExpectedIndex(t, idx)
+}
+
+func TestTantivyIndexReuse(t *testing.T) {
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+	fmt.Printf("WD = %s", wd)
+	t.Setenv("LD_LIBRARY_PATH", ".")
+	LibInit()
+	td, err := ioutil.TempDir("", "tindex*")
+	defer func(err error) {
+		if err == nil {
+			if os.RemoveAll(td) != nil {
+				log.Error("unable to cleanup temp dir", "val", td)
+			}
+		}
+	}(err)
+	assert.NoError(t, err)
+	_ = makeIndex(t, td, false)
+
+	idx := makeIndex(t, td, true)
+	testExpectedIndex(t, idx)
 }
