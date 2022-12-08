@@ -36,21 +36,29 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 
 	"github.com/JanFalkin/tantivy_jpc/go-client/tantivy"
 )
 
 func main() {
 	tantivy.LibInit()
-	builder, err := tantivy.NewBuilder()
+	td, err := ioutil.TempDir("", "tindex")
+	defer func() {
+		if err == nil {
+			os.RemoveAll(td)
+		}
+	}()
+	builder, err := tantivy.NewBuilder(td)
 	if err != nil {
 		panic(err)
 	}
-	idxFieldTitle, err := builder.AddTextField("title", false)
+	idxFieldTitle, err := builder.AddTextField("title", tantivy.STRING, false)
 	if err != nil {
 		panic(err)
 	}
-	idxFieldBody, err := builder.AddTextField("body", false)
+	idxFieldBody, err := builder.AddTextField("body", tantivy.TEXT, true)
 	if err != nil {
 		panic(err)
 	}
@@ -131,7 +139,8 @@ func main() {
 	searcherAgain.Search()
 
 }
-````
+
+```
 
 
 ```
