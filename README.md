@@ -42,6 +42,16 @@ import (
 	"github.com/JanFalkin/tantivy_jpc/go-client/tantivy"
 )
 
+const ofMiceAndMen = `A few miles south of Soledad, the Salinas River drops in close to the hillside
+bank and runs deep and green. The water is warm too, for it has slipped twinkling
+over the yellow sands in the sunlight before reaching the narrow pool. On one
+side of the river the golden foothill slopes curve up to the strong and rocky
+Gabilan Mountains, but on the valley side the water is lined with trees—willows
+fresh and green with every spring, carrying in their lower leaf junctures the
+debris of the winter's flooding; and sycamores with mottled, white, recumbent
+limbs and branches that arch over the pool`
+const oldMan = "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."
+
 func main() {
 	tantivy.LibInit()
 	td, err := ioutil.TempDir("", "tindex")
@@ -54,7 +64,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	idxFieldTitle, err := builder.AddTextField("title", tantivy.STRING, false)
+	idxFieldTitle, err := builder.AddTextField("title", tantivy.TEXT, true)
 	if err != nil {
 		panic(err)
 	}
@@ -76,16 +86,9 @@ func main() {
 		panic(err)
 	}
 	doc.AddText(idxFieldTitle, "The Old Man and the Sea", doc1)
-	doc.AddText(idxFieldBody, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish.", doc1)
+	doc.AddText(idxFieldBody, oldMan, doc1)
 	doc.AddText(idxFieldTitle, "Of Mice and Men", doc2)
-	doc.AddText(idxFieldBody, `A few miles south of Soledad, the Salinas River drops in close to the hillside
-	bank and runs deep and green. The water is warm too, for it has slipped twinkling
-	over the yellow sands in the sunlight before reaching the narrow pool. On one
-	side of the river the golden foothill slopes curve up to the strong and rocky
-	Gabilan Mountains, but on the valley side the water is lined with trees—willows
-	fresh and green with every spring, carrying in their lower leaf junctures the
-	debris of the winter's flooding; and sycamores with mottled, white, recumbent
-	limbs and branches that arch over the pool`, doc2)
+	doc.AddText(idxFieldBody, ofMiceAndMen, doc2)
 
 	idx, err := doc.CreateIndex()
 	if err != nil {
@@ -95,21 +98,19 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	opst1, err := idw.AddDocument(doc1)
+	_, err = idw.AddDocument(doc1)
 	if err != nil {
 		panic(err)
 	}
-	opst2, err := idw.AddDocument(doc2)
+	_, err = idw.AddDocument(doc2)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("op1 = %v op2 = %v\n", opst1, opst2)
 
-	idCommit, err := idw.Commit()
+	_, err = idw.Commit()
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("commit id = %v", idCommit)
 
 	rb, err := idx.ReaderBuilder()
 	if err != nil {
@@ -126,17 +127,41 @@ func main() {
 		panic(err)
 	}
 
-	searcher, err := qp.ParseQuery("sea")
+	searcher, err := qp.ParseQuery("Old Man")
 	if err != nil {
 		panic(err)
 	}
-	searcher.Search()
 
-	searcherAgain, err := qp.ParseQuery("mottled")
+	var sr map[string][]string
+
+	s, err := searcher.Search()
 	if err != nil {
 		panic(err)
 	}
-	searcherAgain.Search()
+
+	err = json.Unmarshal([]byte(s), &sr)
+	if err != nil {
+		panic(err)
+	}
+	if sr["title"][1] != oldMan {
+		panic("expcted value not received")
+	}
+	searcherAgain, err := qp.ParseQuery("Mice Men")
+	if err != nil {
+		panic(err)
+	}
+	s, err = searcherAgain.Search()
+	if err != nil {
+		panic(err)
+	}
+	err = json.Unmarshal([]byte(s), &sr)
+	if err != nil {
+		panic(err)
+	}
+
+	if sr["title"][1] != ofMiceAndMen {
+		panic("expcted value not received")
+	}
 
 }
 
