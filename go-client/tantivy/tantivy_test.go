@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const resultSet1 = `{"title":["The Old Man and the Sea","He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."]}`
-const resultSet2 = `{"title":["Of Mice and Men","A few miles south of Soledad, the Salinas River drops in close to the hillside\n\tbank and runs deep and green. The water is warm too, for it has slipped twinkling\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve up to the strong and rocky\n\tGabilan Mountains, but on the valley side the water is lined with trees—willows\n\tfresh and green with every spring, carrying in their lower leaf junctures the\n\tdebris of the winter's flooding; and sycamores with mottled, white, recumbent\n\tlimbs and branches that arch over the pool"]}`
+const resultSet1 = `{"body":["He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."],"title":["The Old Man and the Sea"]}`
+const resultSet2 = `{"body":["A few miles south of Soledad, the Salinas River drops in close to the hillside\n\tbank and runs deep and green. The water is warm too, for it has slipped twinkling\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve up to the strong and rocky\n\tGabilan Mountains, but on the valley side the water is lined with trees—willows\n\tfresh and green with every spring, carrying in their lower leaf junctures the\n\tdebris of the winter's flooding; and sycamores with mottled, white, recumbent\n\tlimbs and branches that arch over the pool"],"title":["Of Mice and Men"]}`
 
 func makeIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	builder, err := NewBuilder(td)
