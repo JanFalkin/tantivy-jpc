@@ -10,7 +10,7 @@ use tantivy::collector::TopDocs;
 use std::str;
 use std::collections::HashMap;
 use tantivy::Document;
-use tantivy::schema::{Field, TextOptions, Schema, SchemaBuilder, STRING, TEXT, STORED, NumericOptions};
+use tantivy::schema::{Field, TextOptions, Schema, STRING, TEXT, STORED, NumericOptions};
 use tantivy::{LeasedItem, Searcher};
 use tantivy::query::{Query, QueryParser};
 
@@ -162,7 +162,7 @@ impl<'a> TantivySession<'a>{
             self.dyn_q = match qp.parse_query(query){
                 Ok(qp) => Some(qp),
                 Err(_e) => {
-                    return make_internal_json_error::<u32>(ErrorKinds::BadParams(format!("query parser error : {}", _e)))
+                    return make_internal_json_error::<u32>(ErrorKinds::BadParams(format!("query parser error : {_e}")))
                 }
             };
         }
@@ -182,7 +182,7 @@ impl<'a> TantivySession<'a>{
         };
         let td = match li.search(query, &TopDocs::with_limit(10)){
             Ok(td) => td,
-            Err(e) => return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {}", e))),
+            Err(e) => return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}"))),
         };
         info!("search complete len = {}, td = {:?}", td.len(), td);
         for (_score, doc_address) in td {
@@ -203,7 +203,7 @@ impl<'a> TantivySession<'a>{
                         self.index.as_ref().unwrap()
                     },
                     Err(err) => {
-                        let buf = format!("{}", err);
+                        let buf = format!("{err}");
                         return make_internal_json_error(ErrorKinds::BadParams(buf));
                     },
                 }
@@ -219,7 +219,7 @@ impl<'a> TantivySession<'a>{
                 idx
             }
             &_ => {
-                return make_internal_json_error(ErrorKinds::UnRecognizedCommand(format!("unknown method {}", method)))
+                return make_internal_json_error(ErrorKinds::UnRecognizedCommand(format!("unknown method {method}")))
             }
         };
         Ok(0)
@@ -262,7 +262,7 @@ impl<'a> TantivySession<'a>{
                         info!("{}", self.return_buffer);
                         x
                     },
-                    Err(err) => return make_internal_json_error(ErrorKinds::NotFinalized(format!("failed to commit indexwriter, {}", err)))
+                    Err(err) => return make_internal_json_error(ErrorKinds::NotFinalized(format!("failed to commit indexwriter, {err}")))
                 };
             },
             _ => {}
@@ -281,7 +281,7 @@ impl<'a> TantivySession<'a>{
                             info!("Got leased item");
                             self.leased_item = Some(Box::new(idx_read.searcher()))
                         },
-                        Err(err) => {return make_internal_json_error(ErrorKinds::Other(format!("tantivy error {}", err)))}
+                        Err(err) => {return make_internal_json_error(ErrorKinds::Other(format!("tantivy error {err}")))}
                     }
                 }
             }
@@ -318,7 +318,7 @@ impl<'a> TantivySession<'a>{
                 };
                 let cur_doc = match d.get_mut(doc_idx){
                     Some(d) => d,
-                    None => {return make_internal_json_error(ErrorKinds::BadInitialization(format!("document at index {} does not exist", doc_idx)))}
+                    None => {return make_internal_json_error(ErrorKinds::BadInitialization(format!("document at index {doc_idx} does not exist")))}
                 };
                 cur_doc.add_text(f,field_val);
             },
@@ -375,7 +375,7 @@ impl<'a> TantivySession<'a>{
         let sb = match &mut self.builder{
             Some(x) => x,
             None => {
-                self.builder = Some(Box::new(SchemaBuilder::default()));
+                self.builder = Some(Box::default());
                 self.builder.as_mut().unwrap()
             }
         };
@@ -439,37 +439,37 @@ impl<'a> TantivySession<'a>{
         match obj {
             "query_parser" => {
                 if let Err(e) = self.handle_query_parser(method,obj,params) {
-                    return make_json_error(&format!("handle query parser error={}", e), self.id)
+                    return make_json_error(&format!("handle query parser error={e}"), self.id)
                 };
             },
             "searcher" =>{
                 if let Err(e) = self.handle_searcher(method,obj,params) {
-                    return make_json_error(&format!("handle searcher error={}", e), self.id)
+                    return make_json_error(&format!("handle searcher error={e}"), self.id)
                 };
             }
             "index" =>{
                 if let Err(e) = self.handle_index(method,obj,params) {
-                    return make_json_error(&format!("handle index error={}", e), self.id)
+                    return make_json_error(&format!("handle index error={e}"), self.id)
                 };
             },
             "indexwriter" => {
                 if let Err(e) = self.handle_index_writer(method,obj,params) {
-                    return make_json_error(&format!("handle index writer error={}", e), self.id)
+                    return make_json_error(&format!("handle index writer error={e}"), self.id)
                 };
             },
             "index_reader" => {
                 if let Err(e) = self.handle_index_reader(method,obj,params) {
-                    return make_json_error(&format!("handle index reader error={}", e), self.id)
+                    return make_json_error(&format!("handle index reader error={e}"), self.id)
                 };
             },
             "document" => {
                 if let Err(e) = self.handle_document(method,obj,params) {
-                    return make_json_error(&format!("handle document error={}", e), self.id)
+                    return make_json_error(&format!("handle document error={e}"), self.id)
                 };
             },
             "builder" => {
                 if let Err(e) = self.handler_builder(method,obj,params) {
-                    return make_json_error(&format!("handle builder error={}", e), self.id)
+                    return make_json_error(&format!("handle builder error={e}"), self.id)
                 };
             },
             "schema" => {
@@ -505,7 +505,7 @@ pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize){
     );
     let vr = match serde_json::to_string(&msg){
         Ok(x)=> x,
-        Err(err)=> format!("{}", err),
+        Err(err)=> format!("{err}"),
     };
     info!("returning  result = {}", vr);
     let mut t = ERRORS.lock().unwrap();
@@ -524,7 +524,7 @@ pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize){
 }
 
 pub fn make_internal_json_error<T>(ek:ErrorKinds) -> InternalCallResult<T>{
-    info!("error={}", ek);
+    info!("error={ek}");
     Err(ek)
 }
 
@@ -820,7 +820,7 @@ pub mod tests {
                 info!("Val = {}", v);
                 match std::str::from_utf8(sl){
                     Ok(s) => info!("stringified = {}", s),
-                    Err(err) => panic!("ERROR = {} sl = {:?}", err, sl)
+                    Err(err) => panic!("ERROR = {err} sl = {sl:?}")
                 };
                 sl.to_vec()
             }else{
