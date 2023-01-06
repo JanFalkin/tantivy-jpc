@@ -89,8 +89,8 @@ impl<'a> TantivySession<'a>{
         }.as_str().unwrap_or("");
         if !dir_to_use.is_empty(){
             let mdir = tantivy::directory::MmapDirectory::open(dir_to_use)?;
-            let idx = match tantivy::Index::open_or_create(mdir, match self.schema.clone() {
-                Some(s) => s,
+            let idx = match tantivy::Index::open_or_create(mdir, match &self.schema {
+                Some(s) => s.to_owned(),
                 None => return  make_internal_json_error(ErrorKinds::BadParams("A schema must be created before an index".to_string()))
              }){
                 Ok(p) => p,
@@ -98,8 +98,8 @@ impl<'a> TantivySession<'a>{
                     info!("error={}\n", err);
                     match tempdir::TempDir::new("indexer"){
                         Ok(tmp) => {
-                            tantivy::Index::create_in_dir(tmp, if let Some(s) = self.schema.clone() {
-                                s
+                            tantivy::Index::create_in_dir(tmp, if let Some(s) = &self.schema {
+                                s.to_owned()
                             } else {
                                 return  make_internal_json_error(ErrorKinds::BadInitialization("A schema must be created before an index".to_string()));
                             }).unwrap()
@@ -141,7 +141,9 @@ impl<'a> TantivySession<'a>{
             let request_fields = m.get("fields").ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?.as_array().ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?;
             for v in request_fields{
                 let v_str = v.as_str().unwrap_or_default();
-                if let Some(f) = schema.get_field(v_str) { v_out.append(vec![f].as_mut()) }
+                if let Some(f) = schema.get_field(v_str) {
+                     v_out.append(vec![f].as_mut())
+                }
             }
             self.query_parser = Some(Box::new(QueryParser::for_index(idx, v_out)));
         }
@@ -237,7 +239,7 @@ impl<'a> TantivySession<'a>{
         };
         match method {
             "add_document" => {
-                let doc = self.doc.clone();
+                let doc = &self.doc;
                 let d = match doc{
                     Some(x) => x,
                     None => {
@@ -248,8 +250,8 @@ impl<'a> TantivySession<'a>{
                     Some(m)=> m,
                     None => return make_internal_json_error(ErrorKinds::BadParams("invalid parameters pass to Document add_text".to_string()))
                 };
-                let doc_idx = m.get("id").unwrap_or(&json!{0_i32}).as_u64().unwrap_or(0) as usize;
-                let os = writer.add_document(d[doc_idx].clone());
+                let doc_idx = m.get("id").unwrap_or(&json!{0_i32}).as_u64().unwrap_or(0) as usize -1;
+                let os = writer.add_document(d[doc_idx].to_owned());
                 self.return_buffer = json!({"opstamp": os.unwrap_or(0)}).to_string();
                 info!("{}", self.return_buffer);
             },
@@ -293,23 +295,15 @@ impl<'a> TantivySession<'a>{
             "add_text" => {
                 let doc = self.doc.as_mut().take();
                 let d = match doc{
-                    Some(x) => {
-                        let v = x;
-                        v.append(&mut vec![Document::new()]);
-                        self.doc = Some(v.to_vec());
-                        self.doc.as_mut().unwrap()
-                    },
-                    None => {
-                        return make_internal_json_error(ErrorKinds::BadInitialization("add_text with no doucments created".to_string()))
-                    }
+                    Some(v) => v,
+                    None => return make_internal_json_error(ErrorKinds::BadInitialization("add_text with no doucments created".to_string())),
                 };
                 let m = match params.as_object(){
                     Some(m)=> m,
                     None => return make_internal_json_error(ErrorKinds::BadParams("invalid parameters pass to Document add_text".to_string()))
                 };
-                let doc_idx = m.get("doc_id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as usize;
-                let field_idx = m.get("id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as u32;
-                let x = d;
+                let doc_idx = m.get("doc_id").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as usize - 1;
+                let field_idx = m.get("field").unwrap_or(&json!{0}).as_u64().unwrap_or(0) as u32;
                 let f  = Field::from_field_id(field_idx);
                 info!("add_text: name = {:?}", m);
                 match m.get("field"){
@@ -322,7 +316,7 @@ impl<'a> TantivySession<'a>{
                     },
                     None => {return make_internal_json_error(ErrorKinds::BadInitialization("field text required for document".to_string()))}
                 };
-                let cur_doc = match x.get_mut(doc_idx){
+                let cur_doc = match d.get_mut(doc_idx){
                     Some(d) => d,
                     None => {return make_internal_json_error(ErrorKinds::BadInitialization(format!("document at index {} does not exist", doc_idx)))}
                 };
@@ -333,10 +327,8 @@ impl<'a> TantivySession<'a>{
                 let length:usize;
                 match doc{
                     Some(x) => {
-                        let mut v = x.to_vec();
-                        v.append(&mut vec![Document::new()]);
-                        length = v.len();
-                        self.doc = Some(v);
+                        x.push(Document::new());
+                        length = x.len();
                     },
                     None => {
                         let nd= Document::new();
