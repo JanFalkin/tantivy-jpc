@@ -88,28 +88,18 @@ impl<'a> TantivySession<'a>{
             }
         }.as_str().unwrap_or("");
         if !dir_to_use.is_empty(){
-            let mdir = tantivy::directory::MmapDirectory::open(dir_to_use)?;
-            let idx = match tantivy::Index::open_or_create(mdir, match &self.schema {
-                Some(s) => s.to_owned(),
-                None => return  make_internal_json_error(ErrorKinds::BadParams("A schema must be created before an index".to_string()))
-             }){
+            let idx = match tantivy::Index::open_in_dir(dir_to_use){
                 Ok(p) => p,
                 Err(err) => {
                     info!("error={}\n", err);
-                    match tempdir::TempDir::new("indexer"){
-                        Ok(tmp) => {
-                            tantivy::Index::create_in_dir(tmp, if let Some(s) = &self.schema {
-                                s.to_owned()
-                            } else {
-                                return  make_internal_json_error(ErrorKinds::BadInitialization("A schema must be created before an index".to_string()));
-                            }).unwrap()
-                        },
-                        Err(_) => return make_internal_json_error(ErrorKinds::IO("failed to create TempDir".to_string()))
-                    }
+                    tantivy::Index::create_in_dir(dir_to_use, if let Some(s) = &self.schema {
+                        s.to_owned()
+                    } else {
+                        return  make_internal_json_error(ErrorKinds::BadInitialization("A schema must be created before an index".to_string()));
+                    }).unwrap()
                 },
             };
-            self.index = Some(Box::new(idx));
-            Ok(self.index.clone().unwrap())
+            Ok(Box::new(idx))
 
         }else{
             info!("Creating index in RAM");
@@ -199,7 +189,8 @@ impl<'a> TantivySession<'a>{
             Some(x) => x,
             None => {
                 match self.create_index(params){
-                    Ok(_) => {
+                    Ok(x) => {
+                        self.index = Some(x);
                         self.index.as_ref().unwrap()
                     },
                     Err(err) => {
