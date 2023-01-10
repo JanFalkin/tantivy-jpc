@@ -13,6 +13,7 @@ use tantivy::Document;
 use tantivy::schema::{Field, TextOptions, Schema, STRING, TEXT, STORED, NumericOptions};
 use tantivy::{LeasedItem, Searcher};
 use tantivy::query::{Query, QueryParser};
+use std::fmt::Write;
 
 use lazy_static::lazy_static;
 use std::sync::Mutex;
@@ -188,8 +189,14 @@ impl<'a> TantivySession<'a>{
         for (_score, doc_address) in td {
             let retrieved_doc = li.doc(doc_address).unwrap();
             let schema = self.schema.as_ref().unwrap();
-            self.return_buffer += &schema.to_json(&retrieved_doc).to_string();
-            info!("{} n={} vals={:?}", schema.to_json(&retrieved_doc), retrieved_doc.len(), retrieved_doc.field_values());
+            let named_doc = schema.to_named_doc(&retrieved_doc);
+            let mut s = "".to_string();
+            match writeln!(s, "{}", serde_json::to_string(&named_doc).unwrap()){
+                Ok(_) => {},
+                Err (_) => return make_internal_json_error(ErrorKinds::NotExist("format write to string failed".to_string())),
+            };
+            self.return_buffer += &s;
+            info!("{} n={} vals={:?}", s, s.len(), retrieved_doc.field_values());
         }
         Ok(0)
     }
@@ -199,8 +206,11 @@ impl<'a> TantivySession<'a>{
             Some(x) => x,
             None => {
                 match self.create_index(params){
-                    Ok(_) => {
-                        self.index.as_ref().unwrap()
+                    Ok(x) => {
+                        self.index = Some(x);
+                        let r = self.index.as_ref().unwrap();
+                        self.schema = Some(r.schema());
+                        r
                     },
                     Err(err) => {
                         let buf = format!("{err}");

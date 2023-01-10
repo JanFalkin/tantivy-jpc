@@ -66,6 +66,17 @@ func makeIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	return idx
 }
 
+func loadIndex(t *testing.T, td string) *TIndex {
+	builder, err := NewBuilder(td)
+	require.NoError(t, err)
+	doc, err := builder.Build()
+	require.NoError(t, err)
+	idx, err := doc.CreateIndex()
+	require.NoError(t, err)
+	return idx
+
+}
+
 func testExpectedIndex(t *testing.T, idx *TIndex) {
 	rb, err := idx.ReaderBuilder()
 	require.NoError(t, err)
@@ -80,13 +91,13 @@ func testExpectedIndex(t *testing.T, idx *TIndex) {
 	require.NoError(t, err)
 	s, err := searcher.Search()
 	require.NoError(t, err)
-	require.EqualValues(t, resultSet1, s)
+	require.EqualValues(t, resultSet1+"\n", s)
 
 	searcherAgain, err := qp.ParseQuery("mottled")
 	require.NoError(t, err)
 	s, err = searcherAgain.Search()
 	require.NoError(t, err)
-	require.EqualValues(t, resultSet2, s)
+	require.EqualValues(t, resultSet2+"\n", s)
 }
 func TestTantivyBasic(t *testing.T) {
 	wd, err := os.Getwd()
@@ -124,6 +135,6 @@ func TestTantivyIndexReuse(t *testing.T) {
 	assert.NoError(t, err)
 	_ = makeIndex(t, td, false)
 
-	idx := makeIndex(t, td, true)
+	idx := loadIndex(t, td)
 	testExpectedIndex(t, idx)
 }
