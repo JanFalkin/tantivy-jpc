@@ -12,9 +12,9 @@ use serde_derive::{Serialize, Deserialize};
 use tantivy::collector::TopDocs;
 use std::str;
 use std::collections::HashMap;
-use tantivy::Document;
+use tantivy::{Document, DateOptions};
 use tantivy::schema::{Field, TextOptions, Schema, STRING, TEXT, STORED, NumericOptions};
-use tantivy::{LeasedItem, Searcher};
+use tantivy::{Searcher};
 use tantivy::query::{Query, QueryParser};
 use std::fmt::Write;
 use tantivy::TantivyError;
@@ -40,9 +40,9 @@ pub use self::tsession_tests::*;
 
 macro_rules! impl_simple_type {
     () => {};
-    ($self:ident, $handler_params:ident, $handler_obj:ident, $handler_func:ident) => {
+    ($self:ident, $handler_params:ident, $handler_obj:ident, $handler_func:ident, $default_type:ident) => {
         let (name, _field_type, stored) = Self::extract_params($handler_params)?;
-        let mut ni: NumericOptions = NumericOptions::default();
+        let mut ni: $default_type = $default_type::default();
         if stored{
             ni = ni.set_stored();
         }
@@ -64,7 +64,7 @@ struct TantivySession<'a>{
     pub(crate) index:Option<Box<tantivy::Index>>,
     pub(crate) indexwriter:Option<Box<tantivy::IndexWriter>>,
     pub(crate) index_reader_builder:Option<Box<tantivy::IndexReaderBuilder>>,
-    pub(crate) leased_item:Option<Box<LeasedItem<Searcher>>>,
+    pub(crate) leased_item:Option<Box<Searcher>>,
     pub(crate) query_parser:Option<Box<QueryParser>>,
     pub(crate) dyn_q:Option<Box<dyn Query>>,
     return_buffer:String,
@@ -234,16 +234,16 @@ impl<'a> TantivySession<'a>{
                 info!("{}", self.return_buffer);
             },
             "add_date_field" => {
-                impl_simple_type!(self, params, sb, add_date_field);
+                impl_simple_type!(self, params, sb, add_date_field, DateOptions);
             },
             "add_u64_field" => {
-                impl_simple_type!(self, params, sb, add_u64_field);
+                impl_simple_type!(self, params, sb, add_u64_field, NumericOptions);
             },
             "add_i64_field" => {
-                impl_simple_type!(self, params, sb, add_i64_field);
+                impl_simple_type!(self, params, sb, add_i64_field, NumericOptions);
             },
             "add_f64_field" => {
-                impl_simple_type!(self, params, sb, add_f64_field);
+                impl_simple_type!(self, params, sb, add_f64_field, NumericOptions);
             },
             "build" => {
                 let sb = match self.builder.take(){
