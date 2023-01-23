@@ -46,6 +46,10 @@ func (s *TSearcher) Search() (string, error) {
 	return callTantivy(s.JPCId.id, "searcher", "search", msi{})
 }
 
+func (s *TSearcher) FuzzySearch() (string, error) {
+	return callTantivy(s.JPCId.id, "fuzzy_searcher", "fuzzy_searcher", msi{})
+}
+
 type TQueryParser struct {
 	*TIndex
 }
@@ -63,6 +67,17 @@ func (qp *TQueryParser) ForIndex(fields []string) (uint, error) {
 func (qp *TQueryParser) ParseQuery(query string) (*TSearcher, error) {
 	_, err := callTantivy(qp.JPCId.id, "query_parser", "parse_query", msi{
 		"query": query,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &TSearcher{qp}, nil
+}
+
+func (qp *TQueryParser) ParseFuzzyQuery(field, term string) (*TSearcher, error) {
+	_, err := callTantivy(qp.JPCId.id, "query_parser", "parse_fuzzy_query", msi{
+		"term":  term,
+		"field": field,
 	})
 	if err != nil {
 		return nil, err
