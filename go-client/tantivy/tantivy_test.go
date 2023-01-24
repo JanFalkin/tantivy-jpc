@@ -20,9 +20,6 @@ func makeFuzzyIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	idxFieldTitle, err := builder.AddTextField("title", TEXT, true)
 	require.NoError(t, err)
 	require.EqualValues(t, 0, idxFieldTitle)
-	idxFieldBody, err := builder.AddTextField("body", TEXT, true)
-	require.NoError(t, err)
-	require.EqualValues(t, 1, idxFieldBody)
 	doc, err := builder.Build()
 	require.NoError(t, err)
 	doc1, err := doc.Create()
@@ -34,25 +31,17 @@ func makeFuzzyIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	doc3, err := doc.Create()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, doc3)
+	doc4, err := doc.Create()
+	require.NoError(t, err)
+	require.EqualValues(t, 4, doc4)
 
-	_, err = doc.AddText(idxFieldTitle, "The Old Man and the Sea", doc1)
+	_, err = doc.AddText(idxFieldTitle, "The Name of the Wind", doc1)
 	require.NoError(t, err)
-	_, err = doc.AddText(idxFieldBody, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless.", doc1)
+	_, err = doc.AddText(idxFieldTitle, "The Diary of Muadib", doc2)
 	require.NoError(t, err)
-	_, err = doc.AddText(idxFieldTitle, "Of Mice and Men", doc2)
+	_, err = doc.AddText(idxFieldTitle, "A Dairy Cow", doc3)
 	require.NoError(t, err)
-	_, err = doc.AddText(idxFieldBody, `A few miles south of Soledad, the Salinas River drops in close to the hillside
-	bank and runs deep and green. The water is warm too, for it has slipped twinkling
-	over the yellow sands in the sunlight before reaching the narrow pool. On one
-	side of the river the golden foothill slopes curve up to the strong and rocky
-	Gabilan Mountains, but on the valley side the water is lined with trees—willows
-	fresh and green with every spring, carrying in their lower leaf junctures the
-	debris of the winter's flooding; and sycamores with mottled, white, recumbent
-	limbs and branches that arch over the pool`, doc2)
-	require.NoError(t, err)
-	_, err = doc.AddText(idxFieldTitle, "My man", doc3)
-	require.NoError(t, err)
-	_, err = doc.AddText(idxFieldBody, `He was my man`, doc3)
+	_, err = doc.AddText(idxFieldTitle, "The Diary of a Young Girl", doc4)
 	require.NoError(t, err)
 
 	idx, err := doc.CreateIndex()
@@ -69,7 +58,11 @@ func makeFuzzyIndex(t *testing.T, td string, useExisting bool) *TIndex {
 		opst3, err := idw.AddDocument(doc3)
 		require.NoError(t, err)
 		require.EqualValues(t, 2, opst3)
-		fmt.Printf("op1 = %v op2 = %v op3 = %v\n ", opst1, opst2, opst3)
+		opst4, err := idw.AddDocument(doc4)
+		require.NoError(t, err)
+		require.EqualValues(t, 3, opst4)
+
+		fmt.Printf("op1 = %v op2 = %v op3 = %v op4 = %v\n ", opst1, opst2, opst3, opst4)
 		idCommit, err := idw.Commit()
 		require.NoError(t, err)
 		fmt.Printf("commit id = %v", idCommit)
@@ -170,11 +163,7 @@ func testFuzzyExpectedIndex(t *testing.T, idx *TIndex) {
 	qp, err := rb.Searcher()
 	require.NoError(t, err)
 
-	// _, err = qp.ForIndex([]string{"title", "body"})
-	// require.NoError(t, err)
-
-	// searcher, err := qp.ParseQuery("Sea")
-	searcher, err := qp.ParseFuzzyQuery("title", "man")
+	searcher, err := qp.ParseFuzzyQuery("title", "Diary")
 	require.NoError(t, err)
 	s, err := searcher.FuzzySearch()
 	log.Info("return", s)

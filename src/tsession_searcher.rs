@@ -15,6 +15,7 @@ use std::fmt::Write;
 impl<'a> TantivySession<'a>{
 
     pub fn handle_fuzzy_searcher(&mut self, _method:&str, _obj: &str, _params:serde_json::Value)  -> InternalCallResult<u32>{
+        self.return_buffer = r#"{ "result" : "EMPTY"}"#.to_string();
         info!("Searcher");
         let query = match self.fuzzy_q.as_ref(){
             Some(dq) => dq,
@@ -22,18 +23,20 @@ impl<'a> TantivySession<'a>{
                 return make_internal_json_error(ErrorKinds::NotExist("dyn query not created".to_string()));
             }
         };
-        let li = match self.leased_item.as_ref(){
-            Some(li) => li,
-            None => return make_internal_json_error(ErrorKinds::NotExist("leased item not found".to_string())),
-        };
-        let q = *query.clone();
-        let td = match li.search(&q, &TopDocs::with_limit(10)){
+        let rdr = &self.index.clone().unwrap().reader()?;
+        // let li = match self.leased_item.as_ref(){
+        //     Some(li) => li,
+        //     None => return make_internal_json_error(ErrorKinds::NotExist("leased item not found".to_string())),
+        // };
+        let q = &*query.clone();
+        let searcher = rdr.searcher();
+        let td = match searcher.search(q, &TopDocs::with_limit(10)){
             Ok(td) => td,
             Err(e) => return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}"))),
         };
         info!("search complete len = {}, td = {:?}", td.len(), td);
         for (_score, doc_address) in td {
-            let retrieved_doc = li.doc(doc_address)?;
+            let retrieved_doc = searcher.doc(doc_address)?;
             let schema = self.schema.as_ref().ok_or_else(|| ErrorKinds::NotExist("Schema not present".to_string()))?;
             let named_doc = schema.to_named_doc(&retrieved_doc);
             let mut s = "".to_string();

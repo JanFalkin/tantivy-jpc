@@ -11,9 +11,8 @@ use serde_json::json;
 use serde_derive::{Serialize, Deserialize};
 use std::str;
 use std::collections::HashMap;
-use tantivy::{Searcher, Term};
+use tantivy::{Searcher, TantivyError};
 use tantivy::query::{Query, QueryParser, FuzzyTermQuery};
-use tantivy::TantivyError;
 
 use lazy_static::lazy_static;
 use std::sync::Mutex;
@@ -56,7 +55,6 @@ struct TantivySession<'a>{
     pub(crate) query_parser:Option<Box<QueryParser>>,
     pub(crate) dyn_q:Option<Box<dyn Query>>,
     pub(crate) fuzzy_q:Option<Box<FuzzyTermQuery>>,
-    pub(crate) fuzzy_term:Option<Box<Term>>,
 
 
     return_buffer:String,
@@ -76,7 +74,6 @@ impl<'a> TantivySession<'a>{
             query_parser:None,
             dyn_q: None,
             fuzzy_q: None,
-            fuzzy_term:None,
             return_buffer:String::new(),
         }
     }
@@ -243,13 +240,14 @@ impl From<serde_json::Error> for ErrorKinds{
 
 pub type InternalCallResult<T> = std::result::Result<T, ErrorKinds>;
 
-use log::*;
 /// # Safety
 ///
 #[no_mangle]
 pub unsafe extern "C" fn init() -> u8{
-    stderrlog::new().module(module_path!()).init().unwrap();
-    0
+    if let Ok(_res) = env_logger::try_init() {
+        return 0;
+    }
+    1
 }
 
 /**
