@@ -59,7 +59,6 @@ impl<'a> TantivySession<'a>{
             };
         }
         if method == "parse_fuzzy_query"{
-            println!("m={m:?}");
             let schema = match self.schema.as_ref(){
                 Some(s) => s,
                 None => return make_internal_json_error(ErrorKinds::BadInitialization("schema not available during for_index".to_string()))

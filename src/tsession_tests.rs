@@ -212,7 +212,6 @@ pub mod tests {
                 };
                 sl
             }else{
-                println!("NO RETURNED REQUESTED");
                 vec![]
             }
         }
@@ -392,7 +391,6 @@ pub mod tests {
         let sres = &searcher.fuzzy_search().unwrap();
         let vret:Vec<serde_json::Value> = serde_json::from_str(sres).unwrap();
         assert_eq!(vret.len(), 2);
-        println!("result = {vret:?}");
     }
     #[test]
     fn all_simple_fields(){

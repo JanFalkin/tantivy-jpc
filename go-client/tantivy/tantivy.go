@@ -76,8 +76,8 @@ func (qp *TQueryParser) ParseQuery(query string) (*TSearcher, error) {
 
 func (qp *TQueryParser) ParseFuzzyQuery(field, term string) (*TSearcher, error) {
 	_, err := callTantivy(qp.JPCId.id, "query_parser", "parse_fuzzy_query", msi{
-		"term":  term,
-		"field": field,
+		"term":  []string{term},
+		"field": []string{field},
 	})
 	if err != nil {
 		return nil, err
@@ -366,7 +366,10 @@ func callTantivy(u, object, method string, params msi) (string, error) {
 	cs := (*C.uchar)(unsafe.Pointer(p))
 	rbl := len(rb)
 	prbl := (*C.ulong)(unsafe.Pointer(&rbl))
-	_ = C.tantivy_jpc(cs, C.ulong(uint64(len(string(b)))), crb, prbl)
+	ttret := C.tantivy_jpc(cs, C.ulong(uint64(len(string(b)))), crb, prbl)
+	if ttret < 0 {
+		return "", errors.E("Tantivy JPC Failed", errors.K.Invalid, "desc", C.GoString(csrb))
+	}
 	returnData := C.GoString(csrb)
 	return returnData, nil
 }
