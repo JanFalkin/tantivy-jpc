@@ -6,6 +6,7 @@ use crate::tantivy_jpc;
 
 pub mod tests {
     extern crate tempdir;
+
     use tempdir::TempDir;
     use uuid::{Uuid};
 
@@ -13,7 +14,7 @@ pub mod tests {
     use serde_json::Map;
 
 
-    pub static mut TEMPDIRS: Vec<TempDir> = vec![];
+    pub static mut GSIZE:usize = 0;
 
     macro_rules! call_simple_type {
         //() => {};
@@ -35,17 +36,18 @@ pub mod tests {
 
 
 
-    #[derive(Clone, Serialize, Deserialize, Debug)]
-    pub struct FakeContext{
+    #[derive(Debug)]
+    pub struct FakeContext<'a>{
         pub id:String,
         pub buf:Vec<u8>,
-        pub ret_len:usize,
+        pub ret_len:&'a mut usize,
+        pub dirs:&'a mut Vec<TempDir>,
 
     }
-    #[derive(Serialize, Deserialize, Debug, Clone)]
-    pub struct TestDocument{
+    #[derive(Debug)]
+    pub struct TestDocument<'a>{
         pub     temp_dir:String,
-        pub ctx:    FakeContext,
+        pub ctx:    &'a FakeContext<'a>,
 
     }
 
@@ -68,32 +70,37 @@ pub mod tests {
     }
 
 
-    pub struct TestIndex{
-        ctx:    FakeContext,
+    pub struct TestIndex<'a>{
+        ctx:    &'a FakeContext<'a>,
         temp_dir: String,
     }
 
-    pub struct TestIndexReader{
-        ctx:    FakeContext,
+    pub struct TestIndexReader<'a>{
+        ctx:    &'a FakeContext<'a>,
     }
 
-    pub struct TestQueryParser{
-        ctx:    FakeContext,
+    pub struct TestQueryParser<'a>{
+        ctx:    &'a FakeContext<'a>,
     }
 
-    pub struct TestSearcher{
-        ctx:    FakeContext,
+    pub struct TestSearcher<'a>{
+        ctx:    &'a FakeContext<'a>,
     }
 
-    impl TestSearcher{
+    impl<'a> TestSearcher<'a>{
         pub fn search(&mut self)-> InternalCallResult<String>{
             let b = self.ctx.call_jpc("searcher".to_string(), "search".to_string(), json!({}),true);
             let s = std::str::from_utf8(&b).unwrap();
             Ok(s.to_string())
         }
+        pub fn fuzzy_search(&mut self)-> InternalCallResult<String>{
+            let b = self.ctx.call_jpc("fuzzy_searcher".to_string(), "fuzzy_searcher".to_string(), json!({}),true);
+            let s = std::str::from_utf8(&b).unwrap();
+            Ok(s.to_string())
+        }
     }
 
-    impl TestQueryParser{
+    impl<'a> TestQueryParser<'a>{
         pub fn for_index(&mut self, v:Vec<String>)-> InternalCallResult<i32>{
             self.ctx.call_jpc("query_parser".to_string(), "for_index".to_string(), json!({
                 "fields": v,
@@ -102,17 +109,22 @@ pub mod tests {
         }
         pub fn parse_query(&mut self, query:String) ->  InternalCallResult<TestSearcher> {
             self.ctx.call_jpc("query_parser".to_string(), "parse_query".to_string(), json!({"query": query}), false);
-            Ok(TestSearcher{ctx:self.ctx.clone()})
+            Ok(TestSearcher{ctx:self.ctx})
         }
+        pub fn parse_fuzzy_query(&mut self, term:String, field:String) ->  InternalCallResult<TestSearcher> {
+            self.ctx.call_jpc("query_parser".to_string(), "parse_fuzzy_query".to_string(), json!({"term": [term], "field" : [field]}), false);
+            Ok(TestSearcher{ctx:self.ctx})
+        }
+
     }
-    impl TestIndexReader{
+    impl<'a> TestIndexReader<'a>{
         pub fn searcher(&mut self) -> InternalCallResult<TestQueryParser>{
             self.ctx.call_jpc("index_reader".to_string(), "searcher".to_string(), json!({}),false);
-            Ok(TestQueryParser{ctx:self.ctx.clone()})
+            Ok(TestQueryParser{ctx:self.ctx})
         }
     }
 
-    impl TestIndex{
+    impl<'a> TestIndex<'a>{
         pub fn add_document(&mut self, doc_id:i32) ->Result<u64, u32>{
             let _ = self.temp_dir;
             let s = self.ctx.call_jpc("indexwriter".to_string(), "add_document".to_string(), json!({"id": doc_id}), true);
@@ -128,11 +140,11 @@ pub mod tests {
         }
         pub fn reader_builder(&mut self)-> InternalCallResult<TestIndexReader>{
             self.ctx.call_jpc("index".to_string(), "reader_builder".to_string(), json!({}),false);
-            Ok(TestIndexReader{ctx:self.ctx.clone()})
+            Ok(TestIndexReader{ctx:self.ctx})
         }
     }
 
-    impl TestDocument{
+    impl<'a> TestDocument<'a>{
         pub fn create(&mut self) -> Result<usize, i32>{
             let tdc:TestCreateDocumentResult = serde_json::from_slice(&self.ctx.call_jpc("document".to_string(), "create".to_string(), json!({}), true)).unwrap();
             Ok(tdc.document_count)
@@ -144,29 +156,39 @@ pub mod tests {
         pub fn create_index(&mut self) -> Result<TestIndex, std::io::Error>{
             self.ctx.call_jpc("index".to_string(), "create".to_string(), json!({"directory":  self.temp_dir}), false);
             Ok(TestIndex{
-                ctx:self.ctx.clone(),
+                ctx:self.ctx,
                 temp_dir:self.temp_dir.clone(),
             })
         }
     }
 
-    impl Default for FakeContext {
+    impl<'a> Default for FakeContext<'a> {
        fn default() -> Self {
             Self::new()
        }
     }
 
-    impl FakeContext {
-        pub fn new() -> FakeContext{
+    impl<'a> Drop for FakeContext<'a>{
+        fn drop(&mut self) {
+            for t in 0..self.dirs.len(){
+                let td = self.dirs[t].as_ref();
+                let _ = std::fs::remove_dir_all(td);
+            }
+        }
+    }
+
+    impl<'a> FakeContext<'a> {
+        pub fn new() -> FakeContext<'a>{
             FakeContext{
                 id: Uuid::new_v4().to_string(),
                 buf: vec![0; 5000000],
-                ret_len:0,
-
+                ret_len:Box::leak(Box::<usize>::new(0)),
+                dirs:Box::leak(Box::<Vec<TempDir>>::default()),
             }
         }
-        pub fn call_jpc(&mut self, object:String, method:String, params:serde_json::Value, do_ret:bool)-> Vec<u8>{
-            let my_ret_ptr = &mut self.ret_len as *mut usize;
+        pub fn call_jpc(&'a self, object:String, method:String, params:serde_json::Value, do_ret:bool)-> Vec<u8>{
+            let my_ret_ptr = Box::leak(Box::new(0));
+
             let call_p = json!({
                 "id":     self.id,
                 "jpc":    "1.0",
@@ -174,26 +196,24 @@ pub mod tests {
                 "method": method,
                 "params": params,
             });
-            let sp = call_p.to_string();
-            let ar = sp.as_ptr();
-            let p = self.buf.as_mut_ptr();
+            let mut sp = serde_json::to_vec(&call_p).unwrap_or(vec![]);
+            let p = Box::leak(Box::<Vec<u8>>::new(vec![0; 5000000]));
             info!("calling tantivy_jpc json = {}", call_p);
             unsafe{
-            tantivy_jpc(ar, sp.len(), p, my_ret_ptr);
-            let sl = std::slice::from_raw_parts(p, self.ret_len);
+                tantivy_jpc(sp.as_mut_ptr(), sp.len(), p.as_mut_ptr(), my_ret_ptr);
+            }
+            let sl = p[0..*my_ret_ptr].to_vec();
             if do_ret{
-                let v:serde_json::Value = serde_json::from_slice(sl).unwrap();
+                let v:serde_json::Value = serde_json::from_slice(&sl).unwrap_or(json!({"result" : "empty"}));
                 info!("Val = {}", v);
-                match std::str::from_utf8(sl){
+                match std::str::from_utf8(&sl){
                     Ok(s) => info!("stringified = {}", s),
-                    Err(err) => panic!("ERROR = {err} sl = {sl:?}")
+                    Err(err) => panic!("ERROR = {err} p = {p:?}")
                 };
-                sl.to_vec()
+                sl
             }else{
-                println!("NO RETURNED REQUESTED");
                 vec![]
             }
-        }
         }
         pub fn add_text_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
             let j_param = json!({
@@ -244,19 +264,20 @@ pub mod tests {
             });
             call_simple_type!(self, j_param, "add_f64_field")
         }
-        pub fn build(&mut self)  -> InternalCallResult<TestDocument> {
-            let td = TempDir::new("TantivyBitcodeTest")?;
-            let td_ref:&TempDir;
-            let mut v:Vec<TempDir> = vec![td];
-            unsafe{
-                TEMPDIRS.append(v.as_mut());
-                td_ref = TEMPDIRS.last().unwrap();
+        pub fn build(&mut self, in_memory: bool)  -> InternalCallResult<TestDocument> {
+            if in_memory{
+                let _s = self.call_jpc("builder".to_string(), "build".to_string(), json!({}), false);
+                return Ok(
+                    TestDocument{ctx:self, temp_dir: "".to_string()}
+                )
             }
-
+            let td = TempDir::new("TantivyBitcodeTest")?;
+            self.dirs.append(vec![td].as_mut());
+            let td_ref:&TempDir = self.dirs.last().unwrap();
             let s = self.call_jpc("builder".to_string(), "build".to_string(), json!({}), false);
             info!("build returned={:?}", s);
             Ok(TestDocument{
-                ctx:self.clone(),
+                ctx:self,
                 temp_dir: td_ref.path().to_owned().to_str().unwrap().to_string(),
             })
         }
@@ -269,7 +290,7 @@ pub mod tests {
         let mut ctx = FakeContext::new();
         assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
         assert_eq!(ctx.add_text_field("body".to_string(), 2, true), 1);
-        let mut td = match ctx.build(){
+        let mut td = match ctx.build(false){
             Ok(t) => t,
             Err(e) => {
                 panic!("{}",format!("failed with error {}", e.to_string()));
@@ -309,35 +330,68 @@ pub mod tests {
         let title_result:TestTitleResult = serde_json::from_str(sres).unwrap();
         assert_eq!(title_result.title[0], "The Old Man and the Sea".to_string());
     }
-    // #[test]
-    // fn from_existing(){
-    //     let mut sess = TantivySession::new("test");
-    //     match sess.handler_builder("add_text_field", "", json!({
-    //         "name":   "title",
-    //         "type":   2,
-    //         "stored": true,
-    //     })){
-    //         Ok(x) => x,
-    //         Err(e) => panic!("error={}",e),
-    //     };
-    //     match sess.handler_builder("add_text_field", "", json!({
-    //         "name":   "body",
-    //         "type":   2,
-    //         "stored": true,
-    //     })){
-    //         Ok(x) => x,
-    //         Err(e) => panic!("error={}",e),
-    //     };
-    //     match sess.handler_builder("build", "", json!({})){
-    //         Ok(x) => x,
-    //         Err(e) => panic!("error={}",e),
-    //     };
-    //     let idxO = sess.create_index(json!({"directory" : "/tmp/llvm_working_dir/140c52d6-c1a0-4e86-8422-b577a65aa7b0/hqp_JWSQEhKs5tEtc9kAPBrtKfrB3AVVc6omW8VcXgvr3p6hFbas"}));
-    //     let idx = match idxO{
-    //         Ok(i) => i,
-    //         Err(e) => panic!("error={}",e),
-    //     };
-    // }
+    #[test]
+    fn basic_index_fuzzy(){
+        unsafe{crate::init()};
+        let mut ctx = FakeContext::new();
+        assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
+        let mut td = match ctx.build(true){
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}",format!("failed with error {}", e.to_string()));
+            }
+        };
+        let doc1 = match td.create(){
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}",format!("doc1 create failed error {}", e.to_string()));
+            }
+        };
+
+        let doc2 = match td.create(){
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}",format!("doc2 create failed error {}", e.to_string()));
+            }
+        };
+
+        let doc3 = match td.create(){
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}",format!("doc3 create failed error {}", e.to_string()));
+            }
+        };
+
+        let doc4 = match td.create(){
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}",format!("doc4 create failed error {}", e.to_string()));
+            }
+        };
+        assert_eq!(td.add_text(0, "The Name of the Wind".to_string(), doc1 as u32), 0);
+        assert_eq!(td.add_text(0, "The Diary of Muadib".to_string(), doc2 as u32), 0);
+        assert_eq!(td.add_text(0, "A Dairy Cow".to_string(), doc3 as u32), 0);
+        assert_eq!(td.add_text(0, "The Diary of a Young Girl".to_string(), doc4 as u32), 0);
+        let mut ti = match td.create_index(){
+            Ok(i) => i,
+            Err(e) => panic!("failed to create index err ={} ", e)
+        };
+        let op1 = ti.add_document(doc1 as i32).unwrap();
+        let op2 = ti.add_document(doc2 as i32).unwrap();
+        let op3 = ti.add_document(doc3 as i32).unwrap();
+        let op4 = ti.add_document(doc4 as i32).unwrap();
+        assert_eq!(op1, 0);
+        assert_eq!(op2, 1);
+        assert_eq!(op3, 2);
+        assert_eq!(op4, 3);
+        ti.commit().unwrap();
+        let mut rb = ti.reader_builder().unwrap();
+        let mut qp = rb.searcher().unwrap();
+        let mut searcher = qp.parse_fuzzy_query("Diary".to_string(), "title".to_string()).unwrap();
+        let sres = &searcher.fuzzy_search().unwrap();
+        let vret:Vec<serde_json::Value> = serde_json::from_str(sres).unwrap();
+        assert_eq!(vret.len(), 2);
+    }
     #[test]
     fn all_simple_fields(){
         unsafe{crate::init()};
