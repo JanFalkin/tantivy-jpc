@@ -45,7 +45,7 @@ pub use self::tsession_tests::*;
 // conversation based on the TantivySession::id.
 struct TantivySession<'a>{
     pub(crate) id:&'a str,
-    pub(crate) doc:Option<Vec<tantivy::Document>>,
+    pub(crate) doc:Option<HashMap<usize, tantivy::Document>>,
     pub(crate) builder:Option<Box<tantivy::schema::SchemaBuilder>>,
     pub(crate) schema:Option<tantivy::schema::Schema>,
     pub(crate) index:Option<Box<tantivy::Index>>,

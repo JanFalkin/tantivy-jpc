@@ -79,8 +79,8 @@ impl<'a> TantivySession<'a>{
                 None => return make_internal_json_error(ErrorKinds::BadInitialization("Field requested is not present".to_string()))
             };
             if let Some(f) = schema.get_field(f_str) {
-                let f_term = &fuzzy_term[0];
-                let t = Term::from_field_text(f, &f_term.to_string());
+                let f_term = fuzzy_term[0].as_str().ok_or(ErrorKinds::BadInitialization("Failed to parse fuzzy term".to_string()))?;
+                let t = Term::from_field_text(f, f_term);
                 let q = FuzzyTermQuery::new(t, 1, true);
                 self.fuzzy_q = Some(Box::new(q));
             }

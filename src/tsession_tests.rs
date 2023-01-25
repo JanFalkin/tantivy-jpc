@@ -204,7 +204,7 @@ pub mod tests {
             }
             let sl = p[0..*my_ret_ptr].to_vec();
             if do_ret{
-                let v:serde_json::Value = serde_json::from_slice(&sl).unwrap();
+                let v:serde_json::Value = serde_json::from_slice(&sl).unwrap_or(json!({"result" : "empty"}));
                 info!("Val = {}", v);
                 match std::str::from_utf8(&sl){
                     Ok(s) => info!("stringified = {}", s),
@@ -265,7 +265,13 @@ pub mod tests {
             });
             call_simple_type!(self, j_param, "add_f64_field")
         }
-        pub fn build(&mut self)  -> InternalCallResult<TestDocument> {
+        pub fn build(&mut self, in_memory: bool)  -> InternalCallResult<TestDocument> {
+            if in_memory{
+                let _s = self.call_jpc("builder".to_string(), "build".to_string(), json!({}), false);
+                return Ok(
+                    TestDocument{ctx:self, temp_dir: "".to_string()}
+                )
+            }
             let td = TempDir::new("TantivyBitcodeTest")?;
             self.dirs.append(vec![td].as_mut());
             let td_ref:&TempDir = self.dirs.last().unwrap();
@@ -285,7 +291,7 @@ pub mod tests {
         let mut ctx = FakeContext::new();
         assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
         assert_eq!(ctx.add_text_field("body".to_string(), 2, true), 1);
-        let mut td = match ctx.build(){
+        let mut td = match ctx.build(false){
             Ok(t) => t,
             Err(e) => {
                 panic!("{}",format!("failed with error {}", e.to_string()));
@@ -330,7 +336,7 @@ pub mod tests {
         unsafe{crate::init()};
         let mut ctx = FakeContext::new();
         assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
-        let mut td = match ctx.build(){
+        let mut td = match ctx.build(true){
             Ok(t) => t,
             Err(e) => {
                 panic!("{}",format!("failed with error {}", e.to_string()));
@@ -384,7 +390,9 @@ pub mod tests {
         let mut qp = rb.searcher().unwrap();
         let mut searcher = qp.parse_fuzzy_query("Diary".to_string(), "title".to_string()).unwrap();
         let sres = &searcher.fuzzy_search().unwrap();
-        println!("result = {sres}");
+        let vret:Vec<serde_json::Value> = serde_json::from_str(sres).unwrap();
+        assert_eq!(vret.len(), 2);
+        println!("result = {vret:?}");
     }
     #[test]
     fn all_simple_fields(){

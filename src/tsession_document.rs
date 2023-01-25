@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::TantivySession;
 use crate::InternalCallResult;
 use crate::make_internal_json_error;
@@ -18,7 +20,7 @@ impl<'a> TantivySession<'a>{
         info!("Document");
         match method {
             "add_text" => {
-                let doc = self.doc.as_mut().take();
+                let doc = self.doc.as_mut();
                 let d = match doc{
                     Some(v) => v,
                     None => return make_internal_json_error(ErrorKinds::BadInitialization("add_text with no doucments created".to_string())),
@@ -41,25 +43,27 @@ impl<'a> TantivySession<'a>{
                     },
                     None => {return make_internal_json_error(ErrorKinds::BadInitialization("field text required for document".to_string()))}
                 };
-                let cur_doc = match d.get_mut(doc_idx){
+                let cur_doc = match d.get_mut(&doc_idx){
                     Some(d) => d,
                     None => {return make_internal_json_error(ErrorKinds::BadInitialization(format!("document at index {doc_idx} does not exist")))}
                 };
-                cur_doc.add_text(f,field_val);
+                cur_doc.add_field_value(f,field_val);
             },
             "create" => {
-                let doc = self.doc.as_mut().take();
+                let doc = self.doc.as_mut();
                 let length:usize;
                 match doc{
                     Some(x) => {
-                        x.push(Document::new());
+                        let l = x.len();
+                        x.insert(l, Document::default());
                         length = x.len();
                     },
                     None => {
-                        let nd= Document::new();
-                        self.doc = Some(vec![nd]);
+                        let nd= Document::default();
+                        let mut hm = HashMap::<usize, Document>::new();
+                        hm.insert(0, nd);
+                        self.doc = Some(hm);
                         length = 1;
-                        self.doc.as_mut().unwrap(); // this unwrap should be safe
                     },
                 };
                 self.return_buffer = json!({"document_count" : length}).to_string()

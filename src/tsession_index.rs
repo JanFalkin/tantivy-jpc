@@ -41,8 +41,8 @@ impl<'a> TantivySession<'a>{
 
         }else{
             info!("Creating index in RAM");
-            self.index = Some(Box::new(tantivy::Index::create_in_ram(match self.schema.clone() {
-            Some(s) => s,
+            self.index = Some(Box::new(tantivy::Index::create_in_ram(match &self.schema {
+            Some(s) => s.to_owned(),
             None => return  make_internal_json_error(ErrorKinds::BadInitialization("A schema must be created before an index".to_string()))
         })));
             let r = self.index.clone().ok_or_else(|| ErrorKinds::Other("failed to clone index".to_string()))?;
@@ -87,7 +87,7 @@ impl<'a> TantivySession<'a>{
     }
     pub fn handle_index_writer(&mut self, method:&str, _obj: &str, params:serde_json::Value)  -> InternalCallResult<u32>{
         info!("IndexWriter");
-        let writer = match self.indexwriter.as_mut().take(){
+        let writer = match self.indexwriter.as_mut(){
             Some(x) => x,
             None => {
                 let bi = match self.index.as_mut().take(){
@@ -95,25 +95,19 @@ impl<'a> TantivySession<'a>{
                     None => return make_internal_json_error(ErrorKinds::BadInitialization("need index created for writer".to_string())),
                 };
                 self.indexwriter = Some(Box::new((*bi).writer(150000000).unwrap()));
-                self.indexwriter.as_mut().unwrap()
+                self.indexwriter.as_mut().ok_or(ErrorKinds::BadInitialization("need index created for writer".to_string()))?
             },
         };
         match method {
             "add_document" => {
-                let doc = &self.doc;
-                let d = match doc{
-                    Some(x) => x,
-                    None => {
-                        return make_internal_json_error(ErrorKinds::NotExist("document needs to be created".to_string()))
-                    },
-                };
-                let m = match params.as_object(){
-                    Some(m)=> m,
-                    None => return make_internal_json_error(ErrorKinds::BadParams("invalid parameters pass to Document add_text".to_string()))
-                };
+                let mut doc = self.doc.take();
+                let d = doc.as_mut().ok_or(ErrorKinds::NotExist("No value for hash in Documents".to_string()))?;
+                let m = params.as_object().ok_or(ErrorKinds::BadParams("invalid parameters pass to Document add_text".to_string()))?;
                 let doc_idx = m.get("id").unwrap_or(&json!{0_i32}).as_u64().unwrap_or(0) as usize -1;
-                let os = writer.add_document(d[doc_idx].to_owned());
-                self.return_buffer = json!({"opstamp": os.unwrap_or(0)}).to_string();
+                let rm = d.remove(&doc_idx).ok_or(ErrorKinds::BadInitialization("need index created for writer".to_string()))?;
+                let os = writer.add_document(rm)?;
+                self.return_buffer = json!({"opstamp": os}).to_string();
+                self.doc = doc;
                 info!("{}", self.return_buffer);
             },
             "commit" => {
@@ -121,6 +115,7 @@ impl<'a> TantivySession<'a>{
                     Ok(x)=>{
                         self.return_buffer = json!({"id": x}).to_string();
                         info!("{}", self.return_buffer);
+                        self.indexwriter = None;
                         x
                     },
                     Err(err) => return make_internal_json_error(ErrorKinds::NotFinalized(format!("failed to commit indexwriter, {err}")))
