@@ -244,12 +244,12 @@ pub type InternalCallResult<T> = std::result::Result<T, ErrorKinds>;
 ///
 #[no_mangle]
 pub unsafe extern "C" fn init() -> u8{
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init(); 
+    let _= env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).try_init();
     0
 }
 
 pub fn test_init(){
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init(); 
+    let _= env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).try_init();
 }
 
 
