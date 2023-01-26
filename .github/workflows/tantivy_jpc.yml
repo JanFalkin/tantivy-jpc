@@ -1,4 +1,4 @@
-name: Tantivy_jpc
+name: tantivy-jpc
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
           default: true
           override: true
       - name: Build
-        run: cargo build --release && mv target/release/libtantivy_jpc.a go-client/tantivy/packaged/lib/linux-amd64/ && cp -u target/tantivy_jpc.h go-client/tantivy/packaged/include/
+        run: cargo build --release && mv target/release/libtantivy_jpc.a go-client/tantivy/packaged/lib/linux-amd64/ && cp -u target/tantivy-jpc.h go-client/tantivy/packaged/include/
       - name: Run tests
         run: cargo test --verbose
       - name: Create Pull Request

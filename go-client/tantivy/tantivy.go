@@ -7,7 +7,7 @@ package tantivy
 // #cgo LDFLAGS: -ltantivy_jpc -lm -ldl -pthread
 // #cgo linux,amd64 LDFLAGS: -Wl,--allow-multiple-definition
 //
-// #include "tantivy_jpc.h"
+// #include "tantivy-jpc.h"
 import "C"
 import (
 	"encoding/json"
@@ -31,7 +31,7 @@ type msi map[string]interface{}
 
 const defaultMemSize = 5000000
 
-// The comsBuf is a raw byte buffer for tantivy_jpc to send results. A single mutex guards its use.
+// The comsBuf is a raw byte buffer for tantivy-jpc to send results. A single mutex guards its use.
 type JPCId struct {
 	id      string
 	TempDir string

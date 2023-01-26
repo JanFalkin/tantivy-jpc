@@ -198,7 +198,7 @@ pub mod tests {
             });
             let mut sp = serde_json::to_vec(&call_p).unwrap_or(vec![]);
             let p = Box::leak(Box::<Vec<u8>>::new(vec![0; 5000000]));
-            info!("calling tantivy_jpc json = {}", call_p);
+            info!("calling tantivy-jpc json = {}", call_p);
             unsafe{
                 tantivy_jpc(sp.as_mut_ptr(), sp.len(), p.as_mut_ptr(), my_ret_ptr);
             }

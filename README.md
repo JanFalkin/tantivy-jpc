@@ -6,7 +6,7 @@
 
 https://go.dev/dl/
 
-## Changing or updating build targets for tantivy_jpc.so(dll/dynlib)
+## Changing or updating build targets for tantivy-jpc.so(dll/dynlib)
 ### Install Rust
 
 ```
@@ -26,7 +26,7 @@ cargo build --release
 ### Via go get
 
 ```
-go get github.com/JanFalkin/tantivy_jpc/go-client/tantivy
+go get github.com/JanFalkin/tantivy-jpc/go-client/tantivy
 
 ```
 
@@ -39,7 +39,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/JanFalkin/tantivy_jpc/go-client/tantivy"
+	"github.com/JanFalkin/tantivy-jpc/go-client/tantivy"
 )
 
 const ofMiceAndMen = `A few miles south of Soledad, the Salinas River drops in close to the hillside
