@@ -29,9 +29,14 @@ func LibInit() {
 
 type msi map[string]interface{}
 
+const defaultMemSize = 5000000
+
+// The comsBuf is a raw byte buffer for tantivy_jpc to send results. A single mutex guards its use.
 type JPCId struct {
 	id      string
 	TempDir string
+	comsBuf []byte
+	rwLock  sync.Mutex
 }
 
 func (j *JPCId) ID() string {
@@ -43,11 +48,11 @@ type TSearcher struct {
 }
 
 func (s *TSearcher) Search() (string, error) {
-	return callTantivy(s.JPCId.id, "searcher", "search", msi{})
+	return s.callTantivy("searcher", "search", msi{})
 }
 
 func (s *TSearcher) FuzzySearch() (string, error) {
-	return callTantivy(s.JPCId.id, "fuzzy_searcher", "fuzzy_searcher", msi{})
+	return s.callTantivy("fuzzy_searcher", "fuzzy_searcher", msi{})
 }
 
 type TQueryParser struct {
@@ -55,7 +60,7 @@ type TQueryParser struct {
 }
 
 func (qp *TQueryParser) ForIndex(fields []string) (uint, error) {
-	_, err := callTantivy(qp.JPCId.id, "query_parser", "for_index", msi{
+	_, err := qp.callTantivy("query_parser", "for_index", msi{
 		"fields": fields,
 	})
 	if err != nil {
@@ -65,7 +70,7 @@ func (qp *TQueryParser) ForIndex(fields []string) (uint, error) {
 }
 
 func (qp *TQueryParser) ParseQuery(query string) (*TSearcher, error) {
-	_, err := callTantivy(qp.JPCId.id, "query_parser", "parse_query", msi{
+	_, err := qp.callTantivy("query_parser", "parse_query", msi{
 		"query": query,
 	})
 	if err != nil {
@@ -75,7 +80,7 @@ func (qp *TQueryParser) ParseQuery(query string) (*TSearcher, error) {
 }
 
 func (qp *TQueryParser) ParseFuzzyQuery(field, term string) (*TSearcher, error) {
-	_, err := callTantivy(qp.JPCId.id, "query_parser", "parse_fuzzy_query", msi{
+	_, err := qp.callTantivy("query_parser", "parse_fuzzy_query", msi{
 		"term":  []string{term},
 		"field": []string{field},
 	})
@@ -90,7 +95,7 @@ type TIndexReader struct {
 }
 
 func (idr *TIndexReader) Searcher() (*TQueryParser, error) {
-	_, err := callTantivy(idr.JPCId.id, "index_reader", "searcher", msi{})
+	_, err := idr.callTantivy("index_reader", "searcher", msi{})
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +107,7 @@ type TIndexWriter struct {
 }
 
 func (idw *TIndexWriter) Commit() (uint64, error) {
-	s, err := callTantivy(idw.JPCId.id, "indexwriter", "commit", msi{})
+	s, err := idw.callTantivy("indexwriter", "commit", msi{})
 	if err != nil {
 		return 0, err
 	}
@@ -119,9 +124,7 @@ func (idw *TIndexWriter) Commit() (uint64, error) {
 }
 
 func (idw *TIndexWriter) AddDocument(docid uint) (uint, error) {
-	s, err := callTantivy(idw.JPCId.id, "indexwriter", "add_document", msi{
-		"id": docid,
-	})
+	s, err := idw.callTantivy("indexwriter", "add_document", msi{"id": docid})
 	if err != nil {
 		return 0, err
 	}
@@ -146,7 +149,7 @@ func (idx *TIndex) CreateIndexWriter() (*TIndexWriter, error) {
 }
 
 func (idx *TIndex) ReaderBuilder() (*TIndexReader, error) {
-	_, err := callTantivy(idx.JPCId.id, "index", "reader_builder", msi{})
+	_, err := idx.callTantivy("index", "reader_builder", msi{})
 	if err != nil {
 		return nil, err
 	}
@@ -164,20 +167,17 @@ func (td *TDocument) CreateIndex() (*TIndex, error) {
 	if td.TempDir == "" {
 		return nil, e("reason", "TempDir is empty")
 	}
-	_, err := callTantivy(td.JPCId.id, "index", "create", msi{"directory": td.TempDir})
+	_, err := td.callTantivy("index", "create", msi{"directory": td.TempDir})
 	if err != nil {
 		return nil, e(err, "reason", "index create failed")
 	}
 	return &TIndex{
-		JPCId: &JPCId{
-			id:      td.id,
-			TempDir: td.TempDir,
-		},
+		JPCId: td.JPCId,
 	}, nil
 }
 
 func (td *TDocument) Create() (uint, error) {
-	s, err := callTantivy(td.id, "document", "create", msi{})
+	s, err := td.callTantivy("document", "create", msi{})
 	if err != nil {
 		return 0, err
 	}
@@ -194,7 +194,7 @@ func (td *TDocument) Create() (uint, error) {
 }
 
 func (td *TDocument) AddText(field int, value string, doc_id uint) (int, error) {
-	_, err := callTantivy(td.id, "document", "add_text", msi{
+	_, err := td.callTantivy("document", "add_text", msi{
 		"field":  field,
 		"value":  value,
 		"id":     td.JPCId.id,
@@ -217,36 +217,40 @@ const (
 	TEXT   StorageKind = 2
 )
 
-func NewBuilder(td string) (*TBuilder, error) {
+func NewBuilder(td string, memsize ...int32) (*TBuilder, error) {
+	var memSizeToUse int32
+	if len(memsize) > 0 {
+		memSizeToUse = memsize[0]
+	} else {
+		memSizeToUse = defaultMemSize
+	}
 	u := uuid.NewV4()
 	tb := TBuilder{
 		JPCId: &JPCId{
 			id:      u.String(),
 			TempDir: td,
+			comsBuf: make([]byte, memSizeToUse),
 		},
 	}
 	return &tb, nil
 }
 
-func (td *TBuilder) CreateIndex() (*TIndex, error) {
-	e := errors.Template("TBuilder.CreateIndex", errors.K.Invalid, "TempDir", td.TempDir)
+func (tb *TBuilder) CreateIndex() (*TIndex, error) {
+	e := errors.Template("TBuilder.CreateIndex", errors.K.Invalid, "TempDir", tb.TempDir)
 
-	if td.TempDir == "" {
+	if tb.TempDir == "" {
 		return nil, e("reason", "TempDir is empty")
 	}
-	_, err := callTantivy(td.JPCId.id, "index", "create", msi{"directory": td.TempDir})
+	_, err := tb.callTantivy("index", "create", msi{"directory": tb.TempDir})
 	if err != nil {
 		return nil, e(err, "reason", "index create failed")
 	}
 	return &TIndex{
-		JPCId: &JPCId{
-			id:      td.id,
-			TempDir: td.TempDir,
-		},
+		JPCId: tb.JPCId,
 	}, nil
 }
 
-func (td *TBuilder) standardReturnHandler(s string, err error) (int, error) {
+func (tb *TBuilder) standardReturnHandler(s string, err error) (int, error) {
 	if err != nil {
 		return -1, err
 	}
@@ -265,63 +269,63 @@ func (td *TBuilder) standardReturnHandler(s string, err error) (int, error) {
 
 }
 
-func (td *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool) (int, error) {
-	s, err := callTantivy(td.id, "builder", "add_text_field", msi{
+func (tb *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool) (int, error) {
+	s, err := tb.callTantivy("builder", "add_text_field", msi{
 		"name":   name,
 		"type":   fieldType,
 		"stored": true,
-		"id":     td.JPCId.id,
+		"id":     tb.JPCId.id,
 	})
-	return td.standardReturnHandler(s, err)
+	return tb.standardReturnHandler(s, err)
 
 }
 
-func (td *TBuilder) AddDateField(name string, fieldType StorageKind, stored bool) (int, error) {
-	s, err := callTantivy(td.id, "builder", "add_date_field", msi{
+func (tb *TBuilder) AddDateField(name string, fieldType StorageKind, stored bool) (int, error) {
+	s, err := tb.callTantivy("builder", "add_date_field", msi{
 		"name":   name,
 		"type":   fieldType,
 		"stored": true,
-		"id":     td.JPCId.id,
+		"id":     tb.JPCId.id,
 	})
 
-	return td.standardReturnHandler(s, err)
+	return tb.standardReturnHandler(s, err)
 }
 
-func (td *TBuilder) AddU64Field(name string, fieldType StorageKind, stored bool) (int, error) {
-	s, err := callTantivy(td.id, "builder", "add_u64_field", msi{
+func (tb *TBuilder) AddU64Field(name string, fieldType StorageKind, stored bool) (int, error) {
+	s, err := tb.callTantivy("builder", "add_u64_field", msi{
 		"name":   name,
 		"type":   fieldType,
 		"stored": true,
-		"id":     td.JPCId.id,
+		"id":     tb.JPCId.id,
 	})
 
-	return td.standardReturnHandler(s, err)
+	return tb.standardReturnHandler(s, err)
 }
 
-func (td *TBuilder) AddI64Field(name string, fieldType StorageKind, stored bool) (int, error) {
-	s, err := callTantivy(td.id, "builder", "add_i64_field", msi{
+func (tb *TBuilder) AddI64Field(name string, fieldType StorageKind, stored bool) (int, error) {
+	s, err := tb.callTantivy("builder", "add_i64_field", msi{
 		"name":   name,
 		"type":   fieldType,
 		"stored": true,
-		"id":     td.JPCId.id,
+		"id":     tb.JPCId.id,
 	})
 
-	return td.standardReturnHandler(s, err)
+	return tb.standardReturnHandler(s, err)
 }
 
-func (td *TBuilder) AddF64Field(name string, fieldType StorageKind, stored bool) (int, error) {
-	s, err := callTantivy(td.id, "builder", "add_f64_field", msi{
+func (tb *TBuilder) AddF64Field(name string, fieldType StorageKind, stored bool) (int, error) {
+	s, err := tb.callTantivy("builder", "add_f64_field", msi{
 		"name":   name,
 		"type":   fieldType,
 		"stored": true,
-		"id":     td.JPCId.id,
+		"id":     tb.JPCId.id,
 	})
 
-	return td.standardReturnHandler(s, err)
+	return tb.standardReturnHandler(s, err)
 }
 
-func (td *TBuilder) Build() (*TDocument, error) {
-	s, err := callTantivy(td.JPCId.id, "builder", "build", msi{})
+func (tb *TBuilder) Build() (*TDocument, error) {
+	s, err := tb.callTantivy("builder", "build", msi{})
 	if err != nil {
 		return nil, err
 	}
@@ -338,18 +342,15 @@ func (td *TBuilder) Build() (*TDocument, error) {
 	}
 
 	return &TDocument{
-		JPCId: &JPCId{
-			id:      td.id,
-			TempDir: td.TempDir,
-		},
+		JPCId:  tb.JPCId,
 		schema: schema.([]interface{}),
 	}, nil
 
 }
 
-func callTantivy(u, object, method string, params msi) (string, error) {
+func (jpc *JPCId) callTantivy(object, method string, params msi) (string, error) {
 	f := map[string]interface{}{
-		"id":     u,
+		"id":     jpc.id,
 		"jpc":    "1.0",
 		"obj":    object,
 		"method": method,
@@ -360,12 +361,13 @@ func callTantivy(u, object, method string, params msi) (string, error) {
 		return "", err
 	}
 	p := C.CString(string(b))
-	rb := make([]byte, 5000000)
-	csrb := C.CString(string(rb))
+	csrb := C.CString(string(jpc.comsBuf))
 	crb := (*C.uchar)(unsafe.Pointer(csrb))
 	cs := (*C.uchar)(unsafe.Pointer(p))
-	rbl := len(rb)
+	rbl := len(jpc.comsBuf)
 	prbl := (*C.ulong)(unsafe.Pointer(&rbl))
+	jpc.rwLock.Lock()
+	defer jpc.rwLock.Unlock()
 	ttret := C.tantivy_jpc(cs, C.ulong(uint64(len(string(b)))), crb, prbl)
 	if ttret < 0 {
 		return "", errors.E("Tantivy JPC Failed", errors.K.Invalid, "desc", C.GoString(csrb))

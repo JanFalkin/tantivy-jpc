@@ -286,7 +286,7 @@ pub mod tests {
 
     #[test]
     fn basic_index(){
-        unsafe{crate::init()};
+        crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
         assert_eq!(ctx.add_text_field("body".to_string(), 2, true), 1);
@@ -332,7 +332,7 @@ pub mod tests {
     }
     #[test]
     fn basic_index_fuzzy(){
-        unsafe{crate::init()};
+        crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
         let mut td = match ctx.build(true){
@@ -394,7 +394,7 @@ pub mod tests {
     }
     #[test]
     fn all_simple_fields(){
-        unsafe{crate::init()};
+        crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
         assert_eq!(ctx.add_text_field("body".to_string(), 2, true), 1);

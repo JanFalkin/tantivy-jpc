@@ -244,11 +244,15 @@ pub type InternalCallResult<T> = std::result::Result<T, ErrorKinds>;
 ///
 #[no_mangle]
 pub unsafe extern "C" fn init() -> u8{
-    if let Ok(_res) = env_logger::try_init() {
-        return 0;
-    }
-    1
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init(); 
+    0
 }
+
+pub fn test_init(){
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).init(); 
+}
+
+
 
 /**
 tantivy_jpc is the main entry point into a translation layer from Rust to Go for Tantivy
@@ -267,6 +271,7 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
       Err(err) => {
           *ret_len  = err.to_string().len();
           std::ptr::copy(err.to_string().as_ptr(), ret, *ret_len);
+          log::error!("failed error = {err}");
           return -1;
       }
   };
