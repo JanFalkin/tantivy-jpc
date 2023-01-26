@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/JanFalkin/tantivy_jpc/go-client/tantivy"
+	"github.com/JanFalkin/tantivy-jpc/go-client/tantivy"
 )
 
 const ofMiceAndMen = `A few miles south of Soledad, the Salinas River drops in close to the hillside
