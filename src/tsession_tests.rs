@@ -10,8 +10,11 @@ pub mod tests {
     use tempdir::TempDir;
     use uuid::{Uuid};
 
+    use crate::ErrorKinds;
+
     use super::*;
     use serde_json::Map;
+    use std::rc::Rc;
 
 
     pub static mut GSIZE:usize = 0;
@@ -37,17 +40,17 @@ pub mod tests {
 
 
     #[derive(Debug)]
-    pub struct FakeContext<'a>{
+    pub struct FakeContext{
         pub id:String,
         pub buf:Vec<u8>,
-        pub ret_len:&'a mut usize,
-        pub dirs:&'a mut Vec<TempDir>,
+        pub ret_len:usize,
+        pub dirs:Vec<TempDir>,
 
     }
     #[derive(Debug)]
     pub struct TestDocument<'a>{
         pub     temp_dir:String,
-        pub ctx:    &'a FakeContext<'a>,
+        pub ctx:    Rc<&'a FakeContext>,
 
     }
 
@@ -71,23 +74,23 @@ pub mod tests {
 
 
     pub struct TestIndex<'a>{
-        ctx:    &'a FakeContext<'a>,
+        ctx:    Rc<&'a FakeContext>,
         temp_dir: String,
     }
 
     pub struct TestIndexReader<'a>{
-        ctx:    &'a FakeContext<'a>,
+        ctx:    Rc<&'a FakeContext>,
     }
 
     pub struct TestQueryParser<'a>{
-        ctx:    &'a FakeContext<'a>,
+        ctx:    Rc<&'a FakeContext>,
     }
 
     pub struct TestSearcher<'a>{
-        ctx:    &'a FakeContext<'a>,
+        ctx:    Rc<&'a FakeContext>,
     }
 
-    impl<'a> TestSearcher<'a>{
+    impl TestSearcher<'_>{
         pub fn search(&mut self)-> InternalCallResult<String>{
             let b = self.ctx.call_jpc("searcher".to_string(), "search".to_string(), json!({}),true);
             let s = std::str::from_utf8(&b).unwrap();
@@ -100,7 +103,7 @@ pub mod tests {
         }
     }
 
-    impl<'a> TestQueryParser<'a>{
+    impl TestQueryParser<'_>{
         pub fn for_index(&mut self, v:Vec<String>)-> InternalCallResult<i32>{
             self.ctx.call_jpc("query_parser".to_string(), "for_index".to_string(), json!({
                 "fields": v,
@@ -109,22 +112,22 @@ pub mod tests {
         }
         pub fn parse_query(&mut self, query:String) ->  InternalCallResult<TestSearcher> {
             self.ctx.call_jpc("query_parser".to_string(), "parse_query".to_string(), json!({"query": query}), false);
-            Ok(TestSearcher{ctx:self.ctx})
+            Ok(TestSearcher{ctx:self.ctx.clone()})
         }
         pub fn parse_fuzzy_query(&mut self, term:String, field:String) ->  InternalCallResult<TestSearcher> {
             self.ctx.call_jpc("query_parser".to_string(), "parse_fuzzy_query".to_string(), json!({"term": [term], "field" : [field]}), false);
-            Ok(TestSearcher{ctx:self.ctx})
+            Ok(TestSearcher{ctx:self.ctx.clone()})
         }
 
     }
-    impl<'a> TestIndexReader<'a>{
+    impl TestIndexReader<'_>{
         pub fn searcher(&mut self) -> InternalCallResult<TestQueryParser>{
             self.ctx.call_jpc("index_reader".to_string(), "searcher".to_string(), json!({}),false);
-            Ok(TestQueryParser{ctx:self.ctx})
+            Ok(TestQueryParser{ctx:self.ctx.clone()})
         }
     }
 
-    impl<'a> TestIndex<'a>{
+    impl TestIndex<'_>{
         pub fn add_document(&mut self, doc_id:i32) ->Result<u64, u32>{
             let _ = self.temp_dir;
             let s = self.ctx.call_jpc("indexwriter".to_string(), "add_document".to_string(), json!({"id": doc_id}), true);
@@ -140,11 +143,11 @@ pub mod tests {
         }
         pub fn reader_builder(&mut self)-> InternalCallResult<TestIndexReader>{
             self.ctx.call_jpc("index".to_string(), "reader_builder".to_string(), json!({}),false);
-            Ok(TestIndexReader{ctx:self.ctx})
+            Ok(TestIndexReader{ctx:self.ctx.clone()})
         }
     }
 
-    impl<'a> TestDocument<'a>{
+    impl TestDocument<'_>{
         pub fn create(&mut self) -> Result<usize, i32>{
             let tdc:TestCreateDocumentResult = serde_json::from_slice(&self.ctx.call_jpc("document".to_string(), "create".to_string(), json!({}), true)).unwrap();
             Ok(tdc.document_count)
@@ -156,37 +159,37 @@ pub mod tests {
         pub fn create_index(&mut self) -> Result<TestIndex, std::io::Error>{
             self.ctx.call_jpc("index".to_string(), "create".to_string(), json!({"directory":  self.temp_dir}), false);
             Ok(TestIndex{
-                ctx:self.ctx,
+                ctx:self.ctx.clone(),
                 temp_dir:self.temp_dir.clone(),
             })
         }
     }
 
-    impl<'a> Default for FakeContext<'a> {
+    impl Default for FakeContext {
        fn default() -> Self {
             Self::new()
        }
     }
 
-    impl<'a> Drop for FakeContext<'a>{
+    impl Drop for FakeContext{
         fn drop(&mut self) {
             for t in 0..self.dirs.len(){
-                let td = self.dirs[t].as_ref();
+                let td = &self.dirs[t];
                 let _ = std::fs::remove_dir_all(td);
             }
         }
     }
 
-    impl<'a> FakeContext<'a> {
-        pub fn new() -> FakeContext<'a>{
+    impl FakeContext {
+        pub fn new() -> FakeContext{
             FakeContext{
                 id: Uuid::new_v4().to_string(),
                 buf: vec![0; 5000000],
-                ret_len:Box::leak(Box::<usize>::new(0)),
-                dirs:Box::leak(Box::<Vec<TempDir>>::default()),
+                ret_len:0,
+                dirs:<Vec<TempDir>>::default(),
             }
         }
-        pub fn call_jpc(&'a self, object:String, method:String, params:serde_json::Value, do_ret:bool)-> Vec<u8>{
+        pub fn call_jpc(&self, object:String, method:String, params:serde_json::Value, do_ret:bool)-> Vec<u8>{
             let my_ret_ptr = Box::leak(Box::new(0));
 
             let call_p = json!({
@@ -268,17 +271,18 @@ pub mod tests {
             if in_memory{
                 let _s = self.call_jpc("builder".to_string(), "build".to_string(), json!({}), false);
                 return Ok(
-                    TestDocument{ctx:self, temp_dir: "".to_string()}
+                    TestDocument{ctx:Rc::new(self), temp_dir: "".to_string()}
                 )
             }
             let td = TempDir::new("TantivyBitcodeTest")?;
-            self.dirs.append(vec![td].as_mut());
-            let td_ref:&TempDir = self.dirs.last().unwrap();
+            self.dirs.append(&mut vec![td]);
+            let td_ref = self.dirs.last().unwrap();
             let s = self.call_jpc("builder".to_string(), "build".to_string(), json!({}), false);
             info!("build returned={:?}", s);
+            let tdir = td_ref.path().to_str().to_owned().ok_or(ErrorKinds::NotExist("temp path not available".to_string()))?;
             Ok(TestDocument{
-                ctx:self,
-                temp_dir: td_ref.path().to_owned().to_str().unwrap().to_string(),
+                ctx: Rc::new(self),
+                temp_dir: tdir.to_string(),
             })
         }
     }
