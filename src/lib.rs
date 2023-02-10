@@ -6,7 +6,7 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate lazy_static;
 extern crate tempdir;
-use log::{info};
+use log::{info, error};
 use serde_json::json;
 use serde_derive::{Serialize, Deserialize};
 use std::str;
@@ -15,7 +15,7 @@ use tantivy::{Searcher, TantivyError};
 use tantivy::query::{Query, QueryParser, FuzzyTermQuery};
 use std::ffi::{c_char, CStr};
 
-use lazy_static::{lazy_static, __Deref};
+use lazy_static::{lazy_static};
 use std::sync::Mutex;
 
 extern crate thiserror;
@@ -280,7 +280,7 @@ pub unsafe extern "C" fn term(s: *const c_char) -> i8{
                 0
             },
             Err(_) => {
-                info!("tag NOT cleaned");
+                error!("tag NOT cleaned");
                 -1
             },
         };
@@ -306,7 +306,7 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
       Err(err) => {
           *ret_len  = err.to_string().len();
           std::ptr::copy(err.to_string().as_ptr(), ret, *ret_len);
-          log::error!("failed error = {err}");
+          error!("failed error = {err}");
           return -1;
       }
   };
