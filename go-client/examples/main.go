@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
-	"runtime"
 
 	"github.com/JanFalkin/tantivy-jpc/go-client/tantivy"
 )
@@ -135,5 +134,4 @@ func doRun() {
 
 func main() {
 	doRun()
-	runtime.GC()
 }
