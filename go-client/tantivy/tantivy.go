@@ -27,6 +27,10 @@ func LibInit() {
 	})
 }
 
+func Term(s string) {
+	C.term(C.CString(s))
+}
+
 type msi map[string]interface{}
 
 const defaultMemSize = 5000000

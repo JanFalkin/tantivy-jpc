@@ -13,8 +13,9 @@ use std::str;
 use std::collections::HashMap;
 use tantivy::{Searcher, TantivyError};
 use tantivy::query::{Query, QueryParser, FuzzyTermQuery};
+use std::ffi::{c_char, CStr};
 
-use lazy_static::lazy_static;
+use lazy_static::{lazy_static, __Deref};
 use std::sync::Mutex;
 
 extern crate thiserror;
@@ -252,6 +253,40 @@ pub fn test_init(){
     let _= env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace")).try_init();
 }
 
+
+fn do_term(s:&str) -> InternalCallResult<String>{
+    match TANTIVY_MAP.lock().as_mut(){
+        Ok(t) => {
+            info!("removing {s}");
+            t.remove_entry(s).unwrap()
+        },
+        Err(e) => {
+            info!("TANTIVY_MAP lock failed {e}");
+            return Err(ErrorKinds::BadParams("WOOPS".to_string()))
+        },
+      };
+    Ok(s.to_string())
+}
+
+/// # Safety
+///
+#[no_mangle]
+pub unsafe extern "C" fn term(s: *const c_char) -> i8{
+    let c_str = CStr::from_ptr(s).to_str().unwrap_or("");
+    if c_str != ""{
+        match do_term(c_str){
+            Ok(_) => {
+                info!("tag cleaned");
+                0
+            },
+            Err(_) => {
+                info!("tag NOT cleaned");
+                -1
+            },
+        };
+    }
+    0
+}
 
 
 /**

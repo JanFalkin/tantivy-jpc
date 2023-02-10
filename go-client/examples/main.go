@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"runtime"
 
 	"github.com/JanFalkin/tantivy-jpc/go-client/tantivy"
 )
@@ -18,7 +19,7 @@ debris of the winter's flooding; and sycamores with mottled, white, recumbent
 limbs and branches that arch over the pool`
 const oldMan = "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."
 
-func main() {
+func doRun() {
 	tantivy.LibInit()
 	td, err := ioutil.TempDir("", "tindex")
 	defer func() {
@@ -109,7 +110,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if sr["title"][1] != oldMan {
+	if sr["title"][0] != "The Old Man and the Sea" {
 		panic("expcted value not received")
 	}
 	searcherAgain, err := qp.ParseQuery("Mice Men")
@@ -125,8 +126,14 @@ func main() {
 		panic(err)
 	}
 
-	if sr["title"][1] != ofMiceAndMen {
+	if sr["title"][0] != "Of Mice and Men" {
 		panic("expcted value not received")
 	}
+	tantivy.Term(builder.ID())
 
+}
+
+func main() {
+	doRun()
+	runtime.GC()
 }
