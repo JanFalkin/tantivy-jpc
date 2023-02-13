@@ -128,7 +128,7 @@ func doRun() {
 	if sr["title"][0] != "Of Mice and Men" {
 		panic("expcted value not received")
 	}
-	tantivy.Term(builder.ID())
+	tantivy.ClearSession(builder.ID())
 
 }
 

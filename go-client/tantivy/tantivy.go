@@ -27,8 +27,8 @@ func LibInit() {
 	})
 }
 
-func Term(s string) {
-	C.term(C.CString(s))
+func ClearSession(sessionID string) {
+	C.term(C.CString(sessionID))
 }
 
 type msi map[string]interface{}
