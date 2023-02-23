@@ -8,6 +8,10 @@ package tantivy
 // #cgo linux,amd64 LDFLAGS: -Wl,--allow-multiple-definition
 //
 // #include "tantivy-jpc.h"
+// #include <stdlib.h>
+// char* internal_malloc(int sz){
+//	return (char*)malloc(sz);
+//}
 import "C"
 import (
 	"encoding/json"
@@ -31,12 +35,12 @@ type msi map[string]interface{}
 
 const defaultMemSize = 5000000
 
-// The comsBuf is a raw byte buffer for tantivy-jpc to send results. A single mutex guards its use.
+// The ccomsBuf is a raw byte buffer for tantivy-jpc to send results. A single mutex guards its use.
 type JPCId struct {
-	id      string
-	TempDir string
-	comsBuf []byte
-	rwLock  sync.Mutex
+	id       string
+	TempDir  string
+	ccomsBuf *C.char
+	bufLen   int32
 }
 
 func (j *JPCId) ID() string {
@@ -227,9 +231,10 @@ func NewBuilder(td string, memsize ...int32) (*TBuilder, error) {
 	u := uuid.NewV4()
 	tb := TBuilder{
 		JPCId: &JPCId{
-			id:      u.String(),
-			TempDir: td,
-			comsBuf: make([]byte, memSizeToUse),
+			id:       u.String(),
+			TempDir:  td,
+			bufLen:   memSizeToUse,
+			ccomsBuf: C.internal_malloc(C.int(memSizeToUse)),
 		},
 	}
 	return &tb, nil
@@ -360,18 +365,16 @@ func (jpc *JPCId) callTantivy(object, method string, params msi) (string, error)
 	if err != nil {
 		return "", err
 	}
-	p := C.CString(string(b))
-	csrb := C.CString(string(jpc.comsBuf))
-	crb := (*C.uchar)(unsafe.Pointer(csrb))
+	sb := string(b)
+	p := C.CString(sb)
+	defer C.free(unsafe.Pointer(p))
+	crb := (*C.uchar)(unsafe.Pointer(jpc.ccomsBuf))
 	cs := (*C.uchar)(unsafe.Pointer(p))
-	rbl := len(jpc.comsBuf)
-	prbl := (*C.ulong)(unsafe.Pointer(&rbl))
-	jpc.rwLock.Lock()
-	defer jpc.rwLock.Unlock()
-	ttret := C.tantivy_jpc(cs, C.ulong(uint64(len(string(b)))), crb, prbl)
+	prbl := (*C.ulong)(unsafe.Pointer(&jpc.bufLen))
+	ttret := C.tantivy_jpc(cs, C.ulong(uint64(len(sb))), crb, prbl)
 	if ttret < 0 {
-		return "", errors.E("Tantivy JPC Failed", errors.K.Invalid, "desc", C.GoString(csrb))
+		return "", errors.E("Tantivy JPC Failed", errors.K.Invalid, "desc", C.GoString(jpc.ccomsBuf))
 	}
-	returnData := C.GoString(csrb)
+	returnData := C.GoString(jpc.ccomsBuf)
 	return returnData, nil
 }

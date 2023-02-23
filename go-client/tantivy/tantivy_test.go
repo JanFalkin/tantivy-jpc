@@ -248,3 +248,57 @@ func TestTantivyIndexReuse(t *testing.T) {
 	idx := loadIndex(t, td)
 	testExpectedIndex(t, idx)
 }
+
+func TestTantivyStress(t *testing.T) {
+	td, err := ioutil.TempDir("", "tindex")
+	require.NoError(t, err)
+	defer func() {
+		os.RemoveAll(td)
+	}()
+	builder, err := NewBuilder(td)
+	require.NoError(t, err)
+	fieldIds := map[string]int{}
+	fields := []string{"title", "body", "speech", "shot", "action", "logo", "segment", "celeb", "cast"}
+	fieldsLong := []string{"description", "has_field"}
+	for _, f := range fields {
+		fieldIds[f], err = builder.AddTextField(f, TEXT, true)
+		require.NoError(t, err)
+	}
+	for _, f := range fieldsLong {
+		fieldIds[f], err = builder.AddTextField(f, TEXT, true)
+		require.NoError(t, err)
+	}
+
+	doc, err := builder.Build()
+	require.NoError(t, err)
+	ti, err := doc.CreateIndex()
+	require.NoError(t, err)
+	tiw, err := ti.CreateIndexWriter()
+	require.NoError(t, err)
+
+	text := "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."
+	text2 := `A few miles south of Soledad, the Salinas River drops in close to the hillside
+	bank and runs deep and green. The water is warm too, for it has slipped twinkling
+	over the yellow sands in the sunlight before reaching the narrow pool. On one
+	side of the river the golden foothill slopes curve up to the strong and rocky
+	Gabilan Mountains, but on the valley side the water is lined with trees—willows
+	fresh and green with every spring, carrying in their lower leaf junctures the
+	debris of the winter's flooding; and sycamores with mottled, white, recumbent
+	limbs and branches that arch over the pool`
+	for i := 0; i < 1041; i++ {
+		newDoc, err := doc.Create()
+		require.NoError(t, err)
+		for _, f := range fields {
+			_, err = doc.AddText(fieldIds[f], text, newDoc)
+			require.NoError(t, err)
+		}
+		for _, f := range fieldsLong {
+			_, err = doc.AddText(fieldIds[f], text2, newDoc)
+			require.NoError(t, err)
+		}
+		_, err = tiw.AddDocument(newDoc)
+		require.NoError(t, err)
+	}
+	_, err = tiw.Commit()
+	require.NoError(t, err)
+}

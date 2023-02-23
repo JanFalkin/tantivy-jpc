@@ -313,6 +313,8 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
     };
     let (return_val, ret_sz) = entity.do_method(json_params.method, json_params.obj, json_params.params);
     std::ptr::copy(return_val, ret, ret_sz);
+    let end = ret.offset(ret_sz.try_into().unwrap_or_default());
+    *end = 0;
     *ret_len = ret_sz;
     entity.return_buffer.clear();
     0
