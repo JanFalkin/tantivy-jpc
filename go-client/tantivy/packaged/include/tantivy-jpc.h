@@ -10,6 +10,12 @@
 uint8_t init(void);
 
 /**
+ * # Safety
+ *
+ */
+int8_t term(const char *s);
+
+/**
  * tantivy_jpc is the main entry point into a translation layer from Rust to Go for Tantivy this function will # Steps   * parse the input for the appropriately formatted json   * Modify internal state to reflect json requests
  * # Safety
  *

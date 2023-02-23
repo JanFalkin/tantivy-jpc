@@ -31,6 +31,10 @@ func LibInit() {
 	})
 }
 
+func ClearSession(sessionID string) {
+	C.term(C.CString(sessionID))
+}
+
 type msi map[string]interface{}
 
 const defaultMemSize = 5000000

@@ -6,15 +6,16 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate lazy_static;
 extern crate tempdir;
-use log::{info};
+use log::{info, error};
 use serde_json::json;
 use serde_derive::{Serialize, Deserialize};
 use std::str;
 use std::collections::HashMap;
 use tantivy::{Searcher, TantivyError};
 use tantivy::query::{Query, QueryParser, FuzzyTermQuery};
+use std::ffi::{c_char, CStr};
 
-use lazy_static::lazy_static;
+use lazy_static::{lazy_static};
 use std::sync::Mutex;
 
 extern crate thiserror;
@@ -253,6 +254,40 @@ pub fn test_init(){
 }
 
 
+fn do_term(s:&str) -> InternalCallResult<String>{
+    match TANTIVY_MAP.lock().as_mut(){
+        Ok(t) => {
+            info!("removing {s}");
+            t.remove_entry(s).unwrap()
+        },
+        Err(e) => {
+            info!("TANTIVY_MAP lock failed {e}");
+            return Err(ErrorKinds::BadParams("WOOPS".to_string()))
+        },
+      };
+    Ok(s.to_string())
+}
+
+/// # Safety
+///
+#[no_mangle]
+pub unsafe extern "C" fn term(s: *const c_char) -> i8{
+    let c_str = CStr::from_ptr(s).to_str().unwrap_or("");
+    if c_str != ""{
+        match do_term(c_str){
+            Ok(_) => {
+                info!("tag cleaned");
+                0
+            },
+            Err(_) => {
+                error!("tag NOT cleaned");
+                -1
+            },
+        };
+    }
+    0
+}
+
 
 /**
 tantivy_jpc is the main entry point into a translation layer from Rust to Go for Tantivy
@@ -271,7 +306,7 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
       Err(err) => {
           *ret_len  = err.to_string().len();
           std::ptr::copy(err.to_string().as_ptr(), ret, *ret_len);
-          log::error!("failed error = {err}");
+          error!("failed error = {err}");
           return -1;
       }
   };
