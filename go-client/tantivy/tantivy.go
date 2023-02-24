@@ -171,10 +171,6 @@ type TDocument struct {
 
 func (td *TDocument) CreateIndex() (*TIndex, error) {
 	e := errors.Template("TDocument.CreateIndex", errors.K.Invalid, "TempDir", td.TempDir)
-
-	if td.TempDir == "" {
-		return nil, e("reason", "TempDir is empty")
-	}
 	_, err := td.callTantivy("index", "create", msi{"directory": td.TempDir})
 	if err != nil {
 		return nil, e(err, "reason", "index create failed")

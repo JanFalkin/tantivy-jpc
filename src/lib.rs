@@ -273,7 +273,7 @@ fn do_term(s:&str) -> InternalCallResult<String>{
 #[no_mangle]
 pub unsafe extern "C" fn term(s: *const c_char) -> i8{
     let c_str = CStr::from_ptr(s).to_str().unwrap_or("");
-    if c_str != ""{
+    if !c_str.is_empty(){
         match do_term(c_str){
             Ok(_) => {
                 info!("tag cleaned");

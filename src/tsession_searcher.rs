@@ -9,8 +9,21 @@ extern crate serde_derive;
 extern crate serde_json;
 use tantivy::Document;
 use tantivy::collector::{Count, TopDocs};
+use tantivy::schema::{NamedFieldDocument};
 use std::fmt::Write;
+use serde_derive::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
+pub struct ResultElement{
+	pub doc:NamedFieldDocument,
+    pub score:f32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ResultElementDoc{
+	pub doc:Document,
+    pub score:f32,
+}
 
 
 impl<'a> TantivySession<'a>{
@@ -35,10 +48,10 @@ impl<'a> TantivySession<'a>{
             Err(e) => return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}"))),
         };
         info!("search complete len = {}, td = {:?}", td.0.len(), td);
-        let mut vret = Vec::<Document>::new();
-        for (_score, doc_address) in td.0 {
+        let mut vret = Vec::<ResultElementDoc>::new();
+        for (score, doc_address) in td.0 {
             let retrieved_doc = searcher.doc(doc_address)?;
-            vret.push(retrieved_doc);
+            vret.push(ResultElementDoc{doc:retrieved_doc, score});
         }
         let mut s = "".to_string();
         match writeln!(s, "{}", serde_json::to_string(&vret)?){
@@ -70,18 +83,16 @@ impl<'a> TantivySession<'a>{
             Err(e) => return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}"))),
         };
         info!("search complete len = {}, td = {:?}", td.len(), td);
-        for (_score, doc_address) in td {
+        let mut vret:Vec<ResultElement> = Vec::<ResultElement>::new();
+        for (score, doc_address) in td {
             let retrieved_doc = li.doc(doc_address)?;
             let schema = self.schema.as_ref().ok_or_else(|| ErrorKinds::NotExist("Schema not present".to_string()))?;
             let named_doc = schema.to_named_doc(&retrieved_doc);
-            let mut s = "".to_string();
-            match writeln!(s, "{}", serde_json::to_string(&named_doc)?){
-                Ok(_) => {},
-                Err (_) => return make_internal_json_error(ErrorKinds::NotExist("format write to string failed".to_string())),
-            };
-            self.return_buffer += &s;
-            info!("{} n={} vals={:?}", s, s.len(), retrieved_doc.field_values());
+            info!("retrieved doc {:?}",retrieved_doc.field_values());
+            vret.append(&mut vec![ResultElement{doc:named_doc,score}]);
         }
-        Ok(0)
+        self.return_buffer = serde_json::to_string(&vret)?;
+        info!("ret = {}", self.return_buffer);
+    Ok(0)
     }
 }

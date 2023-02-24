@@ -3,6 +3,7 @@ use crate::InternalCallResult;
 use crate::json;
 use crate::info;
 use crate::tantivy_jpc;
+use crate::ResultElement;
 
 pub mod tests {
     extern crate tempdir;
@@ -67,9 +68,9 @@ pub mod tests {
     pub struct TestBuilderAddTextResult {
         pub schema: serde_json::Value,
     }
-    #[derive(Serialize, Deserialize, Clone, Debug, Default)]
+    #[derive(Serialize, Deserialize)]
     pub struct TestTitleResult {
-        pub title: Vec<String>,
+        pub title: Vec<ResultElement>,
     }
 
 
@@ -331,8 +332,8 @@ pub mod tests {
         qp.for_index(vec!["title".to_string()]).unwrap();
         let mut searcher = qp.parse_query("Sea".to_string()).unwrap();
         let sres = &searcher.search().unwrap();
-        let title_result:TestTitleResult = serde_json::from_str(sres).unwrap();
-        assert_eq!(title_result.title[0], "The Old Man and the Sea".to_string());
+        let title_result:Vec<ResultElement> = serde_json::from_str(sres).unwrap();
+        assert_eq!(title_result[0].doc.0.get("title").unwrap()[0].as_text().unwrap(), "The Old Man and the Sea".to_string());
     }
     #[test]
     fn basic_index_fuzzy(){

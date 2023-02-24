@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const resultSet1 = `{"body":["He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless."],"title":["The Old Man and the Sea"]}`
-const resultSet2 = `{"body":["A few miles south of Soledad, the Salinas River drops in close to the hillside\n\tbank and runs deep and green. The water is warm too, for it has slipped twinkling\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve up to the strong and rocky\n\tGabilan Mountains, but on the valley side the water is lined with trees—willows\n\tfresh and green with every spring, carrying in their lower leaf junctures the\n\tdebris of the winter's flooding; and sycamores with mottled, white, recumbent\n\tlimbs and branches that arch over the pool"],"title":["Of Mice and Men"]}`
+const resultSet1 = `[{"doc":{"body":["He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless."],"title":["The Old Man and the Sea"]},"score":0.64072424}]`
+const resultSet2 = `[{"doc":{"body":["A few miles south of Soledad, the Salinas River drops in close to the hillside\n\tbank and runs deep and green. The water is warm too, for it has slipped twinkling\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve up to the strong and rocky\n\tGabilan Mountains, but on the valley side the water is lined with trees—willows\n\tfresh and green with every spring, carrying in their lower leaf junctures the\n\tdebris of the winter's flooding; and sycamores with mottled, white, recumbent\n\tlimbs and branches that arch over the pool"],"title":["Of Mice and Men"]},"score":0.57824844}]`
 
 type jim = map[int]interface{}
 type jm = map[string]interface{}
@@ -151,13 +151,13 @@ func testExpectedIndex(t *testing.T, idx *TIndex) {
 	require.NoError(t, err)
 	s, err := searcher.Search()
 	require.NoError(t, err)
-	require.EqualValues(t, resultSet1+"\n", s)
+	require.EqualValues(t, resultSet1, s)
 
 	searcherAgain, err := qp.ParseQuery("mottled")
 	require.NoError(t, err)
 	s, err = searcherAgain.Search()
 	require.NoError(t, err)
-	require.EqualValues(t, resultSet2+"\n", s)
+	require.EqualValues(t, resultSet2, s)
 }
 
 func testFuzzyExpectedIndex(t *testing.T, idx *TIndex) {
@@ -182,7 +182,7 @@ func testFuzzyExpectedIndex(t *testing.T, idx *TIndex) {
 func compareResults(t *testing.T, res []interface{}) {
 	require.EqualValues(t, 2, len(res))
 	for _, v := range res {
-		innerArray := v.(jm)["field_values"]
+		innerArray := v.(jm)["doc"].(jm)["field_values"]
 		innerMap := innerArray.([]interface{})[0].(jm)
 		inner := innerMap["value"].(string)
 		b := inner == "The Diary of a Young Girl" || inner == "The Diary of Muadib"
