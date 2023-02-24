@@ -160,6 +160,26 @@ func testExpectedIndex(t *testing.T, idx *TIndex) {
 	require.EqualValues(t, resultSet2, s)
 }
 
+func testExpectedTopIndex(t *testing.T, idx *TIndex) {
+	rb, err := idx.ReaderBuilder()
+	require.NoError(t, err)
+
+	qp, err := rb.Searcher()
+	require.NoError(t, err)
+
+	_, err = qp.ForIndex([]string{"title", "body"})
+	require.NoError(t, err)
+
+	searcher, err := qp.ParseQuery("and")
+	require.NoError(t, err)
+	s, err := searcher.Search(1)
+	require.NoError(t, err)
+	var res []interface{}
+	err = json.Unmarshal([]byte(s), &res)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, len(res))
+}
+
 func testFuzzyExpectedIndex(t *testing.T, idx *TIndex) {
 	rb, err := idx.ReaderBuilder()
 	require.NoError(t, err)
@@ -228,6 +248,11 @@ func TestTantivyFuzzy(t *testing.T) {
 	testFuzzyExpectedIndex(t, idx)
 }
 
+func TestTantivyTopLimit(t *testing.T) {
+	idx := makeIndex(t, "", false)
+	testExpectedTopIndex(t, idx)
+
+}
 func TestTantivyIndexReuse(t *testing.T) {
 	wd, err := os.Getwd()
 	require.NoError(t, err)
@@ -250,12 +275,7 @@ func TestTantivyIndexReuse(t *testing.T) {
 }
 
 func TestTantivyStress(t *testing.T) {
-	td, err := ioutil.TempDir("", "tindex")
-	require.NoError(t, err)
-	defer func() {
-		os.RemoveAll(td)
-	}()
-	builder, err := NewBuilder(td)
+	builder, err := NewBuilder("")
 	require.NoError(t, err)
 	fieldIds := map[string]int{}
 	fields := []string{"title", "body", "speech", "shot", "action", "logo", "segment", "celeb", "cast"}

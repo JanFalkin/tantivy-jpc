@@ -92,13 +92,13 @@ pub mod tests {
     }
 
     impl TestSearcher<'_>{
-        pub fn search(&mut self)-> InternalCallResult<String>{
-            let b = self.ctx.call_jpc("searcher".to_string(), "search".to_string(), json!({}),true);
+        pub fn search(&mut self, top:u64)-> InternalCallResult<String>{
+            let b = self.ctx.call_jpc("searcher".to_string(), "search".to_string(), json!({"top_limit" : top }),true);
             let s = std::str::from_utf8(&b).unwrap();
             Ok(s.to_string())
         }
-        pub fn fuzzy_search(&mut self)-> InternalCallResult<String>{
-            let b = self.ctx.call_jpc("fuzzy_searcher".to_string(), "fuzzy_searcher".to_string(), json!({}),true);
+        pub fn fuzzy_search(&mut self, top:u64)-> InternalCallResult<String>{
+            let b = self.ctx.call_jpc("fuzzy_searcher".to_string(), "fuzzy_searcher".to_string(), json!({"top_limit" : top}),true);
             let s = std::str::from_utf8(&b).unwrap();
             Ok(s.to_string())
         }
@@ -331,7 +331,7 @@ pub mod tests {
         let mut qp = rb.searcher().unwrap();
         qp.for_index(vec!["title".to_string()]).unwrap();
         let mut searcher = qp.parse_query("Sea".to_string()).unwrap();
-        let sres = &searcher.search().unwrap();
+        let sres = &searcher.search(1).unwrap();
         let title_result:Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(title_result[0].doc.0.get("title").unwrap()[0].as_text().unwrap(), "The Old Man and the Sea".to_string());
     }
@@ -393,7 +393,7 @@ pub mod tests {
         let mut rb = ti.reader_builder().unwrap();
         let mut qp = rb.searcher().unwrap();
         let mut searcher = qp.parse_fuzzy_query("Diary".to_string(), "title".to_string()).unwrap();
-        let sres = &searcher.fuzzy_search().unwrap();
+        let sres = &searcher.fuzzy_search(2).unwrap();
         let vret:Vec<serde_json::Value> = serde_json::from_str(sres).unwrap();
         assert_eq!(vret.len(), 2);
     }
