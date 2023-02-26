@@ -7,13 +7,14 @@ use crate::info;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
+use serde_json::Value;
 use tantivy::Document;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::schema::{NamedFieldDocument};
 use std::fmt::Write;
 use serde_derive::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ResultElement{
 	pub doc:NamedFieldDocument,
     pub score:f32,
@@ -28,9 +29,16 @@ pub struct ResultElementDoc{
 
 impl<'a> TantivySession<'a>{
 
-    pub fn handle_fuzzy_searcher(&mut self, _method:&str, _obj: &str, _params:serde_json::Value)  -> InternalCallResult<u32>{
+    pub fn handle_fuzzy_searcher(&mut self, _method:&str, _obj: &str, params:serde_json::Value)  -> InternalCallResult<u32>{
         info!("Searcher");
-        let query = match self.fuzzy_q.take(){
+        const DEF_LIMIT:u64 = 2;
+        let top_limit = match params.as_object(){
+            Some(p) => {
+                p.get("top_limit").unwrap_or(&Value::from(DEF_LIMIT)).as_u64().unwrap_or(DEF_LIMIT)
+            },
+            None => DEF_LIMIT,
+        };
+         let query = match self.fuzzy_q.take(){
             Some(dq) => dq,
             None => {
                 return make_internal_json_error(ErrorKinds::NotExist("dyn query not created".to_string()));
@@ -43,7 +51,7 @@ impl<'a> TantivySession<'a>{
 
         let rdr = idx.reader()?;
         let searcher = rdr.searcher();
-        let td = match searcher.search(&*query, &(TopDocs::with_limit(2), Count)){
+        let td = match searcher.search(&*query, &(TopDocs::with_limit(top_limit as usize), Count)){
             Ok(td) => td,
             Err(e) => return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}"))),
         };
@@ -66,8 +74,15 @@ impl<'a> TantivySession<'a>{
         }
         Ok(0)
     }
-    pub fn handle_searcher(&mut self, _method:&str, _obj: &str, _params:serde_json::Value)  -> InternalCallResult<u32>{
+    pub fn handle_searcher(&mut self, _method:&str, _obj: &str, params:serde_json::Value)  -> InternalCallResult<u32>{
         info!("Searcher");
+        const DEF_LIMIT:u64 = 10;
+        let top_limit = match params.as_object(){
+            Some(p) => {
+                p.get("top_limit").unwrap_or(&Value::from(DEF_LIMIT)).as_u64().unwrap_or(DEF_LIMIT)
+            },
+            None => DEF_LIMIT,
+        };
         let query = match self.dyn_q.as_ref(){
             Some(dq) => dq,
             None => {
@@ -78,7 +93,7 @@ impl<'a> TantivySession<'a>{
             Some(li) => li,
             None => return make_internal_json_error(ErrorKinds::NotExist("leased item not found".to_string())),
         };
-        let td = match li.search(query, &TopDocs::with_limit(10)){
+        let td = match li.search(query, &TopDocs::with_limit(top_limit as usize)){
             Ok(td) => td,
             Err(e) => return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}"))),
         };
