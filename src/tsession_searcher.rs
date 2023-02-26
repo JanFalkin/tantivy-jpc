@@ -14,7 +14,7 @@ use tantivy::schema::{NamedFieldDocument};
 use std::fmt::Write;
 use serde_derive::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ResultElement{
 	pub doc:NamedFieldDocument,
     pub score:f32,
