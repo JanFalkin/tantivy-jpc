@@ -2,8 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
-	"os"
 
 	"github.com/JanFalkin/tantivy-jpc/go-client/tantivy"
 )
@@ -19,14 +17,7 @@ limbs and branches that arch over the pool`
 const oldMan = "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."
 
 func doRun() {
-	tantivy.LibInit()
-	td, err := ioutil.TempDir("", "tindex")
-	defer func() {
-		if err == nil {
-			os.RemoveAll(td)
-		}
-	}()
-	builder, err := tantivy.NewBuilder(td)
+	builder, err := tantivy.NewBuilder("")
 	if err != nil {
 		panic(err)
 	}
@@ -34,7 +25,12 @@ func doRun() {
 	if err != nil {
 		panic(err)
 	}
-	idxFieldBody, err := builder.AddTextField("body", tantivy.TEXT, true)
+	idxFieldBody, err := builder.AddTextField("body", tantivy.TEXT, false)
+	if err != nil {
+		panic(err)
+	}
+
+	idxFieldOrder, err := builder.AddI64Field("order", tantivy.INT, true)
 	if err != nil {
 		panic(err)
 	}
@@ -53,8 +49,10 @@ func doRun() {
 	}
 	doc.AddText(idxFieldTitle, "The Old Man and the Sea", doc1)
 	doc.AddText(idxFieldBody, oldMan, doc1)
+	doc.AddInt(idxFieldOrder, 111, doc1)
 	doc.AddText(idxFieldTitle, "Of Mice and Men", doc2)
 	doc.AddText(idxFieldBody, ofMiceAndMen, doc2)
+	doc.AddInt(idxFieldOrder, 222, doc2)
 
 	idx, err := doc.CreateIndex()
 	if err != nil {
@@ -88,17 +86,17 @@ func doRun() {
 		panic(err)
 	}
 
-	_, err = qp.ForIndex([]string{"title", "body"})
+	_, err = qp.ForIndex([]string{"title", "body", "order"})
 	if err != nil {
 		panic(err)
 	}
 
-	searcher, err := qp.ParseQuery("Old Man")
+	searcher, err := qp.ParseQuery("order:111")
 	if err != nil {
 		panic(err)
 	}
 
-	var sr map[string][]string
+	var sr []map[string]interface{}
 
 	s, err := searcher.Search()
 	if err != nil {
@@ -109,10 +107,10 @@ func doRun() {
 	if err != nil {
 		panic(err)
 	}
-	if sr["title"][0] != "The Old Man and the Sea" {
+	if sr[0]["doc"].(map[string]interface{})["title"].([]interface{})[0] != "The Old Man and the Sea" {
 		panic("expcted value not received")
 	}
-	searcherAgain, err := qp.ParseQuery("Mice Men")
+	searcherAgain, err := qp.ParseQuery("title:Mice")
 	if err != nil {
 		panic(err)
 	}
@@ -125,7 +123,7 @@ func doRun() {
 		panic(err)
 	}
 
-	if sr["title"][0] != "Of Mice and Men" {
+	if sr[0]["doc"].(map[string]interface{})["title"].([]interface{})[0] != "Of Mice and Men" {
 		panic("expcted value not received")
 	}
 	tantivy.ClearSession(builder.ID())

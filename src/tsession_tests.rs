@@ -157,6 +157,10 @@ pub mod tests {
             self.ctx.call_jpc("document".to_string(), "add_text".to_string(), json!({"field":  field,"value":  value, "id":  self.ctx.id,  "doc_id": doc_id}),false);
             0
         }
+        pub fn add_int(&mut self, field:i32, value:i64, doc_id:u32) -> i64 {
+            self.ctx.call_jpc("document".to_string(), "add_int".to_string(), json!({"field":  field,"value":  value, "id":  self.ctx.id,  "doc_id": doc_id}),false);
+            0
+        }
         pub fn create_index(&mut self) -> Result<TestIndex, std::io::Error>{
             self.ctx.call_jpc("index".to_string(), "create".to_string(), json!({"directory":  self.temp_dir}), false);
             Ok(TestIndex{
@@ -331,6 +335,58 @@ pub mod tests {
         let mut qp = rb.searcher().unwrap();
         qp.for_index(vec!["title".to_string()]).unwrap();
         let mut searcher = qp.parse_query("Sea".to_string()).unwrap();
+        let sres = &searcher.search(1).unwrap();
+        let title_result:Vec<ResultElement> = serde_json::from_str(sres).unwrap();
+        assert_eq!(title_result[0].doc.0.get("title").unwrap()[0].as_text().unwrap(), "The Old Man and the Sea".to_string());
+    }
+
+    #[test]
+    fn test_all_fields(){
+        crate::test_init();
+        let mut ctx = FakeContext::new();
+        assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
+        assert_eq!(ctx.add_text_field("body".to_string(), 2, true), 1);
+        assert_eq!(ctx.add_i64_field("order".to_string(), 3, true), 2);
+
+        let mut td = match ctx.build(true){
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}",format!("failed with error {}", e.to_string()));
+            }
+        };
+        let doc1 = match td.create(){
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}",format!("doc1 create failed error {}", e.to_string()));
+            }
+        };
+
+        let doc2 = match td.create(){
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}",format!("doc2 create failed error {}", e.to_string()));
+            }
+        };
+        assert_eq!(td.add_text(0, "The Old Man and the Sea".to_string(), doc1 as u32), 0);
+        assert_eq!(td.add_text(1, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish.".to_string(), doc1 as u32), 0);
+        assert_eq!(td.add_int(2, 111, doc1 as u32), 0);
+
+        assert_eq!(td.add_text(0, "Of Mice and Men".to_string(), doc2 as u32), 0);
+        assert_eq!(td.add_text(1, r#"A few miles south of Soledad, the Salinas River drops in close to the hillside bank and runs deep and green. The water is warm too, for it has slipped twinkling over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up to the strong and rocky Gabilan Mountains, but on the valley side the water is lined with trees—willows fresh and green with every spring, carrying in their lower leaf junctures the debris of the winter's flooding; and sycamores with mottled, white, recumbent limbs and branches that arch over the pool"#.to_string(), doc2 as u32), 0);
+        assert_eq!(td.add_int(2, 222, doc2 as u32), 0);
+        let mut ti = match td.create_index(){
+            Ok(i) => i,
+            Err(e) => panic!("failed to create index err ={} ", e)
+        };
+        let op1 = ti.add_document(doc1 as i32).unwrap();
+        let op2 = ti.add_document(doc2 as i32).unwrap();
+        assert_eq!(op1, 0);
+        assert_eq!(op2, 1);
+        ti.commit().unwrap();
+        let mut rb = ti.reader_builder().unwrap();
+        let mut qp = rb.searcher().unwrap();
+        qp.for_index(vec!["title".to_string(), "order".to_string()]).unwrap();
+        let mut searcher = qp.parse_query("order:111 AND title:'Sea'".to_string()).unwrap();
         let sres = &searcher.search(1).unwrap();
         let title_result:Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(title_result[0].doc.0.get("title").unwrap()[0].as_text().unwrap(), "The Old Man and the Sea".to_string());

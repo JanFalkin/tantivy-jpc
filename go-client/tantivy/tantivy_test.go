@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const resultSet1 = `[{"doc":{"body":["He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless."],"title":["The Old Man and the Sea"]},"score":0.64072424}]`
-const resultSet2 = `[{"doc":{"body":["A few miles south of Soledad, the Salinas River drops in close to the hillside\n\tbank and runs deep and green. The water is warm too, for it has slipped twinkling\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve up to the strong and rocky\n\tGabilan Mountains, but on the valley side the water is lined with trees—willows\n\tfresh and green with every spring, carrying in their lower leaf junctures the\n\tdebris of the winter's flooding; and sycamores with mottled, white, recumbent\n\tlimbs and branches that arch over the pool"],"title":["Of Mice and Men"]},"score":0.57824844}]`
+const resultSet1 = `[{"doc":{"body":["He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless."],"test":[555],"title":["The Old Man and the Sea"]},"score":0.64072424}]`
+const resultSet2 = `[{"doc":{"body":["A few miles south of Soledad, the Salinas River drops in close to the hillside\n\tbank and runs deep and green. The water is warm too, for it has slipped twinkling\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve up to the strong and rocky\n\tGabilan Mountains, but on the valley side the water is lined with trees—willows\n\tfresh and green with every spring, carrying in their lower leaf junctures the\n\tdebris of the winter's flooding; and sycamores with mottled, white, recumbent\n\tlimbs and branches that arch over the pool"],"test":[666],"title":["Of Mice and Men"]},"score":0.57824844}]`
 
 type jim = map[int]interface{}
 type jm = map[string]interface{}
@@ -95,6 +95,9 @@ func makeIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	idxFieldBody, err := builder.AddTextField("body", TEXT, true)
 	require.NoError(t, err)
 	require.EqualValues(t, 1, idxFieldBody)
+	idxFieldInt, err := builder.AddI64Field("test", INT, true)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, idxFieldInt)
 	doc, err := builder.Build()
 	require.NoError(t, err)
 	doc1, err := doc.Create()
@@ -107,6 +110,8 @@ func makeIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	require.NoError(t, err)
 	_, err = doc.AddText(idxFieldBody, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless.", doc1)
 	require.NoError(t, err)
+	_, err = doc.AddInt(idxFieldInt, 555, doc1)
+	require.NoError(t, err)
 	_, err = doc.AddText(idxFieldTitle, "Of Mice and Men", doc2)
 	require.NoError(t, err)
 	_, err = doc.AddText(idxFieldBody, `A few miles south of Soledad, the Salinas River drops in close to the hillside
@@ -117,6 +122,8 @@ func makeIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	fresh and green with every spring, carrying in their lower leaf junctures the
 	debris of the winter's flooding; and sycamores with mottled, white, recumbent
 	limbs and branches that arch over the pool`, doc2)
+	require.NoError(t, err)
+	_, err = doc.AddInt(idxFieldInt, 666, doc2)
 	require.NoError(t, err)
 
 	idx, err := doc.CreateIndex()

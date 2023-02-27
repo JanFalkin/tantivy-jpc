@@ -9,21 +9,21 @@ extern crate serde_derive;
 extern crate serde_json;
 use tantivy::DateOptions;
 use serde_json::json;
-use tantivy::schema::{TextOptions, Schema, STRING, TEXT, STORED, NumericOptions};
+use tantivy::schema::{TextOptions, Schema, STRING, TEXT, STORED, NumericOptions, IndexRecordOption, TextFieldIndexing};
 
 
 macro_rules! impl_simple_type {
     () => {};
     ($self:ident, $handler_params:ident, $handler_obj:ident, $handler_func:ident, $default_type:ident) => {
         let (name, _field_type, stored) = Self::extract_params($handler_params)?;
-        let mut ni: $default_type = $default_type::default();
+        let ni: $default_type;
         if stored{
-            ni = ni.set_stored();
+            ni = $default_type::default().set_indexed().set_stored();
+        }else{
+            ni = $default_type::default();
         }
-        info!("add_date_field: name = {}, field_type = {} stored = {}", &name, &_field_type, &stored);
         let f = $handler_obj.$handler_func(&name,ni);
         $self.return_buffer = json!({"field" : f}).to_string();
-        info!("{}", $self.return_buffer);
     }
  }
 
@@ -85,11 +85,13 @@ impl<'a> TantivySession<'a>{
                 };
                 if stored{
                     ti = ti | STORED;
+                    ti = ti.set_indexing_options(TextFieldIndexing::default()
+                    .set_tokenizer("default")
+                    .set_index_option(IndexRecordOption::WithFreqsAndPositions));
                 }
                 info!("add_text_field: name = {}, field_type = {} stored = {}", &name, &field_type, &stored);
                 let f = sb.add_text_field(&name,ti);
                 self.return_buffer = json!({"field" : f}).to_string();
-                info!("{}", self.return_buffer);
             },
             "add_date_field" => {
                 impl_simple_type!(self, params, sb, add_date_field, DateOptions);
