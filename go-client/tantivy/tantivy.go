@@ -218,6 +218,32 @@ func (td *TDocument) AddText(field int, value string, doc_id uint) (int, error) 
 	return 0, nil
 }
 
+func (td *TDocument) AddInt(field int, value int64, doc_id uint) (int, error) {
+	_, err := td.callTantivy("document", "add_int", msi{
+		"field":  field,
+		"value":  value,
+		"id":     td.JPCId.id,
+		"doc_id": doc_id,
+	})
+	if err != nil {
+		return -1, err
+	}
+	return 0, nil
+}
+
+func (td *TDocument) AddUInt(field int, value uint64, doc_id uint) (int, error) {
+	_, err := td.callTantivy("document", "add_uint", msi{
+		"field":  field,
+		"value":  value,
+		"id":     td.JPCId.id,
+		"doc_id": doc_id,
+	})
+	if err != nil {
+		return -1, err
+	}
+	return 0, nil
+}
+
 type TBuilder struct {
 	*JPCId
 }
@@ -227,6 +253,8 @@ type StorageKind uint
 const (
 	STRING StorageKind = 1
 	TEXT   StorageKind = 2
+	INT    StorageKind = 3
+	UINT   StorageKind = 4
 )
 
 func NewBuilder(td string, memsize ...int32) (*TBuilder, error) {
