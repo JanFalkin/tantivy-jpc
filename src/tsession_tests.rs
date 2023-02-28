@@ -207,8 +207,12 @@ pub mod tests {
             let mut sp = serde_json::to_vec(&call_p).unwrap_or(vec![]);
             let p = Box::leak(Box::<Vec<u8>>::new(vec![0; 5000000]));
             info!("calling tantivy-jpc json = {}", call_p);
+            let iret:i64;
             unsafe{
-                tantivy_jpc(sp.as_mut_ptr(), sp.len(), p.as_mut_ptr(), my_ret_ptr);
+                iret = tantivy_jpc(sp.as_mut_ptr(), sp.len(), p.as_mut_ptr(), my_ret_ptr);
+            }
+            if iret != 0{
+                panic!("call_jpc failed")
             }
             let sl = p[0..*my_ret_ptr].to_vec();
             if do_ret{
@@ -351,7 +355,7 @@ pub mod tests {
         let mut ctx = FakeContext::new();
         assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
         assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
-        assert_eq!(ctx.add_i64_field("order".to_string(), 3, true, true), 2);
+        assert_eq!(ctx.add_i64_field("order".to_string(), 3, false, true), 2);
 
         let mut td = match ctx.build(true){
             Ok(t) => t,
@@ -390,8 +394,8 @@ pub mod tests {
         ti.commit().unwrap();
         let mut rb = ti.reader_builder().unwrap();
         let mut qp = rb.searcher().unwrap();
-        qp.for_index(vec!["title".to_string(), "order".to_string()]).unwrap();
-        let mut searcher = qp.parse_query("order:111 AND title:'Sea'".to_string()).unwrap();
+        qp.for_index(vec!["title".to_string(), "body".to_string()]).unwrap();
+        let mut searcher = qp.parse_query("Sea".to_string()).unwrap();
         let sres = &searcher.search(1).unwrap();
         let title_result:Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(title_result[0].doc.0.get("title").unwrap()[0].as_text().unwrap(), "The Old Man and the Sea".to_string());

@@ -79,7 +79,7 @@ impl<'a> TantivySession<'a>{
         }
     }
     // do_method is a translation from a string json method to an actual call.  All json params are passed
-    pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> (*const u8, usize){
+    pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> (*const u8, usize, bool){
         info!("In do_method");
         match obj {
             "query_parser" => {
@@ -128,7 +128,7 @@ impl<'a> TantivySession<'a>{
         };
         let _ = &self.doc;
         let _ = &self.builder;
-            (self.return_buffer.as_ptr() as *const u8, self.return_buffer.len())
+            (self.return_buffer.as_ptr() as *const u8, self.return_buffer.len(), false)
     }
 }
 /// Bitcode representation of a incomming client request
@@ -144,7 +144,7 @@ pub struct Request<'a> {
 /// make_json_error translates the bitcode [ElvError<T>] to an error response to the client
 /// # Arguments
 /// * `err`- the error to be translated to a response
-pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize){
+pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize, bool){
     info!("error={}", err);
     let msg = json!(
         {
@@ -170,7 +170,7 @@ pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize){
         }
     };
     let buf = vr.as_bytes();
-    (buf.as_ptr() as *const u8, buf.len())
+    (buf.as_ptr() as *const u8, buf.len(), true)
 }
 
 pub fn make_internal_json_error<T>(ek:ErrorKinds) -> InternalCallResult<T>{
@@ -314,7 +314,7 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
   let json_params: Request = match serde_json::from_str(input_string){
     Ok(m) => {m},
     Err(_err) => {
-          let (r,sz) = make_json_error("parse failed for http", "ID not found");
+          let (r,sz,_b) = make_json_error("parse failed for http", "ID not found");
           *ret_len = sz;
           std::ptr::copy(r, ret, sz);
           return -1;
@@ -346,11 +346,14 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
             return -1;
         }
     };
-    let (return_val, ret_sz) = entity.do_method(json_params.method, json_params.obj, json_params.params);
+    let (return_val, ret_sz, is_error) = entity.do_method(json_params.method, json_params.obj, json_params.params);
     std::ptr::copy(return_val, ret, ret_sz);
     let end = ret.offset(ret_sz.try_into().unwrap_or_default());
     *end = 0;
     *ret_len = ret_sz;
     entity.return_buffer.clear();
+    if is_error{
+        return -1;
+    }
     0
 }

@@ -22,7 +22,7 @@ func doRun() {
 	if err != nil {
 		panic(err)
 	}
-	idxFieldTitle, err := builder.AddTextField("title", tantivy.TEXT, true, false)
+	idxFieldTitle, err := builder.AddTextField("title", tantivy.TEXT, true, true)
 	if err != nil {
 		panic(err)
 	}
@@ -31,7 +31,7 @@ func doRun() {
 		panic(err)
 	}
 
-	idxFieldOrder, err := builder.AddI64Field("order", tantivy.INT, false, true)
+	idxFieldOrder, err := builder.AddI64Field("order", tantivy.INT, false, false)
 	if err != nil {
 		panic(err)
 	}
@@ -87,12 +87,12 @@ func doRun() {
 		panic(err)
 	}
 
-	_, err = qp.ForIndex([]string{"title", "body", "order"})
+	_, err = qp.ForIndex([]string{"title", "body"})
 	if err != nil {
 		panic(err)
 	}
 
-	searcher, err := qp.ParseQuery("title:Sea")
+	searcher, err := qp.ParseQuery("Sea")
 	if err != nil {
 		panic(err)
 	}
@@ -111,7 +111,7 @@ func doRun() {
 	if sr[0]["doc"].(map[string]interface{})["title"].([]interface{})[0] != "The Old Man and the Sea" {
 		panic("expcted value not received")
 	}
-	searcherAgain, err := qp.ParseQuery("title:Mice")
+	searcherAgain, err := qp.ParseQuery("Mice")
 	if err != nil {
 		panic(err)
 	}
