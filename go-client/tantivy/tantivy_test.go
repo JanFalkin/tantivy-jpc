@@ -21,10 +21,10 @@ type jm = map[string]interface{}
 func makeFuzzyIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	builder, err := NewBuilder(td)
 	require.NoError(t, err)
-	idxFieldTitle, err := builder.AddTextField("title", TEXT, true)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true)
 	require.NoError(t, err)
 	require.EqualValues(t, 0, idxFieldTitle)
-	idxFieldInt, err := builder.AddI64Field("test", INT, true)
+	idxFieldInt, err := builder.AddI64Field("test", INT, true, true)
 	require.NoError(t, err)
 	require.EqualValues(t, 1, idxFieldInt)
 
@@ -89,13 +89,13 @@ func makeFuzzyIndex(t *testing.T, td string, useExisting bool) *TIndex {
 func makeIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	builder, err := NewBuilder(td)
 	require.NoError(t, err)
-	idxFieldTitle, err := builder.AddTextField("title", TEXT, true)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true)
 	require.NoError(t, err)
 	require.EqualValues(t, 0, idxFieldTitle)
-	idxFieldBody, err := builder.AddTextField("body", TEXT, true)
+	idxFieldBody, err := builder.AddTextField("body", TEXT, true, true)
 	require.NoError(t, err)
 	require.EqualValues(t, 1, idxFieldBody)
-	idxFieldInt, err := builder.AddI64Field("test", INT, true)
+	idxFieldInt, err := builder.AddI64Field("test", INT, true, true)
 	require.NoError(t, err)
 	require.EqualValues(t, 2, idxFieldInt)
 	doc, err := builder.Build()
@@ -300,11 +300,11 @@ func TestTantivyStress(t *testing.T) {
 	fields := []string{"title", "body", "speech", "shot", "action", "logo", "segment", "celeb", "cast"}
 	fieldsLong := []string{"description", "has_field"}
 	for _, f := range fields {
-		fieldIds[f], err = builder.AddTextField(f, TEXT, true)
+		fieldIds[f], err = builder.AddTextField(f, TEXT, true, true)
 		require.NoError(t, err)
 	}
 	for _, f := range fieldsLong {
-		fieldIds[f], err = builder.AddTextField(f, TEXT, true)
+		fieldIds[f], err = builder.AddTextField(f, TEXT, true, true)
 		require.NoError(t, err)
 	}
 

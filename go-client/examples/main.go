@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/JanFalkin/tantivy-jpc/go-client/tantivy"
 )
@@ -21,16 +22,16 @@ func doRun() {
 	if err != nil {
 		panic(err)
 	}
-	idxFieldTitle, err := builder.AddTextField("title", tantivy.TEXT, true)
+	idxFieldTitle, err := builder.AddTextField("title", tantivy.TEXT, true, false)
 	if err != nil {
 		panic(err)
 	}
-	idxFieldBody, err := builder.AddTextField("body", tantivy.TEXT, false)
+	idxFieldBody, err := builder.AddTextField("body", tantivy.TEXT, false, false)
 	if err != nil {
 		panic(err)
 	}
 
-	idxFieldOrder, err := builder.AddI64Field("order", tantivy.INT, true)
+	idxFieldOrder, err := builder.AddI64Field("order", tantivy.INT, false, true)
 	if err != nil {
 		panic(err)
 	}
@@ -91,7 +92,7 @@ func doRun() {
 		panic(err)
 	}
 
-	searcher, err := qp.ParseQuery("order:111")
+	searcher, err := qp.ParseQuery("title:Sea")
 	if err != nil {
 		panic(err)
 	}
@@ -127,6 +128,7 @@ func doRun() {
 		panic("expcted value not received")
 	}
 	tantivy.ClearSession(builder.ID())
+	fmt.Println("It worked!!!")
 
 }
 

@@ -223,11 +223,12 @@ pub mod tests {
                 vec![]
             }
         }
-        pub fn add_text_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
+        pub fn add_text_field(&mut self, name:String, a_type:i32, stored:bool, indexed:bool) -> i64{
             let j_param = json!({
                 "name":   name,
                 "type":   a_type,
                 "stored": stored,
+                "indexed" : indexed,
                 "id":     self.id,
             });
             let s = &self.call_jpc("builder".to_string(), "add_text_field".to_string(), j_param, true);
@@ -236,38 +237,42 @@ pub mod tests {
             i["field"].as_i64().unwrap()
         }
 
-        pub fn add_date_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
+        pub fn add_date_field(&mut self, name:String, a_type:i32, stored:bool, indexed:bool) -> i64{
             let j_param = json!({
                 "name":   name,
                 "type":   a_type,
                 "stored": stored,
+                "indexed" : indexed,
                 "id":     self.id,
             });
             call_simple_type!(self, j_param, "add_date_field")
         }
-        pub fn add_i64_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
+        pub fn add_i64_field(&mut self, name:String, a_type:i32, stored:bool, indexed:bool) -> i64{
             let j_param = json!({
                 "name":   name,
                 "type":   a_type,
                 "stored": stored,
+                "indexed" : indexed,
                 "id":     self.id,
             });
             call_simple_type!(self, j_param, "add_i64_field")
         }
-        pub fn add_u64_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
+        pub fn add_u64_field(&mut self, name:String, a_type:i32, stored:bool, indexed:bool) -> i64{
             let j_param = json!({
                 "name":   name,
                 "type":   a_type,
                 "stored": stored,
+                "indexed" : indexed,
                 "id":     self.id,
             });
             call_simple_type!(self, j_param, "add_u64_field")
         }
-        pub fn add_f64_field(&mut self, name:String, a_type:i32, stored:bool) -> i64{
+        pub fn add_f64_field(&mut self, name:String, a_type:i32, stored:bool, indexed:bool) -> i64{
             let j_param = json!({
                 "name":   name,
                 "type":   a_type,
                 "stored": stored,
+                "indexed" : indexed,
                 "id":     self.id,
             });
             call_simple_type!(self, j_param, "add_f64_field")
@@ -297,8 +302,8 @@ pub mod tests {
     fn basic_index(){
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true), 1);
+        assert_eq!(ctx.add_text_field("title".to_string(), 2, true,true), 0);
+        assert_eq!(ctx.add_text_field("body".to_string(), 2, true,true), 1);
         let mut td = match ctx.build(true){
             Ok(t) => t,
             Err(e) => {
@@ -344,9 +349,9 @@ pub mod tests {
     fn test_all_fields(){
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true), 1);
-        assert_eq!(ctx.add_i64_field("order".to_string(), 3, true), 2);
+        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
+        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(ctx.add_i64_field("order".to_string(), 3, true, true), 2);
 
         let mut td = match ctx.build(true){
             Ok(t) => t,
@@ -396,8 +401,8 @@ pub mod tests {
     fn top_limit(){
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true), 1);
+        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
+        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
         let mut td = match ctx.build(true){
             Ok(t) => t,
             Err(e) => {
@@ -446,7 +451,7 @@ pub mod tests {
     fn basic_index_fuzzy(){
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
+        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
         let mut td = match ctx.build(true){
             Ok(t) => t,
             Err(e) => {
@@ -508,11 +513,11 @@ pub mod tests {
     fn all_simple_fields(){
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true), 1);
-        assert_eq!(ctx.add_date_field("date".to_string(), 2, true), 2);
-        assert_eq!(ctx.add_u64_field("someu64".to_string(), 2, true), 3);
-        assert_eq!(ctx.add_i64_field("somei64".to_string(), 2, true), 4);
-        assert_eq!(ctx.add_f64_field("somef64".to_string(), 2, true), 5);
+        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
+        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(ctx.add_date_field("date".to_string(), 2, true, true), 2);
+        assert_eq!(ctx.add_u64_field("someu64".to_string(), 2, true, true), 3);
+        assert_eq!(ctx.add_i64_field("somei64".to_string(), 2, true, true), 4);
+        assert_eq!(ctx.add_f64_field("somef64".to_string(), 2, true, true), 5);
     }
 }
