@@ -4,10 +4,13 @@ type TSearcher struct {
 	*TQueryParser
 }
 
-func (s *TSearcher) Search(topLimit ...uint64) (string, error) {
+func (s *TSearcher) Search(explain bool, topLimit ...uint64) (string, error) {
 	args := msi{}
 	if len(topLimit) >= 1 {
 		args["top_limit"] = topLimit[0]
+	}
+	if explain {
+		args["explain"] = true
 	}
 	return s.callTantivy("searcher", "search", args)
 }

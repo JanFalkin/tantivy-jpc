@@ -99,7 +99,7 @@ func doRun() {
 
 	var sr []map[string]interface{}
 
-	s, err := searcher.Search()
+	s, err := searcher.Search(false)
 	if err != nil {
 		panic(err)
 	}
@@ -115,7 +115,7 @@ func doRun() {
 	if err != nil {
 		panic(err)
 	}
-	s, err = searcherAgain.Search()
+	s, err = searcherAgain.Search(false)
 	if err != nil {
 		panic(err)
 	}

@@ -12,10 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const resultSet1 = `[{"doc":{"body":["He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless."],"test":[555],"title":["The Old Man and the Sea"]},"score":0.64072424}]`
-const resultSet2 = `[{"doc":{"body":["A few miles south of Soledad, the Salinas River drops in close to the hillside\n\tbank and runs deep and green. The water is warm too, for it has slipped twinkling\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve up to the strong and rocky\n\tGabilan Mountains, but on the valley side the water is lined with trees—willows\n\tfresh and green with every spring, carrying in their lower leaf junctures the\n\tdebris of the winter's flooding; and sycamores with mottled, white, recumbent\n\tlimbs and branches that arch over the pool"],"test":[666],"title":["Of Mice and Men"]},"score":0.57824844}]`
+const resultSet1 = `[{"doc":{"body":["He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless."],"test":[555],"title":["The Old Man and the Sea"]},"score":0.64072424,"explain":"noexplain"}]`
 
-type jim = map[int]interface{}
 type jm = map[string]interface{}
 
 func makeFuzzyIndex(t *testing.T, td string, useExisting bool) *TIndex {
@@ -159,7 +157,7 @@ func loadIndex(t *testing.T, td string) *TIndex {
 func testExpectedIndex(t *testing.T, idx *TIndex) {
 	rb, err := idx.ReaderBuilder()
 	require.NoError(t, err)
-
+	expected := "{\n  \"value\": 0.57824844,\n  \"description\": \"BooleanClause. Sum of ...\",\n  \"details\": [\n    {\n      \"value\": 0.57824844,\n      \"description\": \"TermQuery, product of...\",\n      \"details\": [\n        {\n          \"value\": 2.2,\n          \"description\": \"(K1+1)\",\n          \"context\": []\n        },\n        {\n          \"value\": 0.6931472,\n          \"description\": \"idf, computed as log(1 + (N - n + 0.5) / (n + 0.5))\",\n          \"details\": [\n            {\n              \"value\": 1.0,\n              \"description\": \"n, number of docs containing this term\",\n              \"context\": []\n            },\n            {\n              \"value\": 2.0,\n              \"description\": \"N, total number of docs\",\n              \"context\": []\n            }\n          ],\n          \"context\": []\n        },\n        {\n          \"value\": 0.37919825,\n          \"description\": \"freq / (freq + k1 * (1 - b + b * dl / avgdl))\",\n          \"details\": [\n            {\n              \"value\": 1.0,\n              \"description\": \"freq, occurrences of term within document\",\n              \"context\": []\n            },\n            {\n              \"value\": 1.2,\n              \"description\": \"k1, term saturation parameter\",\n              \"context\": []\n            },\n            {\n              \"value\": 0.75,\n              \"description\": \"b, length normalization parameter\",\n              \"context\": []\n            },\n            {\n              \"value\": 104.0,\n              \"description\": \"dl, length of field\",\n              \"context\": []\n            },\n            {\n              \"value\": 70.0,\n              \"description\": \"avgdl, average length of field\",\n              \"context\": []\n            }\n          ],\n          \"context\": []\n        }\n      ],\n      \"context\": [\n        \"Term=Term(type=Str, field=1, \\\"mottled\\\")\"\n      ]\n    }\n  ],\n  \"context\": []\n}"
 	qp, err := rb.Searcher()
 	require.NoError(t, err)
 
@@ -168,15 +166,21 @@ func testExpectedIndex(t *testing.T, idx *TIndex) {
 
 	searcher, err := qp.ParseQuery("Sea")
 	require.NoError(t, err)
-	s, err := searcher.Search()
+	s, err := searcher.Search(false)
 	require.NoError(t, err)
 	require.EqualValues(t, resultSet1, s)
 
 	searcherAgain, err := qp.ParseQuery("mottled")
 	require.NoError(t, err)
-	s, err = searcherAgain.Search()
+	s, err = searcherAgain.Search(true)
 	require.NoError(t, err)
-	require.EqualValues(t, resultSet2, s)
+	resultSet := []interface{}{}
+	err = json.Unmarshal([]byte(s), &resultSet)
+	require.NoError(t, err)
+	exp, ok := resultSet[0].(jm)["explain"].(string)
+	log.Info(exp)
+	require.EqualValues(t, true, ok)
+	require.EqualValues(t, expected, exp)
 }
 
 func testExpectedTopIndex(t *testing.T, idx *TIndex) {
@@ -191,7 +195,7 @@ func testExpectedTopIndex(t *testing.T, idx *TIndex) {
 
 	searcher, err := qp.ParseQuery("and")
 	require.NoError(t, err)
-	s, err := searcher.Search(1)
+	s, err := searcher.Search(false, uint64(1))
 	require.NoError(t, err)
 	var res []interface{}
 	err = json.Unmarshal([]byte(s), &res)
