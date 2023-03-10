@@ -18,6 +18,7 @@ use serde_derive::{Deserialize, Serialize};
 pub struct ResultElement{
 	pub doc:NamedFieldDocument,
     pub score:f32,
+    pub explain:String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -77,11 +78,12 @@ impl<'a> TantivySession<'a>{
     pub fn handle_searcher(&mut self, _method:&str, _obj: &str, params:serde_json::Value)  -> InternalCallResult<u32>{
         info!("Searcher");
         const DEF_LIMIT:u64 = 10;
-        let top_limit = match params.as_object(){
+        let (top_limit, explain) = match params.as_object(){
             Some(p) => {
-                p.get("top_limit").unwrap_or(&Value::from(DEF_LIMIT)).as_u64().unwrap_or(DEF_LIMIT)
+                (p.get("top_limit").unwrap_or(&Value::from(DEF_LIMIT)).as_u64().unwrap_or(DEF_LIMIT),
+                p.get("explain").unwrap_or(&Value::from(false)).as_bool().unwrap_or(false))
             },
-            None => DEF_LIMIT,
+            None => (DEF_LIMIT, false),
         };
         let query = match self.dyn_q.as_ref(){
             Some(dq) => dq,
@@ -103,8 +105,12 @@ impl<'a> TantivySession<'a>{
             let retrieved_doc = li.doc(doc_address)?;
             let schema = self.schema.as_ref().ok_or_else(|| ErrorKinds::NotExist("Schema not present".to_string()))?;
             let named_doc = schema.to_named_doc(&retrieved_doc);
+            let mut s:String = "noexplain".to_string();
+            if explain{
+                s = query.explain(li, doc_address)?.to_pretty_json();
+            }
             info!("retrieved doc {:?}",retrieved_doc.field_values());
-            vret.append(&mut vec![ResultElement{doc:named_doc,score}]);
+            vret.append(&mut vec![ResultElement{doc:named_doc,score, explain:s}]);
         }
         self.return_buffer = serde_json::to_string(&vret)?;
         info!("ret = {}", self.return_buffer);
