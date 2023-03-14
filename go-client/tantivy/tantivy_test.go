@@ -345,3 +345,12 @@ func TestTantivyStress(t *testing.T) {
 	_, err = tiw.Commit()
 	require.NoError(t, err)
 }
+
+func TestChangeKB(t *testing.T) {
+	LibInit()
+	SetKB(1.0, 0.80)
+
+	//	idx := makeIndex(t, "", false)
+	//	testExpectedTopIndex(t, idx)
+
+}

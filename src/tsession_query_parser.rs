@@ -33,7 +33,7 @@ impl<'a> TantivySession<'a>{
             let request_fields = m.get("fields").ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?.as_array().ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?;
             for v in request_fields{
                 let v_str = v.as_str().unwrap_or_default();
-                if let Some(f) = schema.get_field(v_str) {
+                if let Ok(f) = schema.get_field(v_str) {
                      v_out.append(vec![f].as_mut())
                 }
             }
@@ -57,6 +57,7 @@ impl<'a> TantivySession<'a>{
                     return make_internal_json_error::<u32>(ErrorKinds::BadParams(format!("query parser error : {_e}")))
                 }
             };
+            //self.dyn_q.unwrap().weight(true).unwrap().scorer(reader, boost)
         }
         if method == "parse_fuzzy_query"{
             let schema = match self.schema.as_ref(){
@@ -77,7 +78,7 @@ impl<'a> TantivySession<'a>{
                 Some(s) => s,
                 None => return make_internal_json_error(ErrorKinds::BadInitialization("Field requested is not present".to_string()))
             };
-            if let Some(f) = schema.get_field(f_str) {
+            if let Ok(f) = schema.get_field(f_str) {
                 let f_term = fuzzy_term[0].as_str().ok_or(ErrorKinds::BadInitialization("Failed to parse fuzzy term".to_string()))?;
                 let t = Term::from_field_text(f, f_term);
                 let q = FuzzyTermQuery::new(t, 1, true);

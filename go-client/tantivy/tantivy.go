@@ -33,6 +33,10 @@ func ClearSession(sessionID string) {
 	C.term(C.CString(sessionID))
 }
 
+func SetKB(k float64, b float64) {
+	C.set_k_and_b(C.float(k), C.float(b))
+}
+
 type msi map[string]interface{}
 
 const defaultMemSize = 5000000

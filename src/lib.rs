@@ -33,6 +33,7 @@ pub mod tsession_searcher;
 pub mod tsession_document;
 pub mod tsession_tests;
 
+
 pub use self::tsession_builder::*;
 pub use self::tsession_index::*;
 pub use self::tsession_query_parser::*;
@@ -239,7 +240,7 @@ impl From<serde_json::Error> for ErrorKinds{
 
 
 
-pub type InternalCallResult<T> = std::result::Result<T, ErrorKinds>;
+pub type InternalCallResult<T> = Result<T, ErrorKinds>;
 
 /// # Safety
 ///
@@ -288,7 +289,18 @@ pub unsafe extern "C" fn term(s: *const c_char) -> i8{
     0
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn set_k_and_b(k:f32, b:f32) -> i8{
+    tantivy::query::do_set_k_and_b(k,b);
+    0
+}
 
+#[test]
+fn test_kb(){
+    unsafe{
+        set_k_and_b(1.0, 1.0);
+    }
+}
 /**
 tantivy_jpc is the main entry point into a translation layer from Rust to Go for Tantivy
 this function will
