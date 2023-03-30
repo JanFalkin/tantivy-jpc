@@ -55,6 +55,23 @@ func (idw *TIndexWriter) AddDocument(docid uint) (uint, error) {
 	return uint(c.(float64)), nil
 }
 
+func (idw *TIndexWriter) DeleteTerm(field, term string) (uint, error) {
+	s, err := idw.callTantivy("indexwriter", "delete_term", msi{"field": field, "term": term})
+	if err != nil {
+		return 0, err
+	}
+	var data msi
+	err = json.Unmarshal([]byte(s), &data)
+	if err != nil {
+		return 0, err
+	}
+	c, ok := data["opstamp"]
+	if !ok {
+		return 0, fmt.Errorf("document_count element not found in data %v or data not able to be type asserted to uint", data)
+	}
+	return uint(c.(float64)), nil
+}
+
 type TIndex struct {
 	*JPCId
 }

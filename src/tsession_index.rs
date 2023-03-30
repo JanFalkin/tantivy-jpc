@@ -8,6 +8,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 use serde_json::json;
+use tantivy::Term;
 
 
 impl<'a> TantivySession<'a>{
@@ -109,6 +110,44 @@ impl<'a> TantivySession<'a>{
                 self.return_buffer = json!({"opstamp": os}).to_string();
                 self.doc = doc;
                 info!("{}", self.return_buffer);
+            },
+            "delete_term" =>{
+                let m = params.as_object().ok_or(ErrorKinds::BadParams("invalid parameters pass delete_term, params not an object".to_string()))?;
+                let writer = match self.indexwriter.as_mut(){
+                    Some(x) => x,
+                    None => {
+                        let bi = match self.index.as_mut().take(){
+                            Some(x) => x,
+                            None => return make_internal_json_error(ErrorKinds::BadInitialization("need index created for writer".to_string())),
+                        };
+                        self.indexwriter = Some(Box::new((*bi).writer(150000000).unwrap()));
+                        self.indexwriter.as_mut().ok_or(ErrorKinds::BadInitialization("need index created for writer".to_string()))?
+                    },
+                };
+                let schema = match self.schema.as_ref(){
+                    Some(s) => s,
+                    None => return make_internal_json_error(ErrorKinds::BadInitialization("schema not available during delete_term".to_string()))
+                };
+                let request_field = m.get("field").ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?.as_array().ok_or_else(|| ErrorKinds::BadParams("field not present".to_string()))?;
+                if request_field.len() != 1{
+                    return make_internal_json_error(ErrorKinds::BadInitialization("Requesting more than one field in delete_term disallowed".to_string()))
+                }
+                let field = &request_field[0];
+                let f_str = match field.as_str(){
+                    Some(s) => s,
+                    None => return make_internal_json_error(ErrorKinds::BadInitialization("Field requested is not present".to_string()))
+                };
+                let terms = m.get("term").ok_or_else(|| ErrorKinds::BadParams("term not present".to_string()))?.as_array().ok_or_else(|| ErrorKinds::BadParams("term not present".to_string()))?;
+                if terms.len() != 1{
+                    return make_internal_json_error(ErrorKinds::BadInitialization("Requesting more than one term in fuzzy query disallowed".to_string()))
+                }
+                let str_term = terms[0].as_str().ok_or(ErrorKinds::BadInitialization("term not coercable to str".to_string()))?;
+                if let Ok(f) = schema.get_field(f_str) {
+                    let term = Term::from_field_text(f, str_term);
+                    let ostamp = writer.delete_term(term);
+                    //NOTE DELETIONS WILL NOT BE VISIBLE UNTIL AFTER COMMIT
+                    self.return_buffer = json!({"opstamp": ostamp}).to_string();
+                }
             },
             "commit" => {
                 match writer.commit(){
