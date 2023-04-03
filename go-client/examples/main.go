@@ -22,16 +22,16 @@ func doRun() {
 	if err != nil {
 		panic(err)
 	}
-	idxFieldTitle, err := builder.AddTextField("title", tantivy.TEXT, true, true)
+	idxFieldTitle, err := builder.AddTextField("title", tantivy.TEXT, true, true, true)
 	if err != nil {
 		panic(err)
 	}
-	idxFieldBody, err := builder.AddTextField("body", tantivy.TEXT, false, false)
+	idxFieldBody, err := builder.AddTextField("body", tantivy.TEXT, false, false, true)
 	if err != nil {
 		panic(err)
 	}
 
-	idxFieldOrder, err := builder.AddI64Field("order", tantivy.INT, false, false)
+	idxFieldOrder, err := builder.AddI64Field("order", tantivy.INT, false, false, true)
 	if err != nil {
 		panic(err)
 	}

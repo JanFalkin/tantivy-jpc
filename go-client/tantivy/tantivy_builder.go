@@ -74,61 +74,66 @@ func (tb *TBuilder) standardReturnHandler(s string, err error) (int, error) {
 
 }
 
-func (tb *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool, indexed bool) (int, error) {
+func (tb *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool, indexed bool, fast bool) (int, error) {
 	s, err := tb.callTantivy("builder", "add_text_field", msi{
 		"name":    name,
 		"type":    fieldType,
 		"stored":  stored,
 		"indexed": indexed,
 		"id":      tb.JPCId.id,
+		"fast":    fast,
 	})
 	return tb.standardReturnHandler(s, err)
 
 }
 
-func (tb *TBuilder) AddDateField(name string, fieldType StorageKind, stored bool, indexed bool) (int, error) {
+func (tb *TBuilder) AddDateField(name string, fieldType StorageKind, stored bool, indexed bool, fast bool) (int, error) {
 	s, err := tb.callTantivy("builder", "add_date_field", msi{
 		"name":    name,
 		"type":    fieldType,
 		"stored":  stored,
 		"indexed": indexed,
 		"id":      tb.JPCId.id,
+		"fast":    fast,
 	})
 
 	return tb.standardReturnHandler(s, err)
 }
 
-func (tb *TBuilder) AddU64Field(name string, fieldType StorageKind, stored bool, indexed bool) (int, error) {
+func (tb *TBuilder) AddU64Field(name string, fieldType StorageKind, stored bool, indexed bool, fast bool) (int, error) {
 	s, err := tb.callTantivy("builder", "add_u64_field", msi{
 		"name":    name,
 		"type":    fieldType,
 		"stored":  stored,
 		"indexed": indexed,
 		"id":      tb.JPCId.id,
+		"fast":    fast,
 	})
 
 	return tb.standardReturnHandler(s, err)
 }
 
-func (tb *TBuilder) AddI64Field(name string, fieldType StorageKind, stored bool, indexed bool) (int, error) {
+func (tb *TBuilder) AddI64Field(name string, fieldType StorageKind, stored bool, indexed bool, fast bool) (int, error) {
 	s, err := tb.callTantivy("builder", "add_i64_field", msi{
 		"name":    name,
 		"type":    fieldType,
 		"stored":  stored,
 		"indexed": indexed,
 		"id":      tb.JPCId.id,
+		"fast":    fast,
 	})
 
 	return tb.standardReturnHandler(s, err)
 }
 
-func (tb *TBuilder) AddF64Field(name string, fieldType StorageKind, stored bool, indexed bool) (int, error) {
+func (tb *TBuilder) AddF64Field(name string, fieldType StorageKind, stored bool, indexed bool, fast bool) (int, error) {
 	s, err := tb.callTantivy("builder", "add_f64_field", msi{
 		"name":    name,
 		"type":    fieldType,
 		"stored":  stored,
 		"indexed": indexed,
 		"id":      tb.JPCId.id,
+		"fast":    fast,
 	})
 
 	return tb.standardReturnHandler(s, err)

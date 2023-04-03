@@ -15,7 +15,7 @@ use tantivy::schema::{TextOptions, Schema, STRING, TEXT, STORED, NumericOptions,
 macro_rules! impl_simple_type {
     () => {};
     ($self:ident, $handler_params:ident, $handler_obj:ident, $handler_func:ident, $default_type:ident) => {
-        let (name, _field_type, stored, indexed) = Self::extract_params($handler_params)?;
+        let (name, _field_type, stored, indexed, fast) = Self::extract_params($handler_params)?;
         let mut ni: $default_type;
         if stored{
             ni = $default_type::default().set_stored();
@@ -25,6 +25,9 @@ macro_rules! impl_simple_type {
         if indexed{
             ni = ni.set_indexed();
         }
+        if fast{
+            ni = ni.set_fast();
+        }
         let f = $handler_obj.$handler_func(&name,ni);
         $self.return_buffer = json!({"field" : f}).to_string();
     }
@@ -33,7 +36,7 @@ macro_rules! impl_simple_type {
 
 impl<'a> TantivySession<'a>{
 
-    pub fn extract_params(params:serde_json::Value) -> InternalCallResult<(String,u64,bool,bool)>{
+    pub fn extract_params(params:serde_json::Value) -> InternalCallResult<(String,u64,bool,bool,bool)>{
         let m = match params.as_object(){
             Some(x)=> x,
             None => return make_internal_json_error(ErrorKinds::BadParams("parameters are not a json object".to_string())),
@@ -63,7 +66,14 @@ impl<'a> TantivySession<'a>{
             }
             None => false,
         };
-        Ok((name.to_string(), field_type, stored,indexed))
+        let fast = match m.get("fast"){
+            Some(v) => match v.as_bool() {
+                Some(b) => b,
+                None => false,
+            }
+            None => false,
+        };
+        Ok((name.to_string(), field_type, stored,indexed, fast))
 
     }
     pub fn handler_builder(&mut self, method:&str, _obj: &str, params:serde_json::Value)  -> InternalCallResult<u32>{
@@ -77,7 +87,7 @@ impl<'a> TantivySession<'a>{
         };
         match method {
             "add_text_field" => {
-                let (name, field_type, stored, indexed) = Self::extract_params(params)?;
+                let (name, field_type, stored, indexed, fast) = Self::extract_params(params)?;
 
                 let mut ti: TextOptions;
                 match field_type{
@@ -100,6 +110,9 @@ impl<'a> TantivySession<'a>{
                     ti = ti.set_indexing_options(TextFieldIndexing::default()
                     .set_tokenizer("default")
                     .set_index_option(IndexRecordOption::WithFreqsAndPositions));
+                }
+                if fast{
+                    ti = ti.set_fast();
                 }
                 info!("add_text_field: name = {}, field_type = {} stored = {}", &name, &field_type, &stored);
                 let f = sb.add_text_field(&name,ti);
