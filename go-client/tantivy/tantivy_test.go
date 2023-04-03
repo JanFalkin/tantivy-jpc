@@ -346,6 +346,32 @@ func TestTantivyStress(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestTantivyDeleteTerm(t *testing.T) {
+	builder, err := NewBuilder("")
+	require.NoError(t, err)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, idxFieldTitle)
+	idxFieldInt, err := builder.AddI64Field("test", INT, true, true)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, idxFieldInt)
+	doc, err := builder.Build()
+	require.NoError(t, err)
+	d1, err := doc.Create()
+	require.NoError(t, err)
+	ti, err := doc.CreateIndex()
+	require.NoError(t, err)
+	tiw, err := ti.CreateIndexWriter()
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldTitle, "FooFoo", d1)
+	require.NoError(t, err)
+	_, err = doc.AddInt(idxFieldInt, 444, d1)
+	require.NoError(t, err)
+	_, err = tiw.DeleteTerm("test", 444)
+	require.NoError(t, err)
+
+}
+
 func TestChangeKB(t *testing.T) {
 	LibInit()
 	SetKB(1.0, 0.80)

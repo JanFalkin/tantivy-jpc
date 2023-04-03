@@ -55,7 +55,7 @@ func (idw *TIndexWriter) AddDocument(docid uint) (uint, error) {
 	return uint(c.(float64)), nil
 }
 
-func (idw *TIndexWriter) DeleteTerm(field, term string) (uint, error) {
+func (idw *TIndexWriter) DeleteTerm(field, term interface{}) (uint, error) {
 	s, err := idw.callTantivy("indexwriter", "delete_term", msi{"field": field, "term": term})
 	if err != nil {
 		return 0, err
