@@ -146,6 +146,11 @@ pub mod tests {
             self.ctx.call_jpc("index".to_string(), "reader_builder".to_string(), json!({}),false);
             Ok(TestIndexReader{ctx:self.ctx.clone()})
         }
+
+        pub fn delete_term<T :serde::Serialize>(&mut self, name:String, term:T ) -> i64{
+            self.ctx.call_jpc("indexwriter".to_string(), "delete_term".to_string(), json!({"field" : name, "term" : term}),false);
+            0
+        }
     }
 
     impl TestDocument<'_>{
@@ -281,6 +286,7 @@ pub mod tests {
             });
             call_simple_type!(self, j_param, "add_f64_field")
         }
+
         pub fn build(&mut self, in_memory: bool)  -> InternalCallResult<TestDocument> {
             if in_memory{
                 let _s = self.call_jpc("builder".to_string(), "build".to_string(), json!({}), false);
@@ -513,6 +519,37 @@ pub mod tests {
         let vret:Vec<serde_json::Value> = serde_json::from_str(sres).unwrap();
         assert_eq!(vret.len(), 2);
     }
+
+    #[test]
+    fn test_delete_term(){
+        crate::test_init();
+        let mut ctx = FakeContext::new();
+        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
+        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(ctx.add_i64_field("order".to_string(), 3, false, true), 2);
+
+        let mut td = match ctx.build(true){
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}",format!("failed with error {}", e.to_string()));
+            }
+        };
+        let doc1 = match td.create(){
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}",format!("doc1 create failed error {}", e.to_string()));
+            }
+        };
+        assert_eq!(td.add_text(0, "The Old Man and the Sea".to_string(), doc1 as u32), 0);
+        assert_eq!(td.add_text(1, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish.".to_string(), doc1 as u32), 0);
+        assert_eq!(td.add_int(2, 232, doc1 as u32), 0);
+        let mut ti = match td.create_index(){
+            Ok(i) => i,
+            Err(e) => panic!("failed to create index err ={} ", e)
+        };
+        ti.delete_term("order".to_string(), 232);
+    }
+
     #[test]
     fn all_simple_fields(){
         crate::test_init();

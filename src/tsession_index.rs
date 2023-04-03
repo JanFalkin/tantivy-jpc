@@ -9,6 +9,9 @@ extern crate serde_derive;
 extern crate serde_json;
 use serde_json::json;
 use tantivy::Term;
+use tantivy::schema::{FieldType};
+use tantivy::DateTime;
+
 
 
 impl<'a> TantivySession<'a>{
@@ -112,7 +115,6 @@ impl<'a> TantivySession<'a>{
                 info!("{}", self.return_buffer);
             },
             "delete_term" =>{
-                let m = params.as_object().ok_or(ErrorKinds::BadParams("invalid parameters pass delete_term, params not an object".to_string()))?;
                 let writer = match self.indexwriter.as_mut(){
                     Some(x) => x,
                     None => {
@@ -128,22 +130,63 @@ impl<'a> TantivySession<'a>{
                     Some(s) => s,
                     None => return make_internal_json_error(ErrorKinds::BadInitialization("schema not available during delete_term".to_string()))
                 };
-                let request_field = m.get("field").ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?.as_array().ok_or_else(|| ErrorKinds::BadParams("field not present".to_string()))?;
-                if request_field.len() != 1{
-                    return make_internal_json_error(ErrorKinds::BadInitialization("Requesting more than one field in delete_term disallowed".to_string()))
-                }
-                let field = &request_field[0];
+                let request_field = params.get("field").ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?;
+                let field = request_field;
                 let f_str = match field.as_str(){
                     Some(s) => s,
                     None => return make_internal_json_error(ErrorKinds::BadInitialization("Field requested is not present".to_string()))
                 };
-                let terms = m.get("term").ok_or_else(|| ErrorKinds::BadParams("term not present".to_string()))?.as_array().ok_or_else(|| ErrorKinds::BadParams("term not present".to_string()))?;
-                if terms.len() != 1{
-                    return make_internal_json_error(ErrorKinds::BadInitialization("Requesting more than one term in fuzzy query disallowed".to_string()))
-                }
-                let str_term = terms[0].as_str().ok_or(ErrorKinds::BadInitialization("term not coercable to str".to_string()))?;
+                let terms = params.get("term").ok_or_else(|| ErrorKinds::BadParams("term not present".to_string()))?;
                 if let Ok(f) = schema.get_field(f_str) {
-                    let term = Term::from_field_text(f, str_term);
+                    let fe = schema.get_field_entry(f);
+                    let term:Term = match fe.field_type(){
+                        FieldType::Str(_s) => {
+                            let str_term = terms.as_str().ok_or(ErrorKinds::BadInitialization("term not coercable to str".to_string()))?;
+                            Term::from_field_text(f, str_term)
+
+                        },
+                        FieldType::Bool(_b) => {
+                            let bterm = terms.as_bool().ok_or(ErrorKinds::BadInitialization("term not coercable to bool".to_string()))?;
+                            Term::from_field_bool(f,bterm)
+                        },
+                        FieldType::Bytes(_b) => {
+                            let bterm = serde_json::to_vec(terms.as_array().ok_or(ErrorKinds::BadInitialization("term not coercable to array".to_string()))?)?;
+                            Term::from_field_bytes(f,&bterm)
+                        },
+                        FieldType::Date(_d) => {
+                            let seconds_unix = terms.as_i64().ok_or(ErrorKinds::BadInitialization("term not coercable to i64".to_string()))?;
+                            let datetime = DateTime::from_timestamp_secs(seconds_unix);
+                            Term::from_field_date(f,datetime)
+
+                        },
+                        FieldType::F64(_ff) => {
+                            let bterm = terms.as_f64().ok_or(ErrorKinds::BadInitialization("term not coercable to array".to_string()))?;
+                            Term::from_field_f64(f,bterm)
+                        },
+                        FieldType::Facet(_ff) => {
+                            return Err(ErrorKinds::BadInitialization("term not coercable to array".to_string()));
+
+                        },
+                        FieldType::I64(_i) => {
+                            let bterm = terms.as_i64().ok_or(ErrorKinds::BadInitialization("term not coercable to i64".to_string()))?;
+                            Term::from_field_i64(f,bterm)
+
+                        },
+                        FieldType::IpAddr(_i) => {
+                            let bterm = terms.as_str().ok_or(ErrorKinds::BadInitialization("term not coercable to String".to_string()))?.to_string();
+                            let ipv6_addr = bterm.parse::<std::net::Ipv6Addr>()?;
+                            Term::from_field_ip_addr(f,ipv6_addr)
+
+                        },
+                        FieldType::JsonObject(_j) => {
+                            return Err(ErrorKinds::BadInitialization("term not coercable to json object".to_string()));
+
+                        },
+                        FieldType::U64(_u) => {
+                            let bterm = terms.as_u64().ok_or(ErrorKinds::BadInitialization("term not coercable to array".to_string()))?;
+                            Term::from_field_u64(f,bterm)
+                        },
+                    };
                     let ostamp = writer.delete_term(term);
                     //NOTE DELETIONS WILL NOT BE VISIBLE UNTIL AFTER COMMIT
                     self.return_buffer = json!({"opstamp": ostamp}).to_string();

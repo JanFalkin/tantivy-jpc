@@ -17,6 +17,7 @@ use std::ffi::{c_char, CStr};
 
 use lazy_static::{lazy_static};
 use std::sync::Mutex;
+use chrono::format::ParseError;
 
 extern crate thiserror;
 use thiserror::Error;
@@ -237,6 +238,19 @@ impl From<serde_json::Error> for ErrorKinds{
     }
 }
 
+impl From<ParseError> for ErrorKinds{
+    fn from(e:ParseError) -> Self{
+        ErrorKinds::BadParams(e.to_string())
+    }
+}
+
+impl From<std::net::AddrParseError> for ErrorKinds{
+    fn from(e:std::net::AddrParseError) -> Self{
+        ErrorKinds::BadParams(e.to_string())
+    }
+}
+
+
 
 
 
@@ -289,6 +303,11 @@ pub unsafe extern "C" fn term(s: *const c_char) -> i8{
     0
 }
 
+/// # Safety
+///
+/// This function will directly affect the way Tantivyoreders it's result set.  This is for advanced use only and should 
+/// be avoided unless you understand all the specifics of these 2 globals. Note this will only persist as long as the 
+/// current instance is loaded and will reset on a new invocation of tantivy
 #[no_mangle]
 pub unsafe extern "C" fn set_k_and_b(k:f32, b:f32) -> i8{
     tantivy::query::do_set_k_and_b(k,b);
@@ -322,7 +341,6 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
           return -1;
       }
   };
-  info!("parameters = {}", input_string);
   let json_params: Request = match serde_json::from_str(input_string){
     Ok(m) => {m},
     Err(_err) => {
@@ -332,7 +350,6 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
           return -1;
     }
   };
-  info!("Request parsed");
   let mut tm = match TANTIVY_MAP.lock(){
     Ok(t) => t,
     Err(e) => {

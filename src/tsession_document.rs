@@ -28,7 +28,7 @@ fn uint_val(v:serde_json::Value) -> tantivy::schema::Value{
 
 
 impl<'a> TantivySession<'a>{
-    fn handle_add_field<T>(&mut self, params:serde_json::Value, func:fn (v:serde_json::Value) -> tantivy::schema::Value) -> InternalCallResult<u32>{
+    fn handle_add_field(&mut self, params:serde_json::Value, func:fn (v:serde_json::Value) -> tantivy::schema::Value) -> InternalCallResult<u32>{
         let doc = self.doc.as_mut();
         let d = match doc{
             Some(v) => v,
@@ -63,15 +63,15 @@ impl<'a> TantivySession<'a>{
         info!("Document");
         match method {
             "add_text" => {
-                self.handle_add_field::<String>(params, string_val)?;
+                self.handle_add_field(params, string_val)?;
                 0
             },
             "add_int" => {
-                self.handle_add_field::<i64>(params, int_val)?;
+                self.handle_add_field(params, int_val)?;
                 0
             },
             "add_uint" => {
-                self.handle_add_field::<u64>(params, uint_val)?;
+                self.handle_add_field(params, uint_val)?;
                 0
             },
             "create" => {
