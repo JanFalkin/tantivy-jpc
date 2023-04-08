@@ -91,23 +91,27 @@ impl<'a> TantivySession<'a>{
                 return make_internal_json_error(ErrorKinds::NotExist("dyn query not created".to_string()));
             }
         };
-        let li = match self.leased_item.as_ref(){
-            Some(li) => li,
-            None => return make_internal_json_error(ErrorKinds::NotExist("leased item not found".to_string())),
+        let idx = match &self.index{
+            Some(r) => r,
+            None => return make_internal_json_error(ErrorKinds::NotExist("Reader unavliable".to_string()))
         };
-        let td = match li.search(query, &TopDocs::with_limit(top_limit as usize)){
+
+        let rdr = idx.reader()?;
+        let searcher = rdr.searcher();
+
+        let td = match searcher.search(query, &TopDocs::with_limit(top_limit as usize)){
             Ok(td) => td,
             Err(e) => return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}"))),
         };
         info!("search complete len = {}, td = {:?}", td.len(), td);
         let mut vret:Vec<ResultElement> = Vec::<ResultElement>::new();
         for (score, doc_address) in td {
-            let retrieved_doc = li.doc(doc_address)?;
+            let retrieved_doc = searcher.doc(doc_address)?;
             let schema = self.schema.as_ref().ok_or_else(|| ErrorKinds::NotExist("Schema not present".to_string()))?;
             let named_doc = schema.to_named_doc(&retrieved_doc);
             let mut s:String = "noexplain".to_string();
             if explain{
-                s = query.explain(li, doc_address)?.to_pretty_json();
+                s = query.explain(&searcher, doc_address)?.to_pretty_json();
             }
             info!("retrieved doc {:?}",retrieved_doc.field_values());
             vret.append(&mut vec![ResultElement{doc:named_doc,score, explain:s}]);
