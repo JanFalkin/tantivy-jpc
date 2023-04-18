@@ -22,19 +22,11 @@ type TBuilder struct {
 }
 
 func NewBuilder(td string, memsize ...int32) (*TBuilder, error) {
-	var memSizeToUse int32
-	if len(memsize) > 0 {
-		memSizeToUse = memsize[0]
-	} else {
-		memSizeToUse = defaultMemSize
-	}
 	u := uuid.NewV4()
 	tb := TBuilder{
 		JPCId: &JPCId{
-			id:       u.String(),
-			TempDir:  td,
-			bufLen:   memSizeToUse,
-			ccomsBuf: cAlloc(memSizeToUse),
+			id:      u.String(),
+			TempDir: td,
 		},
 	}
 	return &tb, nil

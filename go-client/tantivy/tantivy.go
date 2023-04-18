@@ -53,18 +53,6 @@ func (j *JPCId) ID() string {
 	return j.id
 }
 
-func cAlloc(sz int32) *C.char {
-	return C.internal_malloc(C.int(sz))
-}
-
-//	func convertCStringToGoString(c *C.uchar) string {
-//		var buf []byte
-//		for *c != 0 {
-//			buf = append(buf, *c)
-//			c = (*C.uchar)(unsafe.Pointer(uintptr(unsafe.Pointer(c)) + 1))
-//		}
-//		return string(buf)
-//	}
 func (jpc *JPCId) callTantivy(object, method string, params msi) (string, error) {
 	f := map[string]interface{}{
 		"id":     jpc.id,
@@ -77,22 +65,22 @@ func (jpc *JPCId) callTantivy(object, method string, params msi) (string, error)
 	if err != nil {
 		return "", err
 	}
-	var comsBuf **C.char
+	var pcomsBuf **C.char
 	var blen int64
 	sb := string(b)
-	p := C.CString(sb)
-	crb := (**C.uchar)(unsafe.Pointer(comsBuf))
+	pcJPCParams := C.CString(sb)
+	pCDesctination := (**C.uchar)(unsafe.Pointer(pcomsBuf))
 	defer func() {
-		C.free(unsafe.Pointer(p))
-		C.free(unsafe.Pointer(*crb))
+		C.free(unsafe.Pointer(pcJPCParams))
+		C.free(unsafe.Pointer(*pCDesctination))
 	}()
-	cs := (*C.uchar)(unsafe.Pointer(p))
-	prbl := (*C.ulong)(unsafe.Pointer(&blen))
-	ttret := C.tantivy_jpc(cs, C.ulong(uint64(len(sb))), &crb, prbl)
+	cJPCParams := (*C.uchar)(unsafe.Pointer(pcJPCParams))
+	pDestinationLen := (*C.ulong)(unsafe.Pointer(&blen))
+	ttret := C.tantivy_jpc(cJPCParams, C.ulong(uint64(len(sb))), &pCDesctination, pDestinationLen)
 	if ttret < 0 {
-		return "", errors.E("Tantivy JPC Failed", errors.K.Invalid, "desc", C.GoString(jpc.ccomsBuf))
+		return "", errors.E("Tantivy JPC Failed", errors.K.Invalid, "desc", string(C.GoBytes(unsafe.Pointer(*pCDesctination), C.int(*pDestinationLen))))
 	}
-	mySlice := C.GoBytes(unsafe.Pointer(*crb), C.int(*prbl))
+	mySlice := C.GoBytes(unsafe.Pointer(*pCDesctination), C.int(*pDestinationLen))
 	returnData := string(mySlice)
 	return returnData, nil
 }
