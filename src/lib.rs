@@ -7,6 +7,7 @@ extern crate serde_json;
 extern crate lazy_static;
 extern crate tempdir;
 use log::{info, error};
+use scopeguard::defer;
 use serde_json::json;
 use serde_derive::{Serialize, Deserialize};
 use std::str;
@@ -81,7 +82,7 @@ impl<'a> TantivySession<'a>{
         }
     }
     // do_method is a translation from a string json method to an actual call.  All json params are passed
-    pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> (*const u8, usize, bool){
+    pub fn do_method<'b>(&'b mut self, method:&str, obj: &str, params:serde_json::Value, mut ret_buffer: &'b mut String) -> (*const u8, usize, bool){
         info!("In do_method");
         match obj {
             "query_parser" => {
@@ -130,7 +131,8 @@ impl<'a> TantivySession<'a>{
         };
         let _ = &self.doc;
         let _ = &self.builder;
-            (self.return_buffer.as_ptr() as *const u8, self.return_buffer.len(), false)
+        ret_buffer = Box::leak(Box::new(self.return_buffer.clone()));
+            (ret_buffer.as_ptr() as *const u8, ret_buffer.len(), false)
     }
 }
 /// Bitcode representation of a incomming client request
@@ -330,13 +332,18 @@ this function will
 /// # Safety
 ///
 #[no_mangle]
-pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*mut usize) -> i64 {
+pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:&mut *mut *mut u8, ret_len:*mut usize) -> i64 {
   info!("In tantivy_jpc");
   let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)){
       Ok(x) => x,
       Err(err) => {
           *ret_len  = err.to_string().len();
-          std::ptr::copy(err.to_string().as_ptr(), ret, *ret_len);
+          let mut buffer = Vec::<u8>::with_capacity(*ret_len).as_mut_ptr();
+          // Prevent the buffer from being deallocated when it goes out of scope
+          Box::leak(Box::new(buffer));
+          std::mem::forget(buffer);          
+          *ret = &mut buffer;
+          std::ptr::copy(err.to_string().as_ptr(), buffer, *ret_len);
           error!("failed error = {err}");
           return -1;
       }
@@ -346,7 +353,12 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
     Err(_err) => {
           let (r,sz,_b) = make_json_error("parse failed for http", "ID not found");
           *ret_len = sz;
-          std::ptr::copy(r, ret, sz);
+          let mut buffer = Vec::<u8>::with_capacity(*ret_len).as_mut_ptr();
+          // Prevent the buffer from being deallocated when it goes out of scope
+          Box::leak(Box::new(buffer));
+          std::mem::forget(buffer);          
+          *ret = &mut buffer;
+          std::ptr::copy(r, buffer, sz);
           return -1;
     }
   };
@@ -371,16 +383,37 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
         }
         _ =>  {
             let msg = ErrorKinds::UnRecognizedCommand(json_params.method.to_string()).to_string();
-            std::ptr::copy(msg.as_ptr() as *const u8, ret, msg.len());
+            let mut buffer = Vec::<u8>::with_capacity(msg.len()).as_mut_ptr();
+            // Prevent the buffer from being deallocated when it goes out of scope
+            Box::leak(Box::new(buffer));
+            std::mem::forget(buffer);          
+            *ret = &mut buffer;
+            std::ptr::copy(msg.as_ptr() as *const u8, buffer, msg.len());
             return -1;
         }
     };
-    let (return_val, ret_sz, is_error) = entity.do_method(json_params.method, json_params.obj, json_params.params);
-    std::ptr::copy(return_val, ret, ret_sz);
-    let end = ret.offset(ret_sz.try_into().unwrap_or_default());
-    *end = 0;
+    let mut ret_buffer = String::new();
+    let (return_val, ret_sz, is_error) = entity.do_method(json_params.method, json_params.obj, json_params.params, &mut ret_buffer);
+    //let buf2 = core::slice::from_raw_parts(return_val, ret_sz as usize).as_mut();
+    let mut buffer = Vec::<u8>::with_capacity(ret_sz);
+    buffer.set_len(ret_sz);
+
+    // Prevent the buffer from being deallocated when it goes out of scope
+    let leaked = Box::leak(Box::new(buffer.as_mut_ptr()));
+    std::ptr::copy(return_val, *leaked, ret_sz);
+    let buf: &mut [u8] = core::slice::from_raw_parts_mut(*leaked, ret_sz as usize);
+
+    let bt =  match std::str::from_utf8(buf){
+        Ok(x) => x,
+        Err(e) => return -1,
+     };
+    println!("{}", bt);
+    // let end = buffer.offset((ret_sz+1).try_into().unwrap());
+    // *end = 0;
+    *ret = leaked;
     *ret_len = ret_sz;
-    entity.return_buffer.clear();
+    std::mem::forget(buffer);
+    //entity.return_buffer.clear();
     if is_error{
         return -1;
     }

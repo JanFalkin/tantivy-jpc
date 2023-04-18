@@ -32,5 +32,5 @@ int8_t set_k_and_b(float k,
  */
 int64_t tantivy_jpc(const uint8_t *msg,
                     uintptr_t len,
-                    uint8_t *ret,
+                    uint8_t ***ret,
                     uintptr_t *ret_len);

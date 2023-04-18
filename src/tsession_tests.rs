@@ -4,6 +4,9 @@ use crate::json;
 use crate::info;
 use crate::tantivy_jpc;
 use crate::ResultElement;
+extern crate scopeguard;
+
+use scopeguard::defer;
 
 pub mod tests {
     extern crate tempdir;
@@ -15,7 +18,7 @@ pub mod tests {
 
     use super::*;
     use serde_json::Map;
-    use std::rc::Rc;
+    use std::{rc::Rc, alloc::{Layout}};
 
 
     pub static mut GSIZE:usize = 0;
@@ -199,8 +202,26 @@ pub mod tests {
                 dirs:<Vec<TempDir>>::default(),
             }
         }
+
+        unsafe fn ptr_to_vec(&self, ptr: *mut *mut u8, sz: &usize) -> Vec<u8> {
+            let ptr_ref = &mut *ptr;
+            let slice = std::slice::from_raw_parts(*ptr_ref, *sz);
+            let mut v = Vec::<u8>::with_capacity(slice.len());
+            std::ptr::copy_nonoverlapping(slice.as_ptr(), v.as_mut_ptr(), slice.len());
+            v.set_len(slice.len());
+            v
+        }
+        // unsafe fn ptr_to_vec(&self, ptr: *mut *mut u8, sz:&usize) -> Vec<u8> {
+        //     let ptr_ref = &mut *ptr; // Step 1: Create a mutable reference to the outer pointer
+        //     let slice = std::slice::from_raw_parts(*ptr_ref, *sz); // Step 2: Convert the inner pointer to a slice
+        //     println!("slice={:?}", slice);
+        //     let v = Vec::<u8>::from(slice);
+        //     println!("v={:?} slice={:?}", v,slice);
+        //     v
+        // }
         pub fn call_jpc(&self, object:String, method:String, params:serde_json::Value, do_ret:bool)-> Vec<u8>{
-            let my_ret_ptr = Box::leak(Box::new(0));
+            //let my_ret_ptr = Box::leak(Box::new(0));
+            let my_ret_ptr = &mut usize::default();
 
             let call_p = json!({
                 "id":     self.id,
@@ -210,22 +231,35 @@ pub mod tests {
                 "params": params,
             });
             let mut sp = serde_json::to_vec(&call_p).unwrap_or(vec![]);
-            let p = Box::leak(Box::<Vec<u8>>::new(vec![0; 5000000]));
+            //let p = Box::leak(Box::<Vec<u8>>::new(vec![0; 5000000]));
+            let mut p:*mut *mut u8 = std::ptr::null_mut();
             info!("calling tantivy-jpc json = {}", call_p);
             let iret:i64;
             unsafe{
-                iret = tantivy_jpc(sp.as_mut_ptr(), sp.len(), p.as_mut_ptr(), my_ret_ptr);
+                iret = tantivy_jpc(sp.as_mut_ptr(), sp.len(), &mut p, my_ret_ptr);
             }
             if iret != 0{
                 panic!("call_jpc failed")
             }
-            let sl = p[0..*my_ret_ptr].to_vec();
+            let sl = unsafe{self.ptr_to_vec(p, &my_ret_ptr)};
+            unsafe{
+                defer!{
+                    let pp = *p;
+                    std::mem::drop(pp);
+                }
+            }
+            match std::str::from_utf8(&sl){
+                Ok(s) => println!("stringified = {}", s),
+                Err(err) => {
+                    println!("ERROR = {err} sl = {sl:?}")
+                },
+            };
             if do_ret{
                 let v:serde_json::Value = serde_json::from_slice(&sl).unwrap_or(json!({"result" : "empty"}));
                 info!("Val = {}", v);
                 match std::str::from_utf8(&sl){
                     Ok(s) => info!("stringified = {}", s),
-                    Err(err) => panic!("ERROR = {err} p = {p:?}")
+                    Err(err) => panic!("ERROR = {err} p = {sl:?}")
                 };
                 sl
             }else{
@@ -301,7 +335,7 @@ pub mod tests {
             info!("build returned={:?}", s);
             let tdir = td_ref.path().to_str().to_owned().ok_or(ErrorKinds::NotExist("temp path not available".to_string()))?;
             Ok(TestDocument{
-                ctx: Rc::new(self),
+                ctx: Rc::new(self), 
                 temp_dir: tdir.to_string(),
             })
         }

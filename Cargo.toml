@@ -26,6 +26,7 @@ lazy_static = "*"
 env_logger = "*"
 tempdir = "*"
 stderrlog = "0.5.4"
+scopeguard = "1.1.0"
 
 [dependencies.uuid]
 version = "1.0.0"
