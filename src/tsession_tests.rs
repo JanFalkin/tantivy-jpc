@@ -18,7 +18,7 @@ pub mod tests {
 
     use super::*;
     use serde_json::Map;
-    use std::{rc::Rc, alloc::{Layout}};
+    use std::rc::Rc;
 
 
     pub static mut GSIZE:usize = 0;
@@ -77,19 +77,23 @@ pub mod tests {
     }
 
 
+    #[allow(clippy::all)]
     pub struct TestIndex<'a>{
         ctx:    Rc<&'a FakeContext>,
         temp_dir: String,
     }
 
+    #[allow(clippy::all)]
     pub struct TestIndexReader<'a>{
         ctx:    Rc<&'a FakeContext>,
     }
 
+    #[allow(clippy::all)]
     pub struct TestQueryParser<'a>{
         ctx:    Rc<&'a FakeContext>,
     }
 
+    #[allow(clippy::all)]
     pub struct TestSearcher<'a>{
         ctx:    Rc<&'a FakeContext>,
     }
@@ -241,10 +245,11 @@ pub mod tests {
             if iret != 0{
                 panic!("call_jpc failed")
             }
-            let sl = unsafe{self.ptr_to_vec(p, &my_ret_ptr)};
+            let sl = unsafe{self.ptr_to_vec(p, my_ret_ptr)};
             unsafe{
                 defer!{
                     let pp = *p;
+                    #[allow(clippy::all)]
                     std::mem::drop(pp);
                 }
             }
@@ -335,7 +340,7 @@ pub mod tests {
             info!("build returned={:?}", s);
             let tdir = td_ref.path().to_str().to_owned().ok_or(ErrorKinds::NotExist("temp path not available".to_string()))?;
             Ok(TestDocument{
-                ctx: Rc::new(self), 
+                ctx: Rc::new(self),
                 temp_dir: tdir.to_string(),
             })
         }
