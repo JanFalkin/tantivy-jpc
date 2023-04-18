@@ -9,9 +9,6 @@ package tantivy
 //
 // #include "tantivy-jpc.h"
 // #include <stdlib.h>
-// char* internal_malloc(int sz){
-//	return (char*)malloc(sz);
-//}
 import "C"
 import (
 	"encoding/json"
