@@ -338,10 +338,6 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:&mut *mut 
 
   #[allow(clippy::all)]
   unsafe fn send_to_golang(val_to_send: *mut u8, go_memory:&mut *mut *mut u8, go_memory_sz:*mut usize, sz:usize){
-    // let mut buffer = Vec::<u8>::with_capacity(sz);
-    // buffer.set_len(sz);
-
-    // Prevent the buffer from being deallocated when it goes out of scope
     let leaked = Box::leak(Box::new(val_to_send));
     *go_memory = leaked;
     *go_memory_sz = sz;
