@@ -77,7 +77,6 @@ func (jpc *JPCId) callTantivy(object, method string, params msi) (string, error)
 	if ttret < 0 {
 		return "", errors.E("Tantivy JPC Failed", errors.K.Invalid, "desc", string(C.GoBytes(unsafe.Pointer(*pCDesctination), C.int(*pDestinationLen))))
 	}
-	mySlice := C.GoBytes(unsafe.Pointer(*pCDesctination), C.int(*pDestinationLen))
-	returnData := string(mySlice)
+	returnData := string(C.GoBytes(unsafe.Pointer(*pCDesctination), C.int(*pDestinationLen)))
 	return returnData, nil
 }

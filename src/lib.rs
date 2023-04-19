@@ -81,7 +81,7 @@ impl<'a> TantivySession<'a>{
         }
     }
     // do_method is a translation from a string json method to an actual call.  All json params are passed
-    pub fn do_method<'b>(&'b mut self, method:&str, obj: &str, params:serde_json::Value, mut ret_buffer: &'b mut String) -> (*const u8, usize, bool){
+    pub fn do_method<'b>(&'b mut self, method:&str, obj: &str, params:serde_json::Value, mut ret_buffer: &'b mut String) -> (*mut u8, usize, bool){
         let _ = ret_buffer; // make warning go away
         info!("In do_method");
         match obj {
@@ -132,7 +132,7 @@ impl<'a> TantivySession<'a>{
         let _ = &self.doc;
         let _ = &self.builder;
         ret_buffer = Box::leak(Box::new(self.return_buffer.clone()));
-            (ret_buffer.as_ptr() as *const u8, ret_buffer.len(), false)
+            (ret_buffer.as_mut_ptr(), ret_buffer.len(), false)
     }
 }
 /// Bitcode representation of a incomming client request
@@ -148,7 +148,7 @@ pub struct Request<'a> {
 /// make_json_error translates the bitcode [ElvError<T>] to an error response to the client
 /// # Arguments
 /// * `err`- the error to be translated to a response
-pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize, bool){
+pub fn make_json_error(err:&str, id:&str) -> (*mut u8, usize, bool){
     info!("error={}", err);
     let msg = json!(
         {
@@ -157,7 +157,7 @@ pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize, bool){
         "id"  : id,
         }
     );
-    let vr = match serde_json::to_string(&msg){
+    let mut vr = match serde_json::to_string(&msg){
         Ok(x)=> x,
         Err(err)=> format!("{err}"),
     };
@@ -173,8 +173,10 @@ pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize, bool){
             t.insert(id.to_string(), vec![err.to_string()]);
         }
     };
-    let buf = vr.as_bytes();
-    (buf.as_ptr() as *const u8, buf.len(), true)
+    unsafe{
+        let buf = vr.as_bytes_mut();
+        (buf.as_mut_ptr() , buf.len(), true)
+    }
 }
 
 pub fn make_internal_json_error<T>(ek:ErrorKinds) -> InternalCallResult<T>{
@@ -335,22 +337,21 @@ this function will
 pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:&mut *mut *mut u8, ret_len:*mut usize) -> i64 {
 
   #[allow(clippy::all)]
-  unsafe fn send_to_golang(val_to_send: *const u8, go_memory:&mut *mut *mut u8, go_memory_sz:*mut usize, sz:usize){
-    let mut buffer = Vec::<u8>::with_capacity(sz);
-    buffer.set_len(sz);
+  unsafe fn send_to_golang(val_to_send: *mut u8, go_memory:&mut *mut *mut u8, go_memory_sz:*mut usize, sz:usize){
+    // let mut buffer = Vec::<u8>::with_capacity(sz);
+    // buffer.set_len(sz);
 
     // Prevent the buffer from being deallocated when it goes out of scope
-    let leaked = Box::leak(Box::new(buffer.as_mut_ptr()));
-    std::ptr::copy(val_to_send, *leaked, sz);
+    let leaked = Box::leak(Box::new(val_to_send));
     *go_memory = leaked;
     *go_memory_sz = sz;
-    std::mem::forget(buffer);
+    std::mem::forget(val_to_send);
   }
   info!("In tantivy_jpc");
   let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)){
       Ok(x) => x,
       Err(err) => {
-          send_to_golang(err.to_string().as_ptr(), ret, ret_len, err.to_string().len());
+          send_to_golang(err.to_string().as_mut_ptr(), ret, ret_len, err.to_string().len());
           error!("failed error = {err}");
           return -1;
       }
@@ -383,8 +384,8 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:&mut *mut 
             }
         }
         _ =>  {
-            let msg = ErrorKinds::UnRecognizedCommand(json_params.method.to_string()).to_string();
-            send_to_golang(msg.as_ptr(), ret, ret_len, msg.len());
+            let mut msg = ErrorKinds::UnRecognizedCommand(json_params.method.to_string()).to_string();
+            send_to_golang(msg.as_mut_ptr(), ret, ret_len, msg.len());
             return -1;
         }
     };
