@@ -324,6 +324,16 @@ fn test_kb(){
         set_k_and_b(1.0, 1.0);
     }
 }
+
+#[no_mangle]
+pub extern "C" fn free_buffer(buffer: *mut *mut u8) {
+    unsafe {
+        let boxed = Box::from_raw(buffer);
+        let leaked_memory = *boxed;
+        drop(boxed); // Drop the outer box to avoid leaking memory
+        let _ = Box::from_raw(leaked_memory);
+    }
+}
 /**
 tantivy_jpc is the main entry point into a translation layer from Rust to Go for Tantivy
 this function will
@@ -336,13 +346,13 @@ this function will
 #[no_mangle]
 pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:&mut *mut *mut u8, ret_len:*mut usize) -> i64 {
 
-  #[allow(clippy::all)]
-  unsafe fn send_to_golang(val_to_send: *mut u8, go_memory:&mut *mut *mut u8, go_memory_sz:*mut usize, sz:usize){
-    let leaked = Box::leak(Box::new(val_to_send));
-    *go_memory = leaked;
-    *go_memory_sz = sz;
-    std::mem::forget(val_to_send);
-  }
+    #[allow(clippy::all)]
+    unsafe fn send_to_golang(val_to_send: *mut u8, go_memory:&mut *mut *mut u8, go_memory_sz:*mut usize, sz:usize){
+      let leaked = Box::leak(Box::new(val_to_send));
+      *go_memory = leaked;
+      *go_memory_sz = sz;
+      std::mem::forget(val_to_send);
+    }
   info!("In tantivy_jpc");
   let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)){
       Ok(x) => x,

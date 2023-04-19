@@ -14,7 +14,7 @@ pub mod tests {
     use tempdir::TempDir;
     use uuid::{Uuid};
 
-    use crate::ErrorKinds;
+    use crate::{ErrorKinds, free_buffer};
 
     use super::*;
     use serde_json::Map;
@@ -224,7 +224,6 @@ pub mod tests {
         //     v
         // }
         pub fn call_jpc(&self, object:String, method:String, params:serde_json::Value, do_ret:bool)-> Vec<u8>{
-            //let my_ret_ptr = Box::leak(Box::new(0));
             let my_ret_ptr = &mut usize::default();
 
             let call_p = json!({
@@ -235,7 +234,6 @@ pub mod tests {
                 "params": params,
             });
             let mut sp = serde_json::to_vec(&call_p).unwrap_or(vec![]);
-            //let p = Box::leak(Box::<Vec<u8>>::new(vec![0; 5000000]));
             let mut p:*mut *mut u8 = std::ptr::null_mut();
             info!("calling tantivy-jpc json = {}", call_p);
             let iret:i64;
@@ -246,12 +244,8 @@ pub mod tests {
                 panic!("call_jpc failed")
             }
             let sl = unsafe{self.ptr_to_vec(p, my_ret_ptr)};
-            unsafe{
-                defer!{
-                    let pp = *p;
-                    #[allow(clippy::all)]
-                    std::mem::drop(pp);
-                }
+            defer!{
+                free_buffer(p)
             }
             match std::str::from_utf8(&sl){
                 Ok(s) => println!("stringified = {}", s),
