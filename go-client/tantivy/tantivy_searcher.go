@@ -22,3 +22,12 @@ func (s *TSearcher) FuzzySearch(topLimit ...uint64) (string, error) {
 	}
 	return s.callTantivy("fuzzy_searcher", "fuzzy_searcher", msi{})
 }
+
+func (s *TSearcher) SearchFiltered(topLimit uint64, docs []uint64) (string, error) {
+	args := msi{
+		"top_limit": topLimit,
+		"docs":      docs,
+	}
+
+	return s.callTantivy("filtered_searcher", "filtered_searcher", args)
+}

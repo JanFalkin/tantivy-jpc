@@ -252,6 +252,37 @@ func TestTantivyBasic(t *testing.T) {
 	testExpectedIndex(t, idx)
 }
 
+func TestTantivySearchFilter(t *testing.T) {
+	t.Setenv("LD_LIBRARY_PATH", ".")
+	LibInit()
+	idx := makeIndex(t, "", false)
+	rb, err := idx.ReaderBuilder()
+	require.NoError(t, err)
+	qp, err := rb.Searcher()
+	require.NoError(t, err)
+
+	_, err = qp.ForIndex([]string{"title", "body"})
+	require.NoError(t, err)
+
+	searcher, err := qp.ParseQuery("Sea")
+	require.NoError(t, err)
+	s, err := searcher.Search(false)
+	require.NoError(t, err)
+	require.EqualValues(t, resultSet1, s)
+
+	searcherAgain, err := qp.ParseQuery("warm")
+	require.NoError(t, err)
+	s, err = searcherAgain.SearchFiltered(10, []uint64{1}) // get just of mice and men
+	require.NoError(t, err)
+	resultSet := []interface{}{}
+	err = json.Unmarshal([]byte(s), &resultSet)
+	require.EqualValues(t, 1, len(resultSet))
+	require.NoError(t, err)
+	res, ok := resultSet[0].(map[string]interface{})
+	require.EqualValues(t, true, ok)
+	require.EqualValues(t, 0.15209927, res["score"])
+}
+
 func TestTantivyFuzzy(t *testing.T) {
 	wd, err := os.Getwd()
 	require.NoError(t, err)
