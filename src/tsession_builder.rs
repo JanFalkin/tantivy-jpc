@@ -93,13 +93,11 @@ impl<'a> TantivySession<'a> {
             },
             None => false,
         };
-        let fast = match m.get("fast") {
-            Some(v) => match v.as_bool() {
-                Some(b) => b,
-                None => false,
-            },
-            None => false,
-        };
+        let fast = m
+            .get("fast")
+            .unwrap_or(&json!(false))
+            .as_bool()
+            .unwrap_or(false);
         Ok((name.to_string(), field_type, stored, indexed, fast))
     }
     pub fn handler_builder(

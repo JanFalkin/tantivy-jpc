@@ -138,7 +138,7 @@ impl<'a> TantivySession<'a> {
         };
         match method {
             "add_document" => {
-                let mut doc = self.doc.take();
+                let mut doc = self.doc.clone();
                 let d = doc.as_mut().ok_or(ErrorKinds::NotExist(
                     "No value for hash in Documents".to_string(),
                 ))?;
@@ -147,10 +147,10 @@ impl<'a> TantivySession<'a> {
                 ))?;
                 let doc_idx =
                     m.get("id").unwrap_or(&json! {0_i32}).as_u64().unwrap_or(0) as usize - 1;
-                let rm = d.remove(&doc_idx).ok_or(ErrorKinds::BadInitialization(
+                let rm = d.get(&doc_idx).ok_or(ErrorKinds::BadInitialization(
                     "need index created for writer".to_string(),
                 ))?;
-                let os = writer.add_document(rm)?;
+                let os = writer.add_document(rm.clone())?;
                 self.return_buffer = json!({ "opstamp": os }).to_string();
                 self.doc = doc;
                 info!("{}", self.return_buffer);

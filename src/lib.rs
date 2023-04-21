@@ -14,6 +14,9 @@ use std::str;
 use tantivy::query::{FuzzyTermQuery, Query, QueryParser};
 use tantivy::{Searcher, TantivyError};
 
+#[macro_use(defer)]
+extern crate scopeguard;
+
 use chrono::format::ParseError;
 use lazy_static::lazy_static;
 use std::sync::Mutex;

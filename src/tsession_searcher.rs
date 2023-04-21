@@ -1,6 +1,5 @@
 use crate::info;
 use crate::make_internal_json_error;
-use crate::make_json_error;
 use crate::ErrorKinds;
 use crate::InternalCallResult;
 use crate::TantivySession;
@@ -8,14 +7,15 @@ use crate::TantivySession;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
+use log::error;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt::Write;
 use tantivy::collector::{Count, TopDocs};
+use tantivy::schema::Field;
 use tantivy::schema::NamedFieldDocument;
-use tantivy::DocAddress;
 use tantivy::Document;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -171,6 +171,16 @@ impl<'a> TantivySession<'a> {
         Ok(0)
     }
 
+    fn check_map(m: &HashMap<usize, Document>, dcur: &Document, vals: &Vec<Value>) -> bool {
+        for k in vals {
+            let v = m.get(&(k.as_u64().unwrap() as usize)).unwrap();
+            if v == dcur {
+                return true;
+            }
+        }
+        return false;
+    }
+
     pub fn handle_searcher_filtered(
         &mut self,
         _method: &str,
@@ -233,9 +243,11 @@ impl<'a> TantivySession<'a> {
             .into_iter()
             .fold(Vec::<ResultElement>::new(), |mut acc, (key, value)| {
                 let mut s = "".to_string();
-                let cmp_v = &json!(value.segment_ord);
-                info!("Docs {docs:?} cmp {cmp_v}");
-                if docs.is_empty() || docs.contains(cmp_v) {
+                let dcur: Document = searcher.doc(value).unwrap_or(Document::default());
+
+                // Get the segment reader for the segment containing the document
+                let m = &self.doc.clone().unwrap();
+                if docs.is_empty() || Self::check_map(&m.clone(), &dcur, &docs.to_vec()) {
                     if explain {
                         s = query
                             .explain(&searcher, value)

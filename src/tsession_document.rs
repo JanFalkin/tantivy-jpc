@@ -105,8 +105,9 @@ impl<'a> TantivySession<'a> {
                 let length: usize;
                 match doc {
                     Some(x) => {
+                        let d = Document::default();
                         let l = x.len();
-                        x.insert(l, Document::default());
+                        x.insert(l, d);
                         length = x.len();
                     }
                     None => {

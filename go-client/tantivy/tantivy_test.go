@@ -84,7 +84,7 @@ func makeFuzzyIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	return idx
 }
 
-func makeIndex(t *testing.T, td string, useExisting bool) *TIndex {
+func makeIndex(t *testing.T, td string, useExisting bool) (*TIndex, uint, uint) {
 	builder, err := NewBuilder(td)
 	require.NoError(t, err)
 	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, true)
@@ -140,7 +140,7 @@ func makeIndex(t *testing.T, td string, useExisting bool) *TIndex {
 		require.NoError(t, err)
 		fmt.Printf("commit id = %v", idCommit)
 	}
-	return idx
+	return idx, doc1, doc2
 }
 
 func loadIndex(t *testing.T, td string) *TIndex {
@@ -248,14 +248,15 @@ func TestTantivyBasic(t *testing.T) {
 		}
 	}(err)
 	assert.NoError(t, err)
-	idx := makeIndex(t, td, false)
+	idx, _, _ := makeIndex(t, td, false)
 	testExpectedIndex(t, idx)
 }
 
 func TestTantivySearchFilter(t *testing.T) {
 	t.Setenv("LD_LIBRARY_PATH", ".")
 	LibInit()
-	idx := makeIndex(t, "", false)
+	idx, doc1, doc2 := makeIndex(t, "", false)
+	log.Info("doc1", doc1, "doc2", doc2)
 	rb, err := idx.ReaderBuilder()
 	require.NoError(t, err)
 	qp, err := rb.Searcher()
@@ -272,7 +273,7 @@ func TestTantivySearchFilter(t *testing.T) {
 
 	searcherAgain, err := qp.ParseQuery("warm")
 	require.NoError(t, err)
-	s, err = searcherAgain.SearchFiltered(10, []uint64{1}) // get just of mice and men
+	s, err = searcherAgain.SearchFiltered(10, []uint64{uint64(doc2 - 1)}) // get just of mice and men
 	require.NoError(t, err)
 	resultSet := []interface{}{}
 	err = json.Unmarshal([]byte(s), &resultSet)
@@ -303,7 +304,7 @@ func TestTantivyFuzzy(t *testing.T) {
 }
 
 func TestTantivyTopLimit(t *testing.T) {
-	idx := makeIndex(t, "", false)
+	idx, _, _ := makeIndex(t, "", false)
 	testExpectedTopIndex(t, idx)
 
 }
@@ -322,7 +323,7 @@ func TestTantivyIndexReuse(t *testing.T) {
 		}
 	}(err)
 	assert.NoError(t, err)
-	_ = makeIndex(t, td, false)
+	_, _, _ = makeIndex(t, td, false)
 
 	idx := loadIndex(t, td)
 	testExpectedIndex(t, idx)

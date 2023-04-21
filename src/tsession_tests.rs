@@ -545,10 +545,11 @@ pub mod tests {
         ti.commit().unwrap();
         let mut rb = ti.reader_builder().unwrap();
         let mut qp = rb.searcher().unwrap();
-        qp.for_index(vec!["title".to_string()]).unwrap();
-        let mut searcher = qp.parse_query("Sea".to_string()).unwrap();
-        let sres = &searcher.filtered_search(1, &vec![json!(doc1)]).unwrap();
+        qp.for_index(vec!["body".to_string()]).unwrap();
+        let mut searcher = qp.parse_query("the".to_string()).unwrap();
+        let sres = &searcher.filtered_search(10, &vec![json!(op1)]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
+        assert!(title_result.len() > 0);
         assert_eq!(
             title_result[0].doc.0.get("title").unwrap()[0]
                 .as_text()
