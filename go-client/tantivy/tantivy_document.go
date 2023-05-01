@@ -40,6 +40,8 @@ func (td *TDocument) Create() (uint, error) {
 	return uint(c.(float64)), nil
 }
 
+// REVIEW: What's the point of returning the uint in most of these cases? We're already in go, and
+// so we already use err != nil to represent success
 func (td *TDocument) AddText(field int, value string, doc_id uint) (int, error) {
 	_, err := td.callTantivy("document", "add_text", msi{
 		"field":  field,

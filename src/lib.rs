@@ -345,6 +345,7 @@ pub unsafe extern "C" fn tantivy_jpc(
     ret_len: *mut usize,
 ) -> i64 {
     info!("In tantivy_jpc");
+    // REVIEW: Does doing this ensure that the memory for msg is freed by rust? Not sure how that works
     let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)) {
         Ok(x) => x,
         Err(err) => {
