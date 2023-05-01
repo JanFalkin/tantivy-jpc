@@ -27,6 +27,7 @@ impl<'a> TantivySession<'a> {
                 ));
             })
             .get("directory");
+
             if let Some(x) = this {
                 x
             } else {
@@ -35,10 +36,17 @@ impl<'a> TantivySession<'a> {
         }
         .as_str()
         .unwrap_or("");
+        // REVIEW: Nit: It would be a lot nicer + more idiomatic rust to directly use options + map,
+        // and check is_some here / above
+
+        // REVIEW: Is this: tantivy::Index::open_or_create(dir, schema) usable here? Do we always
+        // have a schema by this point?
         if !dir_to_use.is_empty() {
             let idx = match tantivy::Index::open_in_dir(dir_to_use) {
                 Ok(p) => p,
                 Err(err) => {
+                    // REVIEW: It would be more idiomatic rust here to actually check the error, and
+                    // see if it is one from an index not existing here, instead of just logging and trying again
                     info!("error={}\n", err);
                     tantivy::Index::create_in_dir(
                         dir_to_use,
@@ -110,6 +118,7 @@ impl<'a> TantivySession<'a> {
         };
         Ok(0)
     }
+
     pub fn handle_index_writer(
         &mut self,
         method: &str,
@@ -128,6 +137,7 @@ impl<'a> TantivySession<'a> {
                         ))
                     }
                 };
+                // REVIEW: This memory usage seems like something that should be configured somewhere, or a constant
                 self.indexwriter = Some(Box::new((*bi).writer(150000000).unwrap()));
                 self.indexwriter
                     .as_mut()
@@ -138,6 +148,7 @@ impl<'a> TantivySession<'a> {
         };
         match method {
             "add_document" => {
+                // REVIEW: Nit: Why do this take -> mutate -> re-set thing? Seems nicer to just grab a mutable reference to self.doc
                 let mut doc = self.doc.take();
                 let d = doc.as_mut().ok_or(ErrorKinds::NotExist(
                     "No value for hash in Documents".to_string(),
@@ -145,6 +156,7 @@ impl<'a> TantivySession<'a> {
                 let m = params.as_object().ok_or(ErrorKinds::BadParams(
                     "invalid parameters pass to Document add_text".to_string(),
                 ))?;
+                // REVIEW: This also will underflow if there is no id key
                 let doc_idx =
                     m.get("id").unwrap_or(&json! {0_i32}).as_u64().unwrap_or(0) as usize - 1;
                 let rm = d.remove(&doc_idx).ok_or(ErrorKinds::BadInitialization(
@@ -156,25 +168,6 @@ impl<'a> TantivySession<'a> {
                 info!("{}", self.return_buffer);
             }
             "delete_term" => {
-                let writer = match self.indexwriter.as_mut() {
-                    Some(x) => x,
-                    None => {
-                        let bi = match self.index.as_mut().take() {
-                            Some(x) => x,
-                            None => {
-                                return make_internal_json_error(ErrorKinds::BadInitialization(
-                                    "need index created for writer".to_string(),
-                                ))
-                            }
-                        };
-                        self.indexwriter = Some(Box::new((*bi).writer(150000000).unwrap()));
-                        self.indexwriter
-                            .as_mut()
-                            .ok_or(ErrorKinds::BadInitialization(
-                                "need index created for writer".to_string(),
-                            ))?
-                    }
-                };
                 let schema = match self.schema.as_ref() {
                     Some(s) => s,
                     None => {
@@ -183,21 +176,21 @@ impl<'a> TantivySession<'a> {
                         ))
                     }
                 };
-                let request_field = params
+
+                // REVIEW: Nit: I changed these, but in general, calling `ok_or_else` should probably just be `ok_or`
+                // Review: Also, doing this type of get -> map -> flatten -> ok_or is a lot more idiomatic and cleaner imo
+                let f_str = params
                     .get("field")
-                    .ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?;
-                let field = request_field;
-                let f_str = match field.as_str() {
-                    Some(s) => s,
-                    None => {
-                        return make_internal_json_error(ErrorKinds::BadInitialization(
-                            "Field requested is not present".to_string(),
-                        ))
-                    }
-                };
+                    .map(|f| f.as_str())
+                    .flatten()
+                    .ok_or(ErrorKinds::BadParams("fields not present".to_string()))?;
+
                 let terms = params
                     .get("term")
-                    .ok_or_else(|| ErrorKinds::BadParams("term not present".to_string()))?;
+                    .ok_or(ErrorKinds::BadParams("term not present".to_string()))?;
+
+                // REVIEW: If `schema.get_field` fails, this should probably error. This could
+                // probably also be grabbed at the same time as the f_str itself, by doing another map and then extra ?.
                 if let Ok(f) = schema.get_field(f_str) {
                     let fe = schema.get_field_entry(f);
                     let term: Term = match fe.field_type() {
@@ -303,6 +296,7 @@ impl<'a> TantivySession<'a> {
         match method {
             "searcher" => {
                 if let Some(idx) = self.index_reader_builder.as_ref() {
+                    // REVIEW: Nit: Why the @@@@@@'s?
                     info!("got index reader@@@@@@");
                     match (*idx)
                         .clone()

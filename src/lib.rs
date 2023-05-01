@@ -86,6 +86,8 @@ impl<'a> TantivySession<'a> {
         params: serde_json::Value,
     ) -> (*const u8, usize, bool) {
         info!("In do_method");
+        // REVIEW: Nit: None of these 'handle_xxx' should have obj passed into them, as that is already a
+        // constant at that point
         match obj {
             "query_parser" => {
                 if let Err(e) = self.handle_query_parser(method, obj, params) {
@@ -267,6 +269,7 @@ pub unsafe extern "C" fn init() -> u8 {
     0
 }
 
+#[cfg(test)]
 pub fn test_init() {
     let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
         .try_init();
@@ -286,6 +289,8 @@ fn do_term(s: &str) -> InternalCallResult<String> {
     Ok(s.to_string())
 }
 
+/// Terminate a tantivy session by its ID.
+///
 /// # Safety
 ///
 #[no_mangle]

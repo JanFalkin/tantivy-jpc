@@ -27,59 +27,6 @@ fn uint_val(v: serde_json::Value) -> tantivy::schema::Value {
 }
 
 impl<'a> TantivySession<'a> {
-    fn handle_add_field(
-        &mut self,
-        params: serde_json::Value,
-        func: fn(v: serde_json::Value) -> tantivy::schema::Value,
-    ) -> InternalCallResult<u32> {
-        let doc = self.doc.as_mut();
-        let d = match doc {
-            Some(v) => v,
-            None => {
-                return make_internal_json_error(ErrorKinds::BadInitialization(
-                    "add_text with no doucments created".to_string(),
-                ))
-            }
-        };
-        let m = match params.as_object() {
-            Some(m) => m,
-            None => {
-                return make_internal_json_error(ErrorKinds::BadParams(
-                    "invalid parameters pass to Document add_text".to_string(),
-                ))
-            }
-        };
-        let doc_idx = m.get("doc_id").unwrap_or(&json! {0}).as_u64().unwrap_or(0) as usize - 1;
-        let field_idx = m.get("field").unwrap_or(&json! {0}).as_u64().unwrap_or(0) as u32;
-        let f = Field::from_field_id(field_idx);
-        info!("add_text: name = {:?}", m);
-        match m.get("field") {
-            Some(f) => f.as_i64(),
-            None => {
-                return make_internal_json_error(ErrorKinds::BadParams(
-                    "field must contain integer id".to_string(),
-                ))
-            }
-        };
-        let field_val = match m.get("value") {
-            Some(v) => func(v.clone()),
-            None => {
-                return make_internal_json_error(ErrorKinds::BadInitialization(
-                    "field text required for document".to_string(),
-                ))
-            }
-        };
-        let cur_doc = match d.get_mut(&doc_idx) {
-            Some(d) => d,
-            None => {
-                return make_internal_json_error(ErrorKinds::BadInitialization(format!(
-                    "document at index {doc_idx} does not exist"
-                )))
-            }
-        };
-        cur_doc.add_field_value(f, field_val);
-        Ok(0)
-    }
     pub fn handle_document(
         &mut self,
         method: &str,
@@ -122,6 +69,62 @@ impl<'a> TantivySession<'a> {
             }
             &_ => 0,
         };
+        Ok(0)
+    }
+
+    fn handle_add_field(
+        &mut self,
+        params: serde_json::Value,
+        func: fn(v: serde_json::Value) -> tantivy::schema::Value,
+    ) -> InternalCallResult<u32> {
+        let doc = self.doc.as_mut();
+        let d = match doc {
+            Some(v) => v,
+            None => {
+                return make_internal_json_error(ErrorKinds::BadInitialization(
+                    "add_text with no doucments created".to_string(),
+                ))
+            }
+        };
+        let m = match params.as_object() {
+            Some(m) => m,
+            None => {
+                return make_internal_json_error(ErrorKinds::BadParams(
+                    "invalid parameters pass to Document add_text".to_string(),
+                ))
+            }
+        };
+        // REVIEW: I think this will just panic if the doc_id is missing, as it will do 0 (usize) -
+        // 1. Also not sure that defaulting to 0 makes sense regardless, probably throwing an error is better
+        let doc_idx = m.get("doc_id").unwrap_or(&json! {0}).as_u64().unwrap_or(0) as usize - 1;
+        let field_idx = m.get("field").unwrap_or(&json! {0}).as_u64().unwrap_or(0) as u32;
+        let f = Field::from_field_id(field_idx);
+        info!("add_text: name = {:?}", m);
+        match m.get("field") {
+            Some(f) => f.as_i64(),
+            None => {
+                return make_internal_json_error(ErrorKinds::BadParams(
+                    "field must contain integer id".to_string(),
+                ))
+            }
+        };
+        let field_val = match m.get("value") {
+            Some(v) => func(v.clone()),
+            None => {
+                return make_internal_json_error(ErrorKinds::BadInitialization(
+                    "field text required for document".to_string(),
+                ))
+            }
+        };
+        let cur_doc = match d.get_mut(&doc_idx) {
+            Some(d) => d,
+            None => {
+                return make_internal_json_error(ErrorKinds::BadInitialization(format!(
+                    "document at index {doc_idx} does not exist"
+                )))
+            }
+        };
+        cur_doc.add_field_value(f, field_val);
         Ok(0)
     }
 }

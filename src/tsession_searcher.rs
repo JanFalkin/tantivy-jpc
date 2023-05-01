@@ -56,7 +56,7 @@ impl<'a> TantivySession<'a> {
             Some(r) => r,
             None => {
                 return make_internal_json_error(ErrorKinds::NotExist(
-                    "Reader unavliable".to_string(),
+                    "Reader unavailable".to_string(),
                 ))
             }
         };
@@ -105,6 +105,7 @@ impl<'a> TantivySession<'a> {
         const DEF_LIMIT: u64 = 10;
         let (top_limit, explain) = match params.as_object() {
             Some(p) => (
+                // REVIEW: Nit: These are nicer as p.get("..").map(|v| v.as_u64()).unwrap_or(..).
                 p.get("top_limit")
                     .unwrap_or(&Value::from(DEF_LIMIT))
                     .as_u64()
@@ -128,7 +129,7 @@ impl<'a> TantivySession<'a> {
             Some(r) => r,
             None => {
                 return make_internal_json_error(ErrorKinds::NotExist(
-                    "Reader unavliable".to_string(),
+                    "Reader unavailable".to_string(),
                 ))
             }
         };
@@ -151,10 +152,10 @@ impl<'a> TantivySession<'a> {
                 .as_ref()
                 .ok_or_else(|| ErrorKinds::NotExist("Schema not present".to_string()))?;
             let named_doc = schema.to_named_doc(&retrieved_doc);
-            let mut s: String = "noexplain".to_string();
-            if explain {
-                s = query.explain(&searcher, doc_address)?.to_pretty_json();
-            }
+            let s = match explain {
+                true => query.explain(&searcher, doc_address)?.to_pretty_json(),
+                false => "noexplain".to_string(),
+            };
             info!("retrieved doc {:?}", retrieved_doc.field_values());
             vret.append(&mut vec![ResultElement {
                 doc: named_doc,

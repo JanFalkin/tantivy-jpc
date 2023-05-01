@@ -16,7 +16,8 @@ use tantivy::DateOptions;
 macro_rules! impl_simple_type {
     () => {};
     ($self:ident, $handler_params:ident, $handler_obj:ident, $handler_func:ident, $default_type:ident) => {
-        let (name, _field_type, stored, indexed, fast) = Self::extract_params($handler_params)?;
+        let (name, _field_type, stored, indexed, fast) =
+            Self::extract_field_params($handler_params)?;
         let mut ni: $default_type;
         if stored {
             ni = $default_type::default().set_stored();
@@ -35,7 +36,7 @@ macro_rules! impl_simple_type {
 }
 
 impl<'a> TantivySession<'a> {
-    pub fn extract_params(
+    pub fn extract_field_params(
         params: serde_json::Value,
     ) -> InternalCallResult<(String, u64, bool, bool, bool)> {
         let m = match params.as_object() {
@@ -102,6 +103,7 @@ impl<'a> TantivySession<'a> {
         };
         Ok((name.to_string(), field_type, stored, indexed, fast))
     }
+
     pub fn handler_builder(
         &mut self,
         method: &str,
@@ -118,7 +120,7 @@ impl<'a> TantivySession<'a> {
         };
         match method {
             "add_text_field" => {
-                let (name, field_type, stored, indexed, fast) = Self::extract_params(params)?;
+                let (name, field_type, stored, indexed, fast) = Self::extract_field_params(params)?;
 
                 let mut ti: TextOptions;
                 match field_type {

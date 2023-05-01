@@ -10,6 +10,8 @@
 uint8_t init(void);
 
 /**
+ * Terminate a tantivy session by its ID.
+ *
  * # Safety
  *
  */
