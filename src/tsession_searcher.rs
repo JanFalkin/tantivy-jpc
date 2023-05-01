@@ -67,7 +67,7 @@ impl<'a> TantivySession<'a>{
             Ok(_) => {},
             Err (_) => return make_internal_json_error(ErrorKinds::NotExist("format write to string failed".to_string())),
         };
-        self.return_buffer += &s;
+        self.return_buffer = s;
 
         self.fuzzy_q = Some(query);
         if self.return_buffer.is_empty(){

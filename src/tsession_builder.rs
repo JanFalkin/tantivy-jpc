@@ -67,10 +67,7 @@ impl<'a> TantivySession<'a>{
             None => false,
         };
         let fast = match m.get("fast"){
-            Some(v) => match v.as_bool() {
-                Some(b) => b,
-                None => false,
-            }
+            Some(v) => v.as_bool().unwrap_or(false),
             None => false,
         };
         Ok((name.to_string(), field_type, stored,indexed, fast))

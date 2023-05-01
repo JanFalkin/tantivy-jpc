@@ -81,7 +81,8 @@ impl<'a> TantivySession<'a>{
         }
     }
     // do_method is a translation from a string json method to an actual call.  All json params are passed
-    pub fn do_method(&mut self, method:&str, obj: &str, params:serde_json::Value) -> (*const u8, usize, bool){
+    pub fn do_method<'b>(&'b mut self, method:&str, obj: &str, params:serde_json::Value, mut ret_buffer: &'b mut String) -> (*mut u8, usize, bool){
+        let _ = ret_buffer; // make warning go away
         info!("In do_method");
         match obj {
             "query_parser" => {
@@ -130,7 +131,8 @@ impl<'a> TantivySession<'a>{
         };
         let _ = &self.doc;
         let _ = &self.builder;
-            (self.return_buffer.as_ptr() as *const u8, self.return_buffer.len(), false)
+        ret_buffer = Box::leak(Box::new(self.return_buffer.clone()));
+            (ret_buffer.as_mut_ptr(), ret_buffer.len(), false)
     }
 }
 /// Bitcode representation of a incomming client request
@@ -146,7 +148,7 @@ pub struct Request<'a> {
 /// make_json_error translates the bitcode [ElvError<T>] to an error response to the client
 /// # Arguments
 /// * `err`- the error to be translated to a response
-pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize, bool){
+pub fn make_json_error(err:&str, id:&str) -> (*mut u8, usize, bool){
     info!("error={}", err);
     let msg = json!(
         {
@@ -155,7 +157,7 @@ pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize, bool){
         "id"  : id,
         }
     );
-    let vr = match serde_json::to_string(&msg){
+    let mut vr = match serde_json::to_string(&msg){
         Ok(x)=> x,
         Err(err)=> format!("{err}"),
     };
@@ -171,8 +173,10 @@ pub fn make_json_error(err:&str, id:&str) -> (*const u8, usize, bool){
             t.insert(id.to_string(), vec![err.to_string()]);
         }
     };
-    let buf = vr.as_bytes();
-    (buf.as_ptr() as *const u8, buf.len(), true)
+    unsafe{
+        let buf = vr.as_bytes_mut();
+        (buf.as_mut_ptr() , buf.len(), true)
+    }
 }
 
 pub fn make_internal_json_error<T>(ek:ErrorKinds) -> InternalCallResult<T>{
@@ -305,8 +309,8 @@ pub unsafe extern "C" fn term(s: *const c_char) -> i8{
 
 /// # Safety
 ///
-/// This function will directly affect the way Tantivyoreders it's result set.  This is for advanced use only and should 
-/// be avoided unless you understand all the specifics of these 2 globals. Note this will only persist as long as the 
+/// This function will directly affect the way Tantivyoreders it's result set.  This is for advanced use only and should
+/// be avoided unless you understand all the specifics of these 2 globals. Note this will only persist as long as the
 /// current instance is loaded and will reset on a new invocation of tantivy
 #[no_mangle]
 pub unsafe extern "C" fn set_k_and_b(k:f32, b:f32) -> i8{
@@ -320,6 +324,16 @@ fn test_kb(){
         set_k_and_b(1.0, 1.0);
     }
 }
+
+#[no_mangle]
+pub extern "C" fn free_buffer(buffer: *mut *mut u8) {
+    unsafe {
+        let boxed = Box::from_raw(buffer);
+        let leaked_memory = *boxed;
+        drop(boxed); // Drop the outer box to avoid leaking memory
+        let _ = Box::from_raw(leaked_memory);
+    }
+}
 /**
 tantivy_jpc is the main entry point into a translation layer from Rust to Go for Tantivy
 this function will
@@ -330,13 +344,20 @@ this function will
 /// # Safety
 ///
 #[no_mangle]
-pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, ret_len:*mut usize) -> i64 {
+pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:&mut *mut *mut u8, ret_len:*mut usize) -> i64 {
+
+    #[allow(clippy::all)]
+    unsafe fn send_to_golang(val_to_send: *mut u8, go_memory:&mut *mut *mut u8, go_memory_sz:*mut usize, sz:usize){
+      let leaked = Box::leak(Box::new(val_to_send));
+      *go_memory = leaked;
+      *go_memory_sz = sz;
+      std::mem::forget(val_to_send);
+    }
   info!("In tantivy_jpc");
   let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)){
       Ok(x) => x,
       Err(err) => {
-          *ret_len  = err.to_string().len();
-          std::ptr::copy(err.to_string().as_ptr(), ret, *ret_len);
+          send_to_golang(err.to_string().as_mut_ptr(), ret, ret_len, err.to_string().len());
           error!("failed error = {err}");
           return -1;
       }
@@ -345,9 +366,8 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
     Ok(m) => {m},
     Err(_err) => {
           let (r,sz,_b) = make_json_error("parse failed for http", "ID not found");
-          *ret_len = sz;
-          std::ptr::copy(r, ret, sz);
-          return -1;
+        send_to_golang(r, ret, ret_len, sz);
+        return -1;
     }
   };
   let mut tm = match TANTIVY_MAP.lock(){
@@ -370,17 +390,14 @@ pub unsafe extern "C" fn tantivy_jpc<>(msg: *const u8, len:usize, ret:*mut u8, r
             }
         }
         _ =>  {
-            let msg = ErrorKinds::UnRecognizedCommand(json_params.method.to_string()).to_string();
-            std::ptr::copy(msg.as_ptr() as *const u8, ret, msg.len());
+            let mut msg = ErrorKinds::UnRecognizedCommand(json_params.method.to_string()).to_string();
+            send_to_golang(msg.as_mut_ptr(), ret, ret_len, msg.len());
             return -1;
         }
     };
-    let (return_val, ret_sz, is_error) = entity.do_method(json_params.method, json_params.obj, json_params.params);
-    std::ptr::copy(return_val, ret, ret_sz);
-    let end = ret.offset(ret_sz.try_into().unwrap_or_default());
-    *end = 0;
-    *ret_len = ret_sz;
-    entity.return_buffer.clear();
+    let mut ret_buffer = String::new();
+    let (return_val, ret_sz, is_error) = entity.do_method(json_params.method, json_params.obj, json_params.params, &mut ret_buffer);
+    send_to_golang(return_val, ret, ret_len, ret_sz);
     if is_error{
         return -1;
     }
