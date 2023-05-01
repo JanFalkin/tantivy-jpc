@@ -20,7 +20,7 @@ serde = "*"
 serde_json = "*"
 serde_derive = "*"
 log = "0.4.14"
-tantivy = { git = "https://github.com/JanFalkin/tantivy.git", branch = "main"  }
+tantivy = { git = "https://github.com/JanFalkin/tantivy.git", branch = "main" }
 #tantivy = { path = "../tantivy"}
 lazy_static = "*"
 env_logger = "*"
@@ -35,4 +35,3 @@ features = [
     "fast-rng",          # Use a faster (but still sufficiently random) RNG
     "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
 ]
-
