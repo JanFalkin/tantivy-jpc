@@ -25,6 +25,10 @@ int8_t term(const char *s);
 int8_t set_k_and_b(float k,
                    float b);
 
+/**
+ * # Safety
+ *
+ */
 void free_buffer(uint8_t **buffer);
 
 /**

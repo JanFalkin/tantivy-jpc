@@ -91,7 +91,6 @@ impl<'a> TantivySession<'a> {
                     )))
                 }
             };
-            //self.dyn_q.unwrap().weight(true).unwrap().scorer(reader, boost)
         }
         if method == "parse_fuzzy_query" {
             let schema = match self.schema.as_ref() {

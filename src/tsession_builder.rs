@@ -110,7 +110,9 @@ impl<'a> TantivySession<'a> {
             Some(x) => x,
             None => {
                 self.builder = Some(Box::default());
-                self.builder.as_mut().unwrap() // should be safe
+                self.builder.as_mut().ok_or(ErrorKinds::BadInitialization(
+                    "Unable to get default Schema as mutable".to_string(),
+                ))? // should be safe
             }
         };
         match method {

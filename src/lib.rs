@@ -164,17 +164,6 @@ pub fn make_json_error(err: &str, id: &str) -> (*mut u8, usize, bool) {
         Err(err) => format!("{err}"),
     };
     info!("returning  result = {}", vr);
-    let mut t = ERRORS.lock().unwrap();
-    let mt = t.get_mut(id);
-    match mt {
-        Some(errs) => {
-            let mut v = vec![err.to_string()];
-            errs.append(&mut v)
-        }
-        None => {
-            t.insert(id.to_string(), vec![err.to_string()]);
-        }
-    };
     unsafe {
         let buf = vr.as_bytes_mut();
         (buf.as_mut_ptr(), buf.len(), true)
@@ -273,16 +262,17 @@ pub fn test_init() {
 }
 
 fn do_term(s: &str) -> InternalCallResult<String> {
-    match TANTIVY_MAP.lock().as_mut() {
+    match TANTIVY_MAP.try_lock().as_mut() {
         Ok(t) => {
             info!("removing {s}");
-            t.remove_entry(s).unwrap()
+            t.remove_entry(s)
+                .ok_or(ErrorKinds::NotExist(format!("Entry {s} is not available")))
         }
         Err(e) => {
             info!("TANTIVY_MAP lock failed {e}");
             return Err(ErrorKinds::BadParams("WOOPS".to_string()));
         }
-    };
+    }?;
     Ok(s.to_string())
 }
 
@@ -323,15 +313,14 @@ fn test_kb() {
         set_k_and_b(1.0, 1.0);
     }
 }
-
+/// # Safety
+///
 #[no_mangle]
-pub extern "C" fn free_buffer(buffer: *mut *mut u8) {
-    unsafe {
-        let boxed = Box::from_raw(buffer);
-        let leaked_memory = *boxed;
-        drop(boxed); // Drop the outer box to avoid leaking memory
-        let _ = Box::from_raw(leaked_memory);
-    }
+pub unsafe extern "C" fn free_buffer(buffer: *mut *mut u8) {
+    let boxed = Box::from_raw(buffer);
+    let leaked_memory = *boxed;
+    drop(boxed); // Drop the outer box to avoid leaking memory
+    let _ = Box::from_raw(leaked_memory);
 }
 /**
 tantivy_jpc is the main entry point into a translation layer from Rust to Go for Tantivy
@@ -399,7 +388,18 @@ pub unsafe extern "C" fn tantivy_jpc(
                 None => {
                     let te = TantivySession::new(json_params.id);
                     tm.insert(json_params.id.to_owned(), te);
-                    tm.get_mut(json_params.id).unwrap() //should be ok just put in
+                    match tm.get_mut(json_params.id) {
+                        Some(s) => s,
+                        None => {
+                            let mut msg = ErrorKinds::NotExist(format!(
+                                "Session {} not found",
+                                json_params.id
+                            ))
+                            .to_string();
+                            send_to_golang(msg.as_mut_ptr(), ret, ret_len, msg.len());
+                            return -1;
+                        }
+                    } //should be ok just put in
                 }
             }
         }

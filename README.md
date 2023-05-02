@@ -10,7 +10,7 @@
 
 ### Install Rust
 
-```
+```sh
 curl https://sh.rustup.rs -sSf | sh -s -- -y
 source $HOME/.cargo/env
 cargo install cargo-post
@@ -18,8 +18,8 @@ cargo install cargo-post
 
 ## Building
 
-```
-cargo build --release
+```sh
+cargo nightly build --release
 
 ```
 
@@ -27,14 +27,14 @@ cargo build --release
 
 ### Via go get
 
-```
+```sh
 go get github.com/JanFalkin/tantivy-jpc/go-client/tantivy
 
 ```
 
 ### A Simple Example
 
-```
+```go
 package main
 
 import (

@@ -12,6 +12,8 @@ use tantivy::schema::FieldType;
 use tantivy::DateTime;
 use tantivy::Term;
 
+const DEFAULT_INDEX_WRITER_MEM_SIZE: usize = 150000000;
+
 impl<'a> TantivySession<'a> {
     pub fn create_index(
         &mut self,
@@ -85,7 +87,14 @@ impl<'a> TantivySession<'a> {
             None => match self.create_index(params) {
                 Ok(x) => {
                     self.index = Some(x);
-                    let r = self.index.as_ref().unwrap();
+                    let r = match self.index.as_ref() {
+                        Some(s) => s,
+                        None => {
+                            return make_internal_json_error(ErrorKinds::Other(
+                                "failed to get Index as reference".to_string(),
+                            ));
+                        }
+                    };
                     self.schema = Some(r.schema());
                     r
                 }
@@ -128,7 +137,8 @@ impl<'a> TantivySession<'a> {
                         ))
                     }
                 };
-                self.indexwriter = Some(Box::new((*bi).writer(150000000).unwrap()));
+                let iw = Box::new((*bi).writer(DEFAULT_INDEX_WRITER_MEM_SIZE)?);
+                self.indexwriter = Some(iw);
                 self.indexwriter
                     .as_mut()
                     .ok_or(ErrorKinds::BadInitialization(
@@ -167,7 +177,8 @@ impl<'a> TantivySession<'a> {
                                 ))
                             }
                         };
-                        self.indexwriter = Some(Box::new((*bi).writer(150000000).unwrap()));
+                        let iw = Box::new((*bi).writer(DEFAULT_INDEX_WRITER_MEM_SIZE)?);
+                        self.indexwriter = Some(iw);
                         self.indexwriter
                             .as_mut()
                             .ok_or(ErrorKinds::BadInitialization(

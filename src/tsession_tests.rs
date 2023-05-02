@@ -323,7 +323,7 @@ pub mod tests {
             }
             let sl = unsafe { self.ptr_to_vec(p, my_ret_ptr) };
             defer! {
-                free_buffer(p)
+                unsafe{free_buffer(p)}
             }
             match std::str::from_utf8(&sl) {
                 Ok(s) => println!("stringified = {}", s),
