@@ -109,7 +109,7 @@ func doRun() {
 		panic(err)
 	}
 	if sr[0]["doc"].(map[string]interface{})["title"].([]interface{})[0] != "The Old Man and the Sea" {
-		panic("expcted value not received")
+		panic("expected value not received")
 	}
 	searcherAgain, err := qp.ParseQuery("Mice")
 	if err != nil {
@@ -125,7 +125,7 @@ func doRun() {
 	}
 
 	if sr[0]["doc"].(map[string]interface{})["title"].([]interface{})[0] != "Of Mice and Men" {
-		panic("expcted value not received")
+		panic("expected value not received")
 	}
 	tantivy.ClearSession(builder.ID())
 	fmt.Println("It worked!!!")
