@@ -43,8 +43,7 @@ impl<'a> TantivySession<'a> {
             };
             let request_fields = m
                 .get("fields")
-                .map(|f| f.as_array())
-                .flatten()
+                .and_then(|f| f.as_array())
                 .ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?;
             for v in request_fields {
                 let v_str = v.as_str().unwrap_or_default();
@@ -98,8 +97,7 @@ impl<'a> TantivySession<'a> {
             };
             let request_field = m
                 .get("field")
-                .map(|f| f.as_array())
-                .flatten()
+                .and_then(|f| f.as_array())
                 .ok_or_else(|| ErrorKinds::BadParams("field not present".to_string()))?;
             if request_field.len() != 1 {
                 return make_internal_json_error(ErrorKinds::BadInitialization(
@@ -108,8 +106,7 @@ impl<'a> TantivySession<'a> {
             }
             let fuzzy_term = m
                 .get("term")
-                .map(|t| t.as_array())
-                .flatten()
+                .and_then(|f| f.as_array())
                 .ok_or_else(|| ErrorKinds::BadParams("term not present".to_string()))?;
             if fuzzy_term.len() != 1 {
                 return make_internal_json_error(ErrorKinds::BadInitialization(

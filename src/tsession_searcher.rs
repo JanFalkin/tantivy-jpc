@@ -37,8 +37,7 @@ impl<'a> TantivySession<'a> {
         let top_limit = match params.as_object() {
             Some(p) => p
                 .get("top_limit")
-                .map(|u| u.as_u64())
-                .flatten()
+                .and_then(|u| u.as_u64())
                 .unwrap_or(DEF_LIMIT),
             None => DEF_LIMIT,
         };
@@ -103,13 +102,9 @@ impl<'a> TantivySession<'a> {
         let (top_limit, explain) = match params.as_object() {
             Some(p) => (
                 p.get("top_limit")
-                    .map(|u| u.as_u64())
-                    .flatten()
+                    .and_then(|u| u.as_u64())
                     .unwrap_or(DEF_LIMIT),
-                p.get("explain")
-                    .map(|u| u.as_bool())
-                    .flatten()
-                    .unwrap_or(false),
+                p.get("explain").and_then(|u| u.as_bool()).unwrap_or(false),
             ),
             None => (DEF_LIMIT, false),
         };

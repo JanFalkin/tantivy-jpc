@@ -194,8 +194,7 @@ impl<'a> TantivySession<'a> {
                 };
                 let f_str = params
                     .get("field")
-                    .map(|f| f.as_str())
-                    .flatten()
+                    .and_then(|f| f.as_str())
                     .ok_or(ErrorKinds::BadParams("fields not present".to_string()))?;
                 let terms = params
                     .get("term")
