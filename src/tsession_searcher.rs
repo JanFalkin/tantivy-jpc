@@ -8,7 +8,6 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 use serde_derive::{Deserialize, Serialize};
-use serde_json::Value;
 use std::fmt::Write;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::schema::NamedFieldDocument;
@@ -31,7 +30,6 @@ impl<'a> TantivySession<'a> {
     pub fn handle_fuzzy_searcher(
         &mut self,
         _method: &str,
-        _obj: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         info!("Searcher");
@@ -39,8 +37,8 @@ impl<'a> TantivySession<'a> {
         let top_limit = match params.as_object() {
             Some(p) => p
                 .get("top_limit")
-                .unwrap_or(&Value::from(DEF_LIMIT))
-                .as_u64()
+                .map(|u| u.as_u64())
+                .flatten()
                 .unwrap_or(DEF_LIMIT),
             None => DEF_LIMIT,
         };
@@ -98,7 +96,6 @@ impl<'a> TantivySession<'a> {
     pub fn handle_searcher(
         &mut self,
         _method: &str,
-        _obj: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         info!("Searcher");
@@ -106,12 +103,12 @@ impl<'a> TantivySession<'a> {
         let (top_limit, explain) = match params.as_object() {
             Some(p) => (
                 p.get("top_limit")
-                    .unwrap_or(&Value::from(DEF_LIMIT))
-                    .as_u64()
+                    .map(|u| u.as_u64())
+                    .flatten()
                     .unwrap_or(DEF_LIMIT),
                 p.get("explain")
-                    .unwrap_or(&Value::from(false))
-                    .as_bool()
+                    .map(|u| u.as_bool())
+                    .flatten()
                     .unwrap_or(false),
             ),
             None => (DEF_LIMIT, false),

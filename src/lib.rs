@@ -89,42 +89,42 @@ impl<'a> TantivySession<'a> {
         info!("In do_method");
         match obj {
             "query_parser" => {
-                if let Err(e) = self.handle_query_parser(method, obj, params) {
+                if let Err(e) = self.handle_query_parser(method, params) {
                     return make_json_error(&format!("handle query parser error={e}"), self.id);
                 };
             }
             "searcher" => {
-                if let Err(e) = self.handle_searcher(method, obj, params) {
+                if let Err(e) = self.handle_searcher(method, params) {
                     return make_json_error(&format!("handle searcher error={e}"), self.id);
                 };
             }
             "fuzzy_searcher" => {
-                if let Err(e) = self.handle_fuzzy_searcher(method, obj, params) {
+                if let Err(e) = self.handle_fuzzy_searcher(method, params) {
                     return make_json_error(&format!("handle searcher error={e}"), self.id);
                 };
             }
             "index" => {
-                if let Err(e) = self.handle_index(method, obj, params) {
+                if let Err(e) = self.handle_index(method, params) {
                     return make_json_error(&format!("handle index error={e}"), self.id);
                 };
             }
             "indexwriter" => {
-                if let Err(e) = self.handle_index_writer(method, obj, params) {
+                if let Err(e) = self.handle_index_writer(method, params) {
                     return make_json_error(&format!("handle index writer error={e}"), self.id);
                 };
             }
             "index_reader" => {
-                if let Err(e) = self.handle_index_reader(method, obj, params) {
+                if let Err(e) = self.handle_index_reader(method, params) {
                     return make_json_error(&format!("handle index reader error={e}"), self.id);
                 };
             }
             "document" => {
-                if let Err(e) = self.handle_document(method, obj, params) {
+                if let Err(e) = self.handle_document(method, params) {
                     return make_json_error(&format!("handle document error={e}"), self.id);
                 };
             }
             "builder" => {
-                if let Err(e) = self.handler_builder(method, obj, params) {
+                if let Err(e) = self.handler_builder(method, params) {
                     return make_json_error(&format!("handle builder error={e}"), self.id);
                 };
             }
@@ -277,6 +277,8 @@ fn do_term(s: &str) -> InternalCallResult<String> {
 }
 
 /// # Safety
+///
+/// Terminate a tantivy session by its ID.
 ///
 #[no_mangle]
 pub unsafe extern "C" fn term(s: *const c_char) -> i8 {

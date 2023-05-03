@@ -49,8 +49,40 @@ impl<'a> TantivySession<'a> {
                 ))
             }
         };
-        let doc_idx = m.get("doc_id").unwrap_or(&json! {0}).as_u64().unwrap_or(0) as usize - 1;
-        let field_idx = m.get("field").unwrap_or(&json! {0}).as_u64().unwrap_or(0) as u32;
+        let doc_idx = match m.get("doc_id") {
+            Some(d) => match d.as_u64() {
+                Some(u) => (u - 1) as usize,
+                None => {
+                    return Err(ErrorKinds::BadParams(format!(
+                        "Unable to coerce {} as uint",
+                        d
+                    )))
+                }
+            },
+            None => {
+                return Err(ErrorKinds::BadParams(format!(
+                    "Could not find doc_id in {:?}",
+                    m
+                )))
+            }
+        };
+        let field_idx = match m.get("field") {
+            Some(d) => match d.as_u64() {
+                Some(u) => u as u32,
+                None => {
+                    return Err(ErrorKinds::BadParams(format!(
+                        "Unable to coerce {} as uint",
+                        d
+                    )))
+                }
+            },
+            None => {
+                return Err(ErrorKinds::BadParams(format!(
+                    "Could not find field in {:?}",
+                    m
+                )))
+            }
+        };
         let f = Field::from_field_id(field_idx);
         info!("add_text: name = {:?}", m);
         match m.get("field") {
@@ -83,7 +115,6 @@ impl<'a> TantivySession<'a> {
     pub fn handle_document(
         &mut self,
         method: &str,
-        _obj: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         info!("Document");

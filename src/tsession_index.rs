@@ -78,7 +78,6 @@ impl<'a> TantivySession<'a> {
     pub fn handle_index(
         &mut self,
         method: &str,
-        _obj: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         info!("Index");
@@ -122,7 +121,6 @@ impl<'a> TantivySession<'a> {
     pub fn handle_index_writer(
         &mut self,
         method: &str,
-        _obj: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         info!("IndexWriter");
@@ -194,18 +192,11 @@ impl<'a> TantivySession<'a> {
                         ))
                     }
                 };
-                let request_field = params
+                let f_str = params
                     .get("field")
-                    .ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?;
-                let field = request_field;
-                let f_str = match field.as_str() {
-                    Some(s) => s,
-                    None => {
-                        return make_internal_json_error(ErrorKinds::BadInitialization(
-                            "Field requested is not present".to_string(),
-                        ))
-                    }
-                };
+                    .map(|f| f.as_str())
+                    .flatten()
+                    .ok_or(ErrorKinds::BadParams("fields not present".to_string()))?;
                 let terms = params
                     .get("term")
                     .ok_or_else(|| ErrorKinds::BadParams("term not present".to_string()))?;
@@ -307,7 +298,6 @@ impl<'a> TantivySession<'a> {
     pub fn handle_index_reader(
         &mut self,
         method: &str,
-        _obj: &str,
         _params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         info!("IndexReader");

@@ -12,6 +12,8 @@ uint8_t init(void);
 /**
  * # Safety
  *
+ * Terminate a tantivy session by its ID.
+ *
  */
 int8_t term(const char *s);
 

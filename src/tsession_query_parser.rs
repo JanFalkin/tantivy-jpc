@@ -15,7 +15,6 @@ impl<'a> TantivySession<'a> {
     pub fn handle_query_parser(
         &mut self,
         method: &str,
-        _obj: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         let m = match params.as_object() {
@@ -29,14 +28,10 @@ impl<'a> TantivySession<'a> {
         info!("QueryParser");
         if method == "for_index" {
             let mut v_out: Vec<Field> = Vec::<Field>::new();
-            let idx = match &self.index {
-                Some(idx) => idx,
-                None => {
-                    return make_internal_json_error::<u32>(ErrorKinds::NotExist(
-                        "index is None".to_string(),
-                    ))
-                }
-            };
+            let idx = &self
+                .index
+                .clone()
+                .ok_or(ErrorKinds::NotExist("index is None".to_string()))?;
             info!("QueryParser aquired");
             let schema = match self.schema.as_ref() {
                 Some(s) => s,
@@ -48,8 +43,8 @@ impl<'a> TantivySession<'a> {
             };
             let request_fields = m
                 .get("fields")
-                .ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?
-                .as_array()
+                .map(|f| f.as_array())
+                .flatten()
                 .ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?;
             for v in request_fields {
                 let v_str = v.as_str().unwrap_or_default();
@@ -103,8 +98,8 @@ impl<'a> TantivySession<'a> {
             };
             let request_field = m
                 .get("field")
-                .ok_or_else(|| ErrorKinds::BadParams("fields not present".to_string()))?
-                .as_array()
+                .map(|f| f.as_array())
+                .flatten()
                 .ok_or_else(|| ErrorKinds::BadParams("field not present".to_string()))?;
             if request_field.len() != 1 {
                 return make_internal_json_error(ErrorKinds::BadInitialization(
@@ -113,8 +108,8 @@ impl<'a> TantivySession<'a> {
             }
             let fuzzy_term = m
                 .get("term")
-                .ok_or_else(|| ErrorKinds::BadParams("term not present".to_string()))?
-                .as_array()
+                .map(|t| t.as_array())
+                .flatten()
                 .ok_or_else(|| ErrorKinds::BadParams("term not present".to_string()))?;
             if fuzzy_term.len() != 1 {
                 return make_internal_json_error(ErrorKinds::BadInitialization(
