@@ -17,7 +17,6 @@ pub mod tests {
     use crate::{free_data, ErrorKinds};
 
     use super::*;
-    use crate::do_term;
     use serde_json::Map;
     use std::rc::Rc;
 
@@ -512,7 +511,7 @@ pub mod tests {
                 .unwrap(),
             "The Old Man and the Sea".to_string()
         );
-        match do_term(&ti.ctx.id) {
+        match crate::do_term(&ti.ctx.id) {
             Ok(o) => o,
             Err(e) => panic!("exception = {e}"),
         };
@@ -580,7 +579,7 @@ pub mod tests {
                 .unwrap(),
             "The Old Man and the Sea".to_string()
         );
-        let _ = do_term(&ti.ctx.id);
+        let _ = crate::do_term(&ti.ctx.id);
     }
 
     #[test]
@@ -637,7 +636,7 @@ pub mod tests {
         let sres = &top_searcher.search(2).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(2, title_result.len());
-        let _ = do_term(&ti.ctx.id);
+        let _ = crate::do_term(&ti.ctx.id);
     }
 
     #[test]
@@ -712,7 +711,7 @@ pub mod tests {
         let sres = &searcher.fuzzy_search(2).unwrap();
         let vret: Vec<serde_json::Value> = serde_json::from_str(sres).unwrap();
         assert_eq!(vret.len(), 2);
-        let _ = do_term(&ti.ctx.id);
+        let _ = crate::do_term(&ti.ctx.id);
     }
 
     #[test]
@@ -746,7 +745,7 @@ pub mod tests {
             Err(e) => panic!("failed to create index err ={} ", e),
         };
         ti.delete_term("order".to_string(), 232);
-        let _ = do_term(&ti.ctx.id);
+        let _ = crate::do_term(&ti.ctx.id);
     }
 
     #[test]
