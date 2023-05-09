@@ -324,7 +324,13 @@ fn test_kb() {
 ///
 #[no_mangle]
 pub unsafe extern "C" fn free_data(handle: i64) -> std::ffi::c_int {
-    let mut map = DATA_MAP.lock().unwrap();
+    let mut map = match DATA_MAP.lock() {
+        Ok(m) => m,
+        Err(e) => {
+            error!("free_data failed to lock data map err={e}");
+            return -1;
+        }
+    };
     match map.remove(&handle) {
         Some(data) => {
             drop(data);
@@ -361,16 +367,30 @@ pub unsafe extern "C" fn tantivy_jpc(
         val_to_send: Vec<u8>,
         go_memory: &mut *const u8,
         go_memory_sz: *mut usize,
-    ) {
-        let mut map = DATA_MAP.lock().unwrap();
+    ) -> i64 {
+        let mut map = match DATA_MAP.lock() {
+            Ok(l) => l,
+            Err(e) => {
+                error!("failed to lock DATA-MAP {e}");
+                return -1;
+            }
+        };
         let handle = map.len() as i64;
         let data = XferData {
             bytes: val_to_send.clone().into_iter().map(Cell::new).collect(),
         };
         //        let leaked = Box::leak(Box::new(val_to_send));
         map.insert(handle, data);
-        *go_memory = map.get(&handle).unwrap().bytes.as_ptr() as *mut u8;
-        *go_memory_sz = map.get(&handle).unwrap().bytes.len();
+        let mem = match map.get(&handle) {
+            Some(m) => m,
+            None => {
+                error!("failed to lock DATA-MAP entry {handle}");
+                return -1;
+            }
+        };
+        *go_memory = mem.bytes.as_ptr() as *mut u8;
+        *go_memory_sz = mem.bytes.len();
+        0
     }
     info!("In tantivy_jpc");
     let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)) {
