@@ -31,7 +31,7 @@ int8_t set_k_and_b(float k,
  * # Safety
  *
  */
-void free_buffer(uint8_t **buffer);
+int free_data(int64_t handle);
 
 /**
  * tantivy_jpc is the main entry point into a translation layer from Rust to Go for Tantivy this function will # Steps   * parse the input for the appropriately formatted json   * Modify internal state to reflect json requests
@@ -40,5 +40,5 @@ void free_buffer(uint8_t **buffer);
  */
 int64_t tantivy_jpc(const uint8_t *msg,
                     uintptr_t len,
-                    uint8_t ***ret,
+                    const uint8_t **ret,
                     uintptr_t *ret_len);
