@@ -14,9 +14,10 @@ pub mod tests {
     use tempdir::TempDir;
     use uuid::Uuid;
 
-    use crate::{free_buffer, ErrorKinds};
+    use crate::{free_data, ErrorKinds};
 
     use super::*;
+    use crate::do_term;
     use serde_json::Map;
     use std::rc::Rc;
 
@@ -279,13 +280,9 @@ pub mod tests {
             }
         }
 
-        unsafe fn ptr_to_vec(&self, ptr: *mut *mut u8, sz: &usize) -> Vec<u8> {
-            let ptr_ref = &mut *ptr;
-            let slice = std::slice::from_raw_parts(*ptr_ref, *sz);
-            let mut v = Vec::<u8>::with_capacity(slice.len());
-            std::ptr::copy_nonoverlapping(slice.as_ptr(), v.as_mut_ptr(), slice.len());
-            v.set_len(slice.len());
-            v
+        unsafe fn ptr_to_vec(&self, ptr: *const u8, sz: &usize) -> Vec<u8> {
+            let slice = unsafe { std::slice::from_raw_parts(ptr, *sz) };
+            slice.to_vec()
         }
         // unsafe fn ptr_to_vec(&self, ptr: *mut *mut u8, sz:&usize) -> Vec<u8> {
         //     let ptr_ref = &mut *ptr; // Step 1: Create a mutable reference to the outer pointer
@@ -303,7 +300,7 @@ pub mod tests {
             do_ret: bool,
         ) -> Vec<u8> {
             let my_ret_ptr = &mut usize::default();
-
+            let mut p: *const u8 = std::ptr::null_mut();
             let call_p = json!({
                 "id":     self.id,
                 "jpc":    "1.0",
@@ -312,18 +309,17 @@ pub mod tests {
                 "params": params,
             });
             let mut sp = serde_json::to_vec(&call_p).unwrap_or(vec![]);
-            let mut p: *mut *mut u8 = std::ptr::null_mut();
             info!("calling tantivy-jpc json = {}", call_p);
             let iret: i64;
             unsafe {
                 iret = tantivy_jpc(sp.as_mut_ptr(), sp.len(), &mut p, my_ret_ptr);
             }
-            if iret != 0 {
+            if iret < 0 {
                 panic!("call_jpc failed")
             }
             let sl = unsafe { self.ptr_to_vec(p, my_ret_ptr) };
             defer! {
-                unsafe{free_buffer(p)}
+                unsafe{free_data(iret);}
             }
             match std::str::from_utf8(&sl) {
                 Ok(s) => println!("stringified = {}", s),
@@ -516,6 +512,10 @@ pub mod tests {
                 .unwrap(),
             "The Old Man and the Sea".to_string()
         );
+        match do_term(&ti.ctx.id) {
+            Ok(o) => o,
+            Err(e) => panic!("exception = {e}"),
+        };
     }
 
     #[test]
@@ -580,6 +580,7 @@ pub mod tests {
                 .unwrap(),
             "The Old Man and the Sea".to_string()
         );
+        let _ = do_term(&ti.ctx.id);
     }
 
     #[test]
@@ -636,6 +637,7 @@ pub mod tests {
         let sres = &top_searcher.search(2).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(2, title_result.len());
+        let _ = do_term(&ti.ctx.id);
     }
 
     #[test]
@@ -710,6 +712,7 @@ pub mod tests {
         let sres = &searcher.fuzzy_search(2).unwrap();
         let vret: Vec<serde_json::Value> = serde_json::from_str(sres).unwrap();
         assert_eq!(vret.len(), 2);
+        let _ = do_term(&ti.ctx.id);
     }
 
     #[test]
@@ -743,6 +746,7 @@ pub mod tests {
             Err(e) => panic!("failed to create index err ={} ", e),
         };
         ti.delete_term("order".to_string(), 232);
+        let _ = do_term(&ti.ctx.id);
     }
 
     #[test]

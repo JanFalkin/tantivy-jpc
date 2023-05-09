@@ -62,20 +62,20 @@ func (jpc *JPCId) callTantivy(object, method string, params msi) (string, error)
 	if err != nil {
 		return "", err
 	}
-	var pcomsBuf **C.char
+	var pcomsBuf *C.char
 	var blen int64
 	sb := string(b)
 	pcJPCParams := C.CString(sb)
-	pCDesctination := (**C.uchar)(unsafe.Pointer(pcomsBuf))
-	defer func() {
-		C.free_buffer(pCDesctination)
-	}()
+	pCDesctination := (*C.uchar)(unsafe.Pointer(pcomsBuf))
 	cJPCParams := (*C.uchar)(unsafe.Pointer(pcJPCParams))
 	pDestinationLen := (*C.ulong)(unsafe.Pointer(&blen))
 	ttret := C.tantivy_jpc(cJPCParams, C.ulong(uint64(len(sb))), &pCDesctination, pDestinationLen)
 	if ttret < 0 {
-		return "", errors.E("Tantivy JPC Failed", errors.K.Invalid, "desc", string(C.GoBytes(unsafe.Pointer(*pCDesctination), C.int(*pDestinationLen))))
+		return "", errors.E("Tantivy JPC Failed", errors.K.Invalid, "desc", string(C.GoBytes(unsafe.Pointer(pCDesctination), C.int(*pDestinationLen))))
 	}
-	returnData := string(C.GoBytes(unsafe.Pointer(*pCDesctination), C.int(*pDestinationLen)))
+	defer func() {
+		C.free_data(ttret)
+	}()
+	returnData := string(C.GoBytes(unsafe.Pointer(pCDesctination), C.int(*pDestinationLen)))
 	return returnData, nil
 }
