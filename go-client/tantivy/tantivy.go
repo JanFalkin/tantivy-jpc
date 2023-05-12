@@ -74,7 +74,9 @@ func (jpc *JPCId) callTantivy(object, method string, params msi) (string, error)
 		return "", errors.E("Tantivy JPC Failed", errors.K.Invalid, "desc", string(C.GoBytes(unsafe.Pointer(pCDesctination), C.int(*pDestinationLen))))
 	}
 	defer func() {
-		C.free_data(ttret)
+		if ttret >= 0 {
+			C.free_data(ttret)
+		}
 	}()
 	returnData := string(C.GoBytes(unsafe.Pointer(pCDesctination), C.int(*pDestinationLen)))
 	return returnData, nil
