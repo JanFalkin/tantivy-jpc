@@ -63,7 +63,7 @@ struct TantivySession<'a> {
 
 #[derive(Clone)]
 pub struct XferData {
-    pub bytes: Vec<u8>,
+    pub bytes: String,
 }
 
 impl<'a> TantivySession<'a> {
@@ -100,6 +100,17 @@ impl<'a> TantivySession<'a> {
             Ok(x) => x,
             Err(err) => format!("{err}"),
         };
+    }
+
+    #[allow(clippy::all)]
+    unsafe fn send_result_to_golang(
+        &self,
+        go_memory: &mut *const u8,
+        go_memory_sz: *mut usize,
+    ) -> i64 {
+        *go_memory = self.return_buffer.as_bytes().as_ptr() as *mut u8;
+        *go_memory_sz = self.return_buffer.as_bytes().len();
+        0
     }
 
     // do_method is a translation from a string json method to an actual call.  All json params are passed
@@ -166,7 +177,7 @@ pub struct Request<'a> {
 /// make_json_error translates the bitcode [ElvError<T>] to an error response to the client
 /// # Arguments
 /// * `err`- the error to be translated to a response
-pub fn make_json_error(err: &str, id: &str) -> (Vec<u8>, bool) {
+pub fn make_json_error(err: &str, id: &str) -> (String, bool) {
     info!("error={}", err);
     let msg = json!(
         {
@@ -180,8 +191,7 @@ pub fn make_json_error(err: &str, id: &str) -> (Vec<u8>, bool) {
         Err(err) => format!("{err}"),
     };
     info!("returning  result = {}", vr);
-    let retval = vr.as_bytes().to_vec();
-    (retval, true)
+    (vr, true)
 }
 
 pub fn make_internal_json_error<T>(ek: ErrorKinds) -> InternalCallResult<T> {
@@ -342,6 +352,9 @@ pub unsafe extern "C" fn free_data(handle: i64) -> std::ffi::c_int {
             return -1;
         }
     };
+    if handle == 0 {
+        return 0;
+    }
     match map.remove(&handle) {
         Some(_data) => {
             0 // success
@@ -352,7 +365,7 @@ pub unsafe extern "C" fn free_data(handle: i64) -> std::ffi::c_int {
 
 #[allow(clippy::all)]
 unsafe fn send_to_golang(
-    val_to_send: Vec<u8>,
+    val_to_send: String,
     go_memory: &mut *const u8,
     go_memory_sz: *mut usize,
 ) -> i64 {
@@ -402,7 +415,7 @@ pub unsafe extern "C" fn tantivy_jpc(
         Ok(x) => x,
         Err(err) => {
             error!("failed error = {err}");
-            return send_to_golang(err.to_string().as_bytes().to_vec(), ret, ret_len);
+            return send_to_golang(err.to_string(), ret, ret_len);
         }
     };
     let json_params: Request = match serde_json::from_str(input_string) {
@@ -436,7 +449,7 @@ pub unsafe extern "C" fn tantivy_jpc(
                                 json_params.id
                             ))
                             .to_string();
-                            return send_to_golang(msg.as_bytes().to_vec(), ret, ret_len);
+                            return send_to_golang(msg, ret, ret_len);
                         }
                     } //should be ok just put in
                 }
@@ -444,9 +457,9 @@ pub unsafe extern "C" fn tantivy_jpc(
         }
         _ => {
             let msg = ErrorKinds::UnRecognizedCommand(json_params.method.to_string()).to_string();
-            return send_to_golang(msg.as_bytes().to_vec(), ret, ret_len);
+            return send_to_golang(msg, ret, ret_len);
         }
     };
     entity.do_method(json_params.method, json_params.obj, json_params.params);
-    send_to_golang(entity.return_buffer.as_bytes().to_vec(), ret, ret_len)
+    entity.send_result_to_golang(ret, ret_len)
 }
