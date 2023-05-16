@@ -26,7 +26,7 @@ fn uint_val(v: serde_json::Value) -> tantivy::schema::Value {
     tantivy::schema::Value::U64(v.as_u64().unwrap_or(0))
 }
 
-impl<'a> TantivySession<'a> {
+impl TantivySession {
     fn handle_add_field(
         &mut self,
         params: serde_json::Value,

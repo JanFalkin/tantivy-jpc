@@ -283,14 +283,7 @@ pub mod tests {
             let slice = unsafe { std::slice::from_raw_parts(ptr, *sz) };
             slice.to_vec()
         }
-        // unsafe fn ptr_to_vec(&self, ptr: *mut *mut u8, sz:&usize) -> Vec<u8> {
-        //     let ptr_ref = &mut *ptr; // Step 1: Create a mutable reference to the outer pointer
-        //     let slice = std::slice::from_raw_parts(*ptr_ref, *sz); // Step 2: Convert the inner pointer to a slice
-        //     println!("slice={:?}", slice);
-        //     let v = Vec::<u8>::from(slice);
-        //     println!("v={:?} slice={:?}", v,slice);
-        //     v
-        // }
+
         pub fn call_jpc(
             &self,
             object: String,
@@ -746,6 +739,61 @@ pub mod tests {
         };
         ti.delete_term("order".to_string(), 232);
         let _ = crate::do_term(&ti.ctx.id);
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct TestResultError {
+        pub error: String,
+        pub id: String,
+        pub jpc: String,
+    }
+
+    #[test]
+    fn bad_params_call_jpc() {
+        fn base_tester(ctx: &FakeContext, object: String, method: String, expected: &str) {
+            let s = &ctx.call_jpc(object, method, json!({}), true);
+            let r: TestResultError = serde_json::from_str(std::str::from_utf8(s).unwrap()).unwrap();
+            assert_eq!(r.error, expected);
+        }
+
+        crate::test_init();
+        let ctx = FakeContext::new();
+        base_tester(
+            &ctx,
+            "nothing".to_string(),
+            "some_function".to_string(),
+            "Not Recognized : `some_function`",
+        );
+        base_tester(
+            &ctx,
+            "builder".to_string(),
+            "some_function".to_string(),
+            "handle builder error=BadParams : `Unknown method some_function`",
+        );
+        base_tester(
+            &ctx,
+            "query_parser".to_string(),
+            "some_function".to_string(),
+            "handle query parser error=BadParams : `Unknown method some_function`",
+        );
+        base_tester(
+            &ctx,
+            "index".to_string(),
+            "some_function".to_string(),
+            "handle index error=BadParams : `Finalized : `A schema must be created before an index``",
+        );
+        base_tester(
+            &ctx,
+            "searcher".to_string(),
+            "some_function".to_string(),
+            "handle searcher error=NotExist : `expecting method search found some_function`",
+        );
+        base_tester(
+            &ctx,
+            "fuzzy_searcher".to_string(),
+            "some_function".to_string(),
+            "handle searcher error=NotExist : `expecting method fuzzy_searcher found some_function`",
+        );
     }
 
     #[test]

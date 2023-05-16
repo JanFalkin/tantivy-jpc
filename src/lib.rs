@@ -22,8 +22,7 @@ extern crate thiserror;
 use thiserror::Error;
 
 lazy_static! {
-    static ref TANTIVY_MAP: Mutex<HashMap<String, TantivySession<'static>>> =
-        Mutex::new(HashMap::new());
+    static ref TANTIVY_MAP: Mutex<HashMap<String, TantivySession>> = Mutex::new(HashMap::new());
     static ref ERRORS: Mutex<HashMap<String, Vec<String>>> = Mutex::new(HashMap::new());
     static ref DATA_MAP: Mutex<HashMap<i64, XferData>> = Mutex::new(HashMap::new());
 }
@@ -45,8 +44,8 @@ pub use self::tsession_tests::*;
 // TantivySession provides a point of access to all Tantivy functionality on and for an Index.
 // each TantivySession will maintain a given Option for it's lifetime and each will be a unique
 // conversation based on the TantivySession::id.
-struct TantivySession<'a> {
-    pub(crate) id: &'a str,
+struct TantivySession {
+    pub(crate) id: String,
     pub(crate) doc: Option<HashMap<usize, tantivy::Document>>,
     pub(crate) builder: Option<Box<tantivy::schema::SchemaBuilder>>,
     pub(crate) schema: Option<tantivy::schema::Schema>,
@@ -66,10 +65,10 @@ pub struct XferData {
     pub bytes: String,
 }
 
-impl<'a> TantivySession<'a> {
-    fn new(id: &'a str) -> TantivySession<'a> {
+impl TantivySession {
+    fn new(id: &str) -> TantivySession {
         TantivySession {
-            id,
+            id: id.to_string(),
             doc: None,
             builder: None,
             schema: None,
@@ -144,7 +143,7 @@ impl<'a> TantivySession<'a> {
             }
             "index_reader" => {
                 if let Err(e) = self.handle_index_reader(method, params) {
-                    return self.make_json_error(&format!("handle index reader error={e}"));
+                    return self.make_json_error(&format!("handle index serde_json::from_str(std::str::from_utf8(s).unwrap()).unwrap();reader error={e}"));
                 };
             }
             "document" => {
@@ -177,7 +176,7 @@ pub struct Request<'a> {
 /// make_json_error translates the bitcode [ElvError<T>] to an error response to the client
 /// # Arguments
 /// * `err`- the error to be translated to a response
-pub fn make_json_error(err: &str, id: &str) -> (String, bool) {
+pub fn make_json_error(err: &str, id: &str) -> String {
     info!("error={}", err);
     let msg = json!(
         {
@@ -191,7 +190,7 @@ pub fn make_json_error(err: &str, id: &str) -> (String, bool) {
         Err(err) => format!("{err}"),
     };
     info!("returning  result = {}", vr);
-    (vr, true)
+    vr
 }
 
 pub fn make_internal_json_error<T>(ek: ErrorKinds) -> InternalCallResult<T> {
@@ -421,7 +420,7 @@ pub unsafe extern "C" fn tantivy_jpc(
     let json_params: Request = match serde_json::from_str(input_string) {
         Ok(m) => m,
         Err(_err) => {
-            let (r, _b) = make_json_error("parse failed for http", "ID not found");
+            let r = make_json_error("parse failed for http", "ID not found");
             return send_to_golang(r, ret, ret_len);
         }
     };
@@ -432,7 +431,7 @@ pub unsafe extern "C" fn tantivy_jpc(
             return -1;
         }
     };
-    let entity: &mut TantivySession<'static> = match json_params.obj {
+    let entity: &mut TantivySession = match json_params.obj {
         "document" | "builder" | "index" | "indexwriter" | "query_parser" | "searcher"
         | "index_reader" | "fuzzy_searcher" => {
             let cur_session = tm.get_mut(json_params.id);
@@ -456,7 +455,11 @@ pub unsafe extern "C" fn tantivy_jpc(
             }
         }
         _ => {
-            let msg = ErrorKinds::UnRecognizedCommand(json_params.method.to_string()).to_string();
+            let msg = make_json_error(
+                &ErrorKinds::UnRecognizedCommand(json_params.method.to_string()).to_string(),
+                "noid",
+            );
+
             return send_to_golang(msg, ret, ret_len);
         }
     };

@@ -26,13 +26,18 @@ pub struct ResultElementDoc {
     pub score: f32,
 }
 
-impl<'a> TantivySession<'a> {
+impl TantivySession {
     pub fn handle_fuzzy_searcher(
         &mut self,
-        _method: &str,
+        method: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
-        info!("Searcher");
+        info!("FuzzySearcher");
+        if method != "fuzzy_searcher" {
+            return Err(ErrorKinds::NotExist(format!(
+                "expecting method fuzzy_searcher found {method}"
+            )));
+        }
         const DEF_LIMIT: u64 = 2;
         let top_limit = match params.as_object() {
             Some(p) => p
@@ -94,10 +99,15 @@ impl<'a> TantivySession<'a> {
     }
     pub fn handle_searcher(
         &mut self,
-        _method: &str,
+        method: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         info!("Searcher");
+        if method != "search" {
+            return Err(ErrorKinds::NotExist(format!(
+                "expecting method search found {method}"
+            )));
+        }
         const DEF_LIMIT: u64 = 10;
         let (top_limit, explain) = match params.as_object() {
             Some(p) => (
