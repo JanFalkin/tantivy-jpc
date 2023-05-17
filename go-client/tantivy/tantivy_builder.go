@@ -21,7 +21,7 @@ type TBuilder struct {
 	*JPCId
 }
 
-func NewBuilder(td string, memsize ...int32) (*TBuilder, error) {
+func NewBuilder(td string) (*TBuilder, error) {
 	u := uuid.NewV4()
 	tb := TBuilder{
 		JPCId: &JPCId{

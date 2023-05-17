@@ -35,7 +35,7 @@ macro_rules! impl_simple_type {
     };
 }
 
-impl<'a> TantivySession<'a> {
+impl TantivySession {
     pub fn extract_field_params(
         params: serde_json::Value,
     ) -> InternalCallResult<(String, u64, bool, bool, bool)> {
@@ -181,7 +181,11 @@ impl<'a> TantivySession<'a> {
                 info!("{}", self.return_buffer);
                 self.schema = Some(schema)
             }
-            &_ => {}
+            &_ => {
+                let e = ErrorKinds::BadParams(format!("Unknown method {method}"));
+                self.make_json_error(&e.to_string());
+                return Err(e);
+            }
         };
 
         Ok(0)

@@ -11,7 +11,7 @@ use tantivy::query::FuzzyTermQuery;
 use tantivy::query::QueryParser;
 use tantivy::schema::{Field, Term};
 
-impl<'a> TantivySession<'a> {
+impl TantivySession {
     pub fn handle_query_parser(
         &mut self,
         method: &str,
@@ -52,6 +52,7 @@ impl<'a> TantivySession<'a> {
                 }
             }
             self.query_parser = Some(Box::new(QueryParser::for_index(idx, v_out)));
+            return Ok(0);
         }
         if method == "parse_query" {
             let qp = match &self.query_parser {
@@ -85,6 +86,7 @@ impl<'a> TantivySession<'a> {
                     )))
                 }
             };
+            return Ok(0);
         }
         if method == "parse_fuzzy_query" {
             let schema = match self.schema.as_ref() {
@@ -131,7 +133,9 @@ impl<'a> TantivySession<'a> {
                 let q = FuzzyTermQuery::new(t, 1, true);
                 self.fuzzy_q = Some(Box::new(q));
             }
+            return Ok(0);
         }
-        Ok(0)
+        let e = ErrorKinds::BadParams(format!("Unknown method {method}"));
+        Err(e)
     }
 }

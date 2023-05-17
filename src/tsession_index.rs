@@ -14,7 +14,7 @@ use tantivy::Term;
 
 const DEFAULT_INDEX_WRITER_MEM_SIZE: usize = 150000000;
 
-impl<'a> TantivySession<'a> {
+impl TantivySession {
     pub fn create_index(
         &mut self,
         params: serde_json::Value,
@@ -289,9 +289,12 @@ impl<'a> TantivySession<'a> {
                     }
                 };
             }
-            _ => {}
+            _ => {
+                return Err(ErrorKinds::NotExist(format!(
+                    "method {method} not supported"
+                )));
+            }
         }
-
         Ok(0)
     }
     pub fn handle_index_reader(
