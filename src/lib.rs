@@ -333,9 +333,6 @@ fn test_kb() {
 ///
 #[no_mangle]
 pub unsafe extern "C" fn free_data(handle: i64) -> std::ffi::c_int {
-    if handle == 0 {
-        return 0;
-    }
     let mut map = match DATA_MAP.lock() {
         Ok(m) => m,
         Err(e) => {
@@ -354,7 +351,7 @@ pub unsafe extern "C" fn free_data(handle: i64) -> std::ffi::c_int {
 
 #[allow(clippy::all)]
 unsafe fn send_to_golang(
-    val_to_send: String,
+    val_to_send: Vec<u8>,
     go_memory: &mut *const u8,
     go_memory_sz: *mut usize,
 ) -> i64 {
@@ -369,9 +366,7 @@ unsafe fn send_to_golang(
     if handle < 0 {
         handle = handle * -1;
     }
-    let data = XferData {
-        bytes: val_to_send.as_bytes().to_vec(),
-    };
+    let data = XferData { bytes: val_to_send };
     map.insert(handle, data);
     let mem = match map.get(&handle) {
         Some(m) => m,
@@ -406,14 +401,14 @@ pub unsafe extern "C" fn tantivy_jpc(
         Ok(x) => x,
         Err(err) => {
             error!("failed error = {err}");
-            return send_to_golang(err.to_string(), ret, ret_len);
+            return send_to_golang(err.to_string().as_bytes().to_vec(), ret, ret_len);
         }
     };
     let json_params: Request = match serde_json::from_str(input_string) {
         Ok(m) => m,
         Err(_err) => {
             let r = make_json_error("parse failed for http", "ID not found");
-            return send_to_golang(r, ret, ret_len);
+            return send_to_golang(r.as_bytes().to_vec(), ret, ret_len);
         }
     };
     let mut tm = match TANTIVY_MAP.lock() {
@@ -440,7 +435,7 @@ pub unsafe extern "C" fn tantivy_jpc(
                                 json_params.id
                             ))
                             .to_string();
-                            return send_to_golang(msg, ret, ret_len);
+                            return send_to_golang(msg.as_bytes().to_vec(), ret, ret_len);
                         }
                     } //should be ok just put in
                 }
@@ -452,9 +447,9 @@ pub unsafe extern "C" fn tantivy_jpc(
                 "noid",
             );
 
-            return send_to_golang(msg, ret, ret_len);
+            return send_to_golang(msg.as_bytes().to_vec(), ret, ret_len);
         }
     };
     entity.do_method(json_params.method, json_params.obj, json_params.params);
-    send_to_golang(entity.return_buffer.to_owned(), ret, ret_len)
+    send_to_golang(entity.return_buffer.as_bytes().to_vec(), ret, ret_len)
 }
