@@ -62,7 +62,7 @@ struct TantivySession {
 
 #[derive(Clone)]
 pub struct XferData {
-    pub bytes: String,
+    pub bytes: Vec<u8>,
 }
 
 impl TantivySession {
@@ -99,17 +99,6 @@ impl TantivySession {
             Ok(x) => x,
             Err(err) => format!("{err}"),
         };
-    }
-
-    #[allow(clippy::all)]
-    unsafe fn send_result_to_golang(
-        &self,
-        go_memory: &mut *const u8,
-        go_memory_sz: *mut usize,
-    ) -> i64 {
-        *go_memory = self.return_buffer.as_bytes().as_ptr() as *mut u8;
-        *go_memory_sz = self.return_buffer.as_bytes().len();
-        0
     }
 
     // do_method is a translation from a string json method to an actual call.  All json params are passed
@@ -344,6 +333,9 @@ fn test_kb() {
 ///
 #[no_mangle]
 pub unsafe extern "C" fn free_data(handle: i64) -> std::ffi::c_int {
+    if handle == 0 {
+        return 0;
+    }
     let mut map = match DATA_MAP.lock() {
         Ok(m) => m,
         Err(e) => {
@@ -351,11 +343,9 @@ pub unsafe extern "C" fn free_data(handle: i64) -> std::ffi::c_int {
             return -1;
         }
     };
-    if handle == 0 {
-        return 0;
-    }
     match map.remove(&handle) {
-        Some(_data) => {
+        Some(data) => {
+            drop(data);
             0 // success
         }
         None => -1, // error: handle not found in the map
@@ -379,7 +369,9 @@ unsafe fn send_to_golang(
     if handle < 0 {
         handle = handle * -1;
     }
-    let data = XferData { bytes: val_to_send };
+    let data = XferData {
+        bytes: val_to_send.as_bytes().to_vec(),
+    };
     map.insert(handle, data);
     let mem = match map.get(&handle) {
         Some(m) => m,
@@ -464,5 +456,5 @@ pub unsafe extern "C" fn tantivy_jpc(
         }
     };
     entity.do_method(json_params.method, json_params.obj, json_params.params);
-    entity.send_result_to_golang(ret, ret_len)
+    send_to_golang(entity.return_buffer.to_owned(), ret, ret_len)
 }
