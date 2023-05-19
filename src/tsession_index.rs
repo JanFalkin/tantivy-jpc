@@ -12,31 +12,28 @@ use tantivy::schema::FieldType;
 use tantivy::DateTime;
 use tantivy::Term;
 
-const DEFAULT_INDEX_WRITER_MEM_SIZE: usize = 150000000;
+pub const DEFAULT_INDEX_WRITER_MEM_SIZE: u64 = 500000000;
 
 impl TantivySession {
     pub fn create_index(
         &mut self,
         params: serde_json::Value,
     ) -> InternalCallResult<Box<tantivy::Index>> {
-        let def_json = &json!("");
-        let dir_to_use = {
-            let this = (if let Some(m) = params.as_object() {
-                m
-            } else {
-                return make_internal_json_error(ErrorKinds::BadParams(
-                    "invalid parameters pass to Document add_text".to_string(),
-                ));
-            })
-            .get("directory");
-            if let Some(x) = this {
-                x
-            } else {
-                def_json
-            }
-        }
-        .as_str()
-        .unwrap_or("");
+        let this = if let Some(m) = params.as_object() {
+            m
+        } else {
+            return make_internal_json_error(ErrorKinds::BadParams(
+                "invalid parameters pass to Document add_text".to_string(),
+            ));
+        };
+
+        let dir_to_use = this.get("directory").and_then(|x| x.as_str()).unwrap_or("");
+
+        self.memsize = this
+            .get("memsize")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(DEFAULT_INDEX_WRITER_MEM_SIZE);
+
         if !dir_to_use.is_empty() {
             let idx = match tantivy::Index::open_in_dir(dir_to_use) {
                 Ok(p) => p,
@@ -135,7 +132,7 @@ impl TantivySession {
                         ))
                     }
                 };
-                let iw = Box::new((*bi).writer(DEFAULT_INDEX_WRITER_MEM_SIZE)?);
+                let iw = Box::new((*bi).writer(self.memsize as usize)?);
                 self.indexwriter = Some(iw);
                 self.indexwriter
                     .as_mut()
@@ -167,21 +164,9 @@ impl TantivySession {
                 let writer = match self.indexwriter.as_mut() {
                     Some(x) => x,
                     None => {
-                        let bi = match self.index.as_mut().take() {
-                            Some(x) => x,
-                            None => {
-                                return make_internal_json_error(ErrorKinds::BadInitialization(
-                                    "need index created for writer".to_string(),
-                                ))
-                            }
-                        };
-                        let iw = Box::new((*bi).writer(DEFAULT_INDEX_WRITER_MEM_SIZE)?);
-                        self.indexwriter = Some(iw);
-                        self.indexwriter
-                            .as_mut()
-                            .ok_or(ErrorKinds::BadInitialization(
-                                "need index created for writer".to_string(),
-                            ))?
+                        return make_internal_json_error(ErrorKinds::BadInitialization(
+                            "need index created for writer".to_string(),
+                        ))
                     }
                 };
                 let schema = match self.schema.as_ref() {

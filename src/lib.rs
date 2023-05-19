@@ -58,6 +58,7 @@ struct TantivySession {
     pub(crate) fuzzy_q: Option<Box<FuzzyTermQuery>>,
 
     return_buffer: String,
+    memsize: u64,
 }
 
 #[derive(Clone)]
@@ -80,6 +81,7 @@ impl TantivySession {
             dyn_q: None,
             fuzzy_q: None,
             return_buffer: String::new(),
+            memsize: crate::tsession_index::DEFAULT_INDEX_WRITER_MEM_SIZE,
         }
     }
 

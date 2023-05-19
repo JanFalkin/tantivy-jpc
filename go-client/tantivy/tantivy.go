@@ -36,7 +36,7 @@ func SetKB(k float64, b float64) {
 
 type msi map[string]interface{}
 
-const defaultMemSize = 5000000
+const defaultMemSize = uint32(500000000)
 
 // The ccomsBuf is a raw byte buffer for tantivy-jpc to send results. A single mutex guards its use.
 type JPCId struct {
