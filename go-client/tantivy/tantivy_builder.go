@@ -32,13 +32,15 @@ func NewBuilder(td string) (*TBuilder, error) {
 	return &tb, nil
 }
 
-func (tb *TBuilder) CreateIndex() (*TIndex, error) {
+func (tb *TBuilder) CreateIndex(memsize ...uint32) (*TIndex, error) {
 	e := errors.Template("TBuilder.CreateIndex", errors.K.Invalid, "TempDir", tb.TempDir)
-
+	if len(memsize) == 0 {
+		memsize = []uint32{defaultMemSize}
+	}
 	if tb.TempDir == "" {
 		return nil, e("reason", "TempDir is empty")
 	}
-	_, err := tb.callTantivy("index", "create", msi{"directory": tb.TempDir})
+	_, err := tb.callTantivy("index", "create", msi{"directory": tb.TempDir, "memsize": memsize[0]})
 	if err != nil {
 		return nil, e(err, "reason", "index create failed")
 	}
