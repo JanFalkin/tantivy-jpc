@@ -210,7 +210,7 @@ func testFuzzyExpectedIndex(t *testing.T, idx *TIndex) {
 	qp, err := rb.Searcher()
 	require.NoError(t, err)
 
-	searcher, err := qp.ParseFuzzyQuery("title", "Diary")
+	searcher, err := qp.ParseFuzzyQuery("title", "Diari")
 	require.NoError(t, err)
 	s, err := searcher.FuzzySearch()
 	log.Info("return", s)
@@ -253,7 +253,6 @@ func TestTantivyBasic(t *testing.T) {
 }
 
 func TestTantivyFuzzy(t *testing.T) {
-	t.Skip()
 	wd, err := os.Getwd()
 	require.NoError(t, err)
 	fmt.Printf("WD = %s", wd)

@@ -632,7 +632,6 @@ pub mod tests {
         let _ = crate::do_term(&ti.ctx.id);
     }
 
-    #[ignore]
     #[test]
     fn basic_index_fuzzy() {
         crate::test_init();
@@ -699,7 +698,7 @@ pub mod tests {
         let mut rb = ti.reader_builder().unwrap();
         let mut qp = rb.searcher().unwrap();
         let mut searcher = qp
-            .parse_fuzzy_query("Diary".to_string(), "title".to_string())
+            .parse_fuzzy_query("diari".to_string(), "title".to_string())
             .unwrap();
         let sres = &searcher.fuzzy_search(2).unwrap();
         let vret: Vec<serde_json::Value> = serde_json::from_str(sres).unwrap();
