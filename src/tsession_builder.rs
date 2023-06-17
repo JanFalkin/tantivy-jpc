@@ -141,7 +141,7 @@ impl TantivySession {
                 if indexed {
                     ti = ti.set_indexing_options(
                         TextFieldIndexing::default()
-                            .set_tokenizer("default")
+                            .set_tokenizer("en_stem")
                             .set_index_option(IndexRecordOption::WithFreqsAndPositions),
                     );
                 }

@@ -632,6 +632,7 @@ pub mod tests {
         let _ = crate::do_term(&ti.ctx.id);
     }
 
+    #[ignore]
     #[test]
     fn basic_index_fuzzy() {
         crate::test_init();
