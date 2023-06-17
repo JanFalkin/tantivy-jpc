@@ -46,7 +46,7 @@ impl TantivySession {
                 .unwrap_or(DEF_LIMIT),
             None => DEF_LIMIT,
         };
-        let query = match self.fuzzy_q.take() {
+        let query = match self.fuzzy_q.as_deref() {
             Some(dq) => dq,
             None => {
                 return make_internal_json_error(ErrorKinds::NotExist(
@@ -91,7 +91,7 @@ impl TantivySession {
         };
         self.return_buffer = s;
 
-        self.fuzzy_q = Some(query);
+        self.fuzzy_q = Some(Box::new(query.clone()));
         if self.return_buffer.is_empty() {
             self.return_buffer = r#"{ "result" : "EMPTY"}"#.to_string();
         }
