@@ -7,22 +7,21 @@ edition = "2021"
 crate-type = ["staticlib", "rlib"]
 
 [build-dependencies]
-cbindgen = "0.20.0"
+cbindgen = "0.24.5"
 
 [dependencies]
 paste = "1.0.0"
 take_mut = "0.2.2"
-chrono = "*"
+chrono = "0.4.26"
 thiserror = "1.0.30"
-serde = "*"
-serde_json = "*"
-serde_derive = "*"
+serde = "1.0.166"
+serde_json = "1.0.99"
+serde_derive = "1.0.166"
 log = "0.4.14"
-tantivy = { git = "https://github.com/JanFalkin/tantivy.git", branch = "main" }
-#tantivy = { path = "../tantivy"}
-lazy_static = "*"
-env_logger = "*"
-tempdir = "*"
+tantivy = { git = "https://github.com/JanFalkin/tantivy.git", rev = "95721970f99712571f14bf5642fa5c8205e077ae" }
+lazy_static = "1.4.0"
+env_logger = "0.10.0"
+tempdir = "0.3.7"
 stderrlog = "0.5.4"
 scopeguard = "1.1.0"
 rand = "0.8.5"

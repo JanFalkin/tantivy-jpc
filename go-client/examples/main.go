@@ -31,7 +31,7 @@ func doRun() {
 		panic(err)
 	}
 
-	idxFieldOrder, err := builder.AddI64Field("order", tantivy.INT, false, false, true)
+	idxFieldOrder, err := builder.AddI64Field("order", tantivy.INT, true, true, true)
 	if err != nil {
 		panic(err)
 	}
@@ -92,7 +92,7 @@ func doRun() {
 		panic(err)
 	}
 
-	searcher, err := qp.ParseQuery("Sea")
+	searcher, err := qp.ParseQuery("order:111")
 	if err != nil {
 		panic(err)
 	}
@@ -111,7 +111,7 @@ func doRun() {
 	if sr[0]["doc"].(map[string]interface{})["title"].([]interface{})[0] != "The Old Man and the Sea" {
 		panic("expected value not received")
 	}
-	searcherAgain, err := qp.ParseQuery("Mice")
+	searcherAgain, err := qp.ParseQuery("order:222")
 	if err != nil {
 		panic(err)
 	}
