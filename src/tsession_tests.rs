@@ -516,7 +516,7 @@ pub mod tests {
         let mut ctx = FakeContext::new();
         assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
         assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
-        assert_eq!(ctx.add_i64_field("order".to_string(), 3, false, true), 2);
+        assert_eq!(ctx.add_i64_field("order".to_string(), 3, true, true), 2);
 
         let mut td = match ctx.build(true) {
             Ok(t) => t,
@@ -563,7 +563,7 @@ pub mod tests {
         let mut qp = rb.searcher().unwrap();
         qp.for_index(vec!["title".to_string(), "body".to_string()])
             .unwrap();
-        let mut searcher = qp.parse_query("Sea".to_string()).unwrap();
+        let mut searcher = qp.parse_query("order:111".to_string()).unwrap();
         let sres = &searcher.search(1).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(
