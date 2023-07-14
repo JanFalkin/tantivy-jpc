@@ -1,8 +1,8 @@
-use crate::info;
 use crate::make_internal_json_error;
 use crate::ErrorKinds;
 use crate::InternalCallResult;
 use crate::TantivySession;
+use crate::{debug, info};
 
 extern crate serde;
 extern crate serde_derive;
@@ -53,7 +53,7 @@ impl TantivySession {
             };
             Ok(Box::new(idx))
         } else {
-            info!("Creating index in RAM");
+            debug!("Creating index in RAM");
             self.index = Some(Box::new(tantivy::Index::create_in_ram(
                 match &self.schema {
                     Some(s) => s.to_owned(),
@@ -77,7 +77,7 @@ impl TantivySession {
         method: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
-        info!("Index");
+        debug!("Index");
         let idx = match &self.index {
             Some(x) => x,
             None => match self.create_index(params) {
@@ -102,7 +102,7 @@ impl TantivySession {
         };
         match method {
             "reader_builder" => {
-                info!("Reader Builder");
+                debug!("Reader Builder");
                 self.index_reader_builder = Some(Box::new(idx.reader_builder()));
                 idx
             }
@@ -120,7 +120,7 @@ impl TantivySession {
         method: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
-        info!("IndexWriter");
+        debug!("IndexWriter");
         let writer = match self.indexwriter.as_mut() {
             Some(x) => x,
             None => {
@@ -158,7 +158,7 @@ impl TantivySession {
                 let os = writer.add_document(rm)?;
                 self.return_buffer = json!({ "opstamp": os }).to_string();
                 self.doc = doc;
-                info!("{}", self.return_buffer);
+                debug!("{}", self.return_buffer);
             }
             "delete_term" => {
                 let writer = match self.indexwriter.as_mut() {
@@ -263,7 +263,7 @@ impl TantivySession {
                 match writer.commit() {
                     Ok(x) => {
                         self.return_buffer = json!({ "id": x }).to_string();
-                        info!("{}", self.return_buffer);
+                        debug!("{}", self.return_buffer);
                         self.indexwriter = None;
                         x
                     }
@@ -287,18 +287,18 @@ impl TantivySession {
         method: &str,
         _params: serde_json::Value,
     ) -> InternalCallResult<u32> {
-        info!("IndexReader");
+        debug!("IndexReader");
         match method {
             "searcher" => {
                 if let Some(idx) = self.index_reader_builder.as_ref() {
-                    info!("got index reader@@@@@@");
+                    debug!("got index reader@@@@@@");
                     match (*idx)
                         .clone()
                         .reload_policy(tantivy::ReloadPolicy::OnCommit)
                         .try_into()
                     {
                         Ok(idx_read) => {
-                            info!("Got leased item");
+                            debug!("Got leased item");
                             self.leased_item = Some(Box::new(idx_read.searcher()))
                         }
                         Err(err) => {

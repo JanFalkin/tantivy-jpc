@@ -1,4 +1,4 @@
-use crate::info;
+use crate::debug;
 use crate::make_internal_json_error;
 use crate::ErrorKinds;
 use crate::InternalCallResult;
@@ -105,7 +105,7 @@ impl TantivySession {
         method: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
-        info!("SchemaBuilder");
+        debug!("SchemaBuilder");
         let sb = match &mut self.builder {
             Some(x) => x,
             None => {
@@ -122,11 +122,11 @@ impl TantivySession {
                 let mut ti: TextOptions;
                 match field_type {
                     1 => {
-                        info!("Found STRING");
+                        debug!("Found STRING");
                         ti = STRING
                     }
                     2 => {
-                        info!("Found TEXT");
+                        debug!("Found TEXT");
                         ti = TEXT
                     }
                     _ => {
@@ -148,7 +148,7 @@ impl TantivySession {
                 if fast {
                     ti = ti.set_fast(None);
                 }
-                info!(
+                debug!(
                     "add_text_field: name = {}, field_type = {} stored = {}",
                     &name, &field_type, &stored
                 );
@@ -178,7 +178,7 @@ impl TantivySession {
                 };
                 let schema: Schema = sb.build();
                 self.return_buffer = json!({ "schema": schema }).to_string();
-                info!("{}", self.return_buffer);
+                debug!("{}", self.return_buffer);
                 self.schema = Some(schema)
             }
             &_ => {

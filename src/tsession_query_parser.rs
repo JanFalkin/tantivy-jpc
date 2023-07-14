@@ -1,4 +1,4 @@
-use crate::info;
+use crate::debug;
 use crate::make_internal_json_error;
 use crate::ErrorKinds;
 use crate::InternalCallResult;
@@ -25,14 +25,14 @@ impl TantivySession {
                 ))
             }
         };
-        info!("QueryParser");
+        debug!("QueryParser");
         if method == "for_index" {
             let mut v_out: Vec<Field> = Vec::<Field>::new();
             let idx = &self
                 .index
                 .clone()
                 .ok_or(ErrorKinds::NotExist("index is None".to_string()))?;
-            info!("QueryParser aquired");
+            debug!("QueryParser aquired");
             let schema = match self.schema.as_ref() {
                 Some(s) => s,
                 None => {

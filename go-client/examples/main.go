@@ -18,6 +18,7 @@ limbs and branches that arch over the pool`
 const oldMan = "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."
 
 func doRun() {
+	tantivy.LibInit("debug")
 	builder, err := tantivy.NewBuilder("")
 	if err != nil {
 		panic(err)
