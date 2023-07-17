@@ -7,11 +7,14 @@ use crate::TantivySession;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
+use log::error;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Write;
 use tantivy::collector::{Count, TopDocs};
+use tantivy::schema::Field;
 use tantivy::schema::NamedFieldDocument;
 use tantivy::Document;
+use tantivy::SnippetGenerator;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ResultElement {
@@ -97,17 +100,8 @@ impl TantivySession {
         }
         Ok(0)
     }
-    pub fn handle_searcher(
-        &mut self,
-        method: &str,
-        params: serde_json::Value,
-    ) -> InternalCallResult<u32> {
-        debug!("Searcher");
-        if method != "search" {
-            return Err(ErrorKinds::NotExist(format!(
-                "expecting method search found {method}"
-            )));
-        }
+
+    fn do_search(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
         const DEF_LIMIT: u64 = 10;
         let (top_limit, explain) = match params.as_object() {
             Some(p) => (
@@ -130,7 +124,7 @@ impl TantivySession {
             Some(r) => r,
             None => {
                 return make_internal_json_error(ErrorKinds::NotExist(
-                    "Reader unavliable".to_string(),
+                    "Reader unavailable".to_string(),
                 ))
             }
         };
@@ -167,5 +161,50 @@ impl TantivySession {
         self.return_buffer = serde_json::to_string(&vret)?;
         debug!("ret = {}", self.return_buffer);
         Ok(0)
+    }
+
+    fn do_create_snippet_generator(
+        &mut self,
+        params: serde_json::Value,
+    ) -> InternalCallResult<u32> {
+        let searcher = match &self.leased_item {
+            Some(s) => &*s,
+            None => {
+                return make_internal_json_error(ErrorKinds::NotExist(
+                    "create snippet called with no searcher set".to_string(),
+                ))
+            }
+        };
+        let query = match &self.dyn_q {
+            Some(s) => &*s,
+            None => {
+                return make_internal_json_error(ErrorKinds::NotExist(
+                    "create snippet called with no searcher set".to_string(),
+                ))
+            }
+        };
+        let field_id: u64 = match params.as_object() {
+            Some(p) => p.get("field_id").and_then(|u| u.as_u64()).unwrap_or(0),
+            None => 0,
+        };
+        let f = Field::from_field_id(field_id as u32);
+        self.snippet_generators = Some(SnippetGenerator::create(&searcher, query, f)?);
+        Ok(0)
+    }
+
+    pub fn handle_searcher(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> InternalCallResult<u32> {
+        debug!("Searcher");
+        return match method {
+            "search" => self.do_search(params),
+            "snippet" => self.do_create_snippet_generator(params),
+            _ => {
+                error!("unknown method {method}");
+                Err(ErrorKinds::NotExist(format!("unknown method {method}")))
+            }
+        };
     }
 }

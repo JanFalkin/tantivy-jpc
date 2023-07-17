@@ -785,7 +785,7 @@ pub mod tests {
             &ctx,
             "searcher".to_string(),
             "some_function".to_string(),
-            "handle searcher error=NotExist : `expecting method search found some_function`",
+            "handle searcher error=NotExist : `unknown method some_function`",
         );
         base_tester(
             &ctx,
