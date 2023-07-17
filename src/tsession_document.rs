@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::info;
+use crate::debug;
 use crate::make_internal_json_error;
 use crate::ErrorKinds;
 use crate::InternalCallResult;
@@ -84,7 +84,7 @@ impl TantivySession {
             }
         };
         let f = Field::from_field_id(field_idx);
-        info!("add_text: name = {:?}", m);
+        debug!("add_text: name = {:?}", m);
         match m.get("field") {
             Some(f) => f.as_i64(),
             None => {
@@ -117,7 +117,7 @@ impl TantivySession {
         method: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
-        info!("Document");
+        debug!("Document");
         match method {
             "add_text" => {
                 self.handle_add_field(params, string_val)?;

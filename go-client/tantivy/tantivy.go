@@ -12,6 +12,7 @@ package tantivy
 import "C"
 import (
 	"encoding/json"
+	"os"
 	"sync"
 	"unsafe"
 
@@ -20,8 +21,15 @@ import (
 
 var doOnce sync.Once
 
-func LibInit() {
+func LibInit(directive ...string) {
+	var initVal string
 	doOnce.Do(func() {
+		if len(directive) == 0 {
+			initVal = "info"
+		} else {
+			initVal = directive[0]
+		}
+		os.Setenv("ELV_RUST_LOG", initVal)
 		C.init()
 	})
 }

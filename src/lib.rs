@@ -5,7 +5,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate tempdir;
-use log::{error, info};
+use log::{debug, error, info};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -89,7 +89,7 @@ impl TantivySession {
     /// # Arguments
     /// * `err`- the error to be translated to a response
     pub fn make_json_error(&mut self, err: &str) {
-        info!("error={}", err);
+        debug!("error={}", err);
         let msg = json!(
             {
             "error" :  err,
@@ -105,7 +105,7 @@ impl TantivySession {
 
     // do_method is a translation from a string json method to an actual call.  All json params are passed
     pub fn do_method(&mut self, method: &str, obj: &str, params: serde_json::Value) {
-        info!("In do_method");
+        debug!("In do_method");
         match obj {
             "query_parser" => {
                 if let Err(e) = self.handle_query_parser(method, params) {
@@ -168,7 +168,7 @@ pub struct Request<'a> {
 /// # Arguments
 /// * `err`- the error to be translated to a response
 pub fn make_json_error(err: &str, id: &str) -> String {
-    info!("error={}", err);
+    debug!("error={}", err);
     let msg = json!(
         {
         "error" :  err,
@@ -180,12 +180,12 @@ pub fn make_json_error(err: &str, id: &str) -> String {
         Ok(x) => x,
         Err(err) => format!("{err}"),
     };
-    info!("returning  result = {}", vr);
+    debug!("returning  result = {}", vr);
     vr
 }
 
 pub fn make_internal_json_error<T>(ek: ErrorKinds) -> InternalCallResult<T> {
-    info!("error={ek}");
+    debug!("error={ek}");
     Err(ek)
 }
 
@@ -265,7 +265,13 @@ pub type InternalCallResult<T> = Result<T, ErrorKinds>;
 ///
 #[no_mangle]
 pub unsafe extern "C" fn init() -> u8 {
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
+    let mut log_level: &str = "info";
+    let parse_val: String;
+    if let Ok(existing_value) = std::env::var("ELV_RUST_LOG") {
+        parse_val = existing_value;
+        log_level = &parse_val;
+    }
+    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(log_level))
         .try_init();
     0
 }
@@ -278,7 +284,7 @@ pub fn test_init() {
 fn do_term(s: &str) -> InternalCallResult<String> {
     match TANTIVY_MAP.lock().as_mut() {
         Ok(t) => {
-            info!("removing {s}");
+            debug!("removing {s}");
             t.remove_entry(s)
                 .ok_or(ErrorKinds::NotExist(format!("Entry {s} is not available")))
         }
@@ -302,7 +308,7 @@ pub unsafe extern "C" fn term(s: *const c_char) -> i8 {
     if !c_str.is_empty() {
         match do_term(c_str) {
             Ok(_) => {
-                info!("tag cleaned");
+                debug!("tag cleaned");
                 0
             }
             Err(_) => {
@@ -398,7 +404,7 @@ pub unsafe extern "C" fn tantivy_jpc(
     ret: &mut *const u8,
     ret_len: *mut usize,
 ) -> i64 {
-    info!("In tantivy_jpc");
+    debug!("In tantivy_jpc");
     let input_string = match str::from_utf8(std::slice::from_raw_parts(msg, len)) {
         Ok(x) => x,
         Err(err) => {

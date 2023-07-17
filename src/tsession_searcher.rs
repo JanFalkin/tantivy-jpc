@@ -1,4 +1,4 @@
-use crate::info;
+use crate::debug;
 use crate::make_internal_json_error;
 use crate::ErrorKinds;
 use crate::InternalCallResult;
@@ -32,7 +32,7 @@ impl TantivySession {
         method: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
-        info!("FuzzySearcher");
+        debug!("FuzzySearcher");
         if method != "fuzzy_searcher" {
             return Err(ErrorKinds::NotExist(format!(
                 "expecting method fuzzy_searcher found {method}"
@@ -71,7 +71,7 @@ impl TantivySession {
                 return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}")))
             }
         };
-        info!("search complete len = {}, td = {:?}", td.0.len(), td);
+        debug!("search complete len = {}, td = {:?}", td.0.len(), td);
         let mut vret = Vec::<ResultElementDoc>::new();
         for (score, doc_address) in td.0 {
             let retrieved_doc = searcher.doc(doc_address)?;
@@ -102,7 +102,7 @@ impl TantivySession {
         method: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
-        info!("Searcher");
+        debug!("Searcher");
         if method != "search" {
             return Err(ErrorKinds::NotExist(format!(
                 "expecting method search found {method}"
@@ -144,7 +144,7 @@ impl TantivySession {
                 return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}")))
             }
         };
-        info!("search complete len = {}, td = {:?}", td.len(), td);
+        debug!("search complete len = {}, td = {:?}", td.len(), td);
         let mut vret: Vec<ResultElement> = Vec::<ResultElement>::new();
         for (score, doc_address) in td {
             let retrieved_doc = searcher.doc(doc_address)?;
@@ -157,7 +157,7 @@ impl TantivySession {
             if explain {
                 s = query.explain(&searcher, doc_address)?.to_pretty_json();
             }
-            info!("retrieved doc {:?}", retrieved_doc.field_values());
+            debug!("retrieved doc {:?}", retrieved_doc.field_values());
             vret.append(&mut vec![ResultElement {
                 doc: named_doc,
                 score,
@@ -165,7 +165,7 @@ impl TantivySession {
             }]);
         }
         self.return_buffer = serde_json::to_string(&vret)?;
-        info!("ret = {}", self.return_buffer);
+        debug!("ret = {}", self.return_buffer);
         Ok(0)
     }
 }
