@@ -88,10 +88,10 @@ func (idx *TIndex) ReaderBuilder() (*TIndexReader, error) {
 	return &TIndexReader{idx}, nil
 }
 
-func (idx *TIndex) SetMultiThreadExecutor(threadCount int32) (*TIndexReader, error) {
+func (idx *TIndex) SetMultiThreadExecutor(threadCount int32) (*TIndex, error) {
 	_, err := idx.callTantivy("index", "set_multithread_executor", msi{"max_threads": threadCount})
 	if err != nil {
 		return nil, err
 	}
-	return &TIndexReader{idx}, nil
+	return idx, nil
 }

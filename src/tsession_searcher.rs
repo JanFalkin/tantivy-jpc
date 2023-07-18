@@ -15,7 +15,6 @@ use tantivy::schema::Field;
 use tantivy::schema::NamedFieldDocument;
 use tantivy::Document;
 use tantivy::SnippetGenerator;
-use tantivy::TERMINATED;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ResultElement {
