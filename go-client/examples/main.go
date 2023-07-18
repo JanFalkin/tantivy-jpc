@@ -18,7 +18,7 @@ limbs and branches that arch over the pool`
 const oldMan = "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."
 
 func doRun() {
-	//tantivy.LibInit("debug")
+	tantivy.LibInit("debug")
 	builder, err := tantivy.NewBuilder("")
 	if err != nil {
 		panic(err)
@@ -134,11 +134,6 @@ func doRun() {
 		panic("expected value not received")
 	}
 
-	rs, err := searcher.RawSearch(0)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(rs)
 	tantivy.ClearSession(builder.ID())
 	fmt.Println("It worked!!!")
 
