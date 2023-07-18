@@ -100,6 +100,16 @@ pub mod tests {
             let s = std::str::from_utf8(&b).unwrap();
             Ok(s.to_string())
         }
+        pub fn raw_search(&mut self, limit: u64) -> InternalCallResult<String> {
+            let b = self.ctx.call_jpc(
+                "searcher".to_string(),
+                "raw_search".to_string(),
+                json!({ "limit": limit }),
+                true,
+            );
+            let s = std::str::from_utf8(&b).unwrap();
+            Ok(s.to_string())
+        }
         pub fn fuzzy_search(&mut self, top: u64) -> InternalCallResult<String> {
             let b = self.ctx.call_jpc(
                 "fuzzy_searcher".to_string(),
@@ -572,6 +582,8 @@ pub mod tests {
                 .unwrap(),
             "The Old Man and the Sea".to_string()
         );
+
+        let _rs = searcher.raw_search(0);
         let _ = crate::do_term(&ti.ctx.id);
     }
 

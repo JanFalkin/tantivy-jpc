@@ -15,6 +15,7 @@ use tantivy::schema::Field;
 use tantivy::schema::NamedFieldDocument;
 use tantivy::Document;
 use tantivy::SnippetGenerator;
+use tantivy::TERMINATED;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ResultElement {
@@ -163,6 +164,65 @@ impl TantivySession {
         Ok(0)
     }
 
+    fn do_raw_search(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
+        const DEF_LIMIT: u64 = 0;
+        let mut limit = match params.as_object() {
+            Some(p) => p.get("limit").and_then(|u| u.as_u64()).unwrap_or(DEF_LIMIT),
+            None => DEF_LIMIT,
+        };
+        let query = match self.dyn_q.as_ref() {
+            Some(dq) => dq,
+            None => {
+                return make_internal_json_error(ErrorKinds::NotExist(
+                    "dyn query not created".to_string(),
+                ));
+            }
+        };
+        let idx = match &self.index {
+            Some(r) => r,
+            None => {
+                return make_internal_json_error(ErrorKinds::NotExist(
+                    "Reader unavailable".to_string(),
+                ))
+            }
+        };
+
+        let rdr = idx.reader()?;
+        let searcher = rdr.searcher();
+
+        if limit == 0 {
+            limit = searcher.num_docs();
+        }
+        let weight = query.weight(tantivy::query::EnableScoring::Disabled {
+            schema: &idx.schema(),
+            searcher_opt: None,
+        })?;
+        let schema = &idx.schema();
+        let mut counter = 1u64;
+        let mut vret: String = "".to_string();
+        for segment_reader in searcher.segment_readers() {
+            let mut scorer = weight.scorer(segment_reader, 0.0)?;
+            let store_reader = segment_reader.get_store_reader(10)?;
+            while scorer.advance() != TERMINATED {
+                let doc_id = scorer.doc();
+                let doc = store_reader.get(doc_id)?;
+                let named_doc = schema.to_named_doc(&doc);
+
+                vret.push_str(format!("{}\n", serde_json::to_string(&named_doc).unwrap()).as_str());
+                counter += 1;
+                if counter > limit {
+                    break;
+                }
+            }
+            if counter > limit {
+                break;
+            }
+        }
+        self.return_buffer = vret;
+        debug!("ret = {}", self.return_buffer);
+        Ok(0)
+    }
+
     fn do_create_snippet_generator(
         &mut self,
         params: serde_json::Value,
@@ -200,6 +260,7 @@ impl TantivySession {
         debug!("Searcher");
         return match method {
             "search" => self.do_search(params),
+            "raw_search" => self.do_raw_search(params),
             "snippet" => self.do_create_snippet_generator(params),
             _ => {
                 error!("unknown method {method}");
