@@ -18,7 +18,7 @@ limbs and branches that arch over the pool`
 const oldMan = "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."
 
 func doRun() {
-	tantivy.LibInit("debug")
+	//tantivy.LibInit("debug")
 	builder, err := tantivy.NewBuilder("")
 	if err != nil {
 		panic(err)
@@ -60,6 +60,11 @@ func doRun() {
 	if err != nil {
 		panic(err)
 	}
+	_, err = idx.SetMultiThreadExecutor(8)
+	if err != nil {
+		panic(err)
+	}
+
 	idw, err := idx.CreateIndexWriter()
 	if err != nil {
 		panic(err)
@@ -100,7 +105,7 @@ func doRun() {
 
 	var sr []map[string]interface{}
 
-	s, err := searcher.Search(false)
+	s, err := searcher.Search(false, 0, true)
 	if err != nil {
 		panic(err)
 	}
@@ -116,7 +121,7 @@ func doRun() {
 	if err != nil {
 		panic(err)
 	}
-	s, err = searcherAgain.Search(false)
+	s, err = searcherAgain.Search(false, 0, true)
 	if err != nil {
 		panic(err)
 	}
@@ -128,6 +133,12 @@ func doRun() {
 	if sr[0]["doc"].(map[string]interface{})["title"].([]interface{})[0] != "Of Mice and Men" {
 		panic("expected value not received")
 	}
+
+	rs, err := searcher.RawSearch(0)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(rs)
 	tantivy.ClearSession(builder.ID())
 	fmt.Println("It worked!!!")
 

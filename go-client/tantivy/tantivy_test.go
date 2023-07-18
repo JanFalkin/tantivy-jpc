@@ -167,7 +167,7 @@ func testExpectedIndex(t *testing.T, idx *TIndex) {
 
 	searcher, err := qp.ParseQuery("title:Sea")
 	require.NoError(t, err)
-	s, err := searcher.Search(false)
+	s, err := searcher.Search(false, 0, true)
 	require.NoError(t, err)
 	results := []map[string]interface{}{}
 	err = json.Unmarshal([]byte(s), &results)
@@ -176,7 +176,7 @@ func testExpectedIndex(t *testing.T, idx *TIndex) {
 
 	searcherAgain, err := qp.ParseQuery("body:mottled")
 	require.NoError(t, err)
-	sAgain, err := searcherAgain.Search(true)
+	sAgain, err := searcherAgain.Search(true, 0, true)
 	require.NoError(t, err)
 	err = json.Unmarshal([]byte(sAgain), &results)
 	require.NoError(t, err)
@@ -196,7 +196,7 @@ func testAltExpectedIndex(t *testing.T, idx *TIndex) {
 
 	searcher, err := qp.ParseQuery("title:Sea AND test:555")
 	require.NoError(t, err)
-	s, err := searcher.Search(false)
+	s, err := searcher.Search(false, 0, true)
 	require.NoError(t, err)
 	results := []map[string]interface{}{}
 	err = json.Unmarshal([]byte(s), &results)
@@ -205,7 +205,7 @@ func testAltExpectedIndex(t *testing.T, idx *TIndex) {
 
 	searcherAgain, err := qp.ParseQuery("body:mottled AND test:666")
 	require.NoError(t, err)
-	s, err = searcherAgain.Search(true)
+	s, err = searcherAgain.Search(true, 0, true)
 	require.NoError(t, err)
 	err = json.Unmarshal([]byte(s), &results)
 	require.NoError(t, err)
@@ -224,7 +224,7 @@ func testExpectedTopIndex(t *testing.T, idx *TIndex) {
 
 	searcher, err := qp.ParseQuery("and")
 	require.NoError(t, err)
-	s, err := searcher.Search(false, uint64(1))
+	s, err := searcher.Search(false, uint64(1), true)
 	require.NoError(t, err)
 	var res []interface{}
 	err = json.Unmarshal([]byte(s), &res)
@@ -354,7 +354,7 @@ func TestIndexer(t *testing.T) {
 
 	searcher, err := qp.ParseQuery("order:1")
 	require.NoError(t, err)
-	s, err := searcher.Search(false)
+	s, err := searcher.Search(false, 0, true)
 	require.NoError(t, err)
 	results := []map[string]interface{}{}
 	err = json.Unmarshal([]byte(s), &results)
@@ -363,7 +363,7 @@ func TestIndexer(t *testing.T) {
 
 	searcherAgain, err := qp.ParseQuery("order:2")
 	require.NoError(t, err)
-	s, err = searcherAgain.Search(true)
+	s, err = searcherAgain.Search(true, 0, true)
 	require.NoError(t, err)
 	err = json.Unmarshal([]byte(s), &results)
 	require.NoError(t, err)

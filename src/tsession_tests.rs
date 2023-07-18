@@ -90,11 +90,11 @@ pub mod tests {
     }
 
     impl TestSearcher<'_> {
-        pub fn search(&mut self, top: u64) -> InternalCallResult<String> {
+        pub fn search(&mut self, top: u64, score: bool) -> InternalCallResult<String> {
             let b = self.ctx.call_jpc(
                 "searcher".to_string(),
                 "search".to_string(),
-                json!({ "top_limit": top }),
+                json!({ "top_limit": top, "scoring":score }),
                 true,
             );
             let s = std::str::from_utf8(&b).unwrap();
@@ -506,7 +506,7 @@ pub mod tests {
         let mut qp = rb.searcher().unwrap();
         qp.for_index(vec!["title".to_string()]).unwrap();
         let mut searcher = qp.parse_query("Sea".to_string()).unwrap();
-        let sres = &searcher.search(1).unwrap();
+        let sres = &searcher.search(1, true).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(
             title_result[0].doc.0.get("title").unwrap()[0]
@@ -514,6 +514,62 @@ pub mod tests {
                 .unwrap(),
             "The Old Man and the Sea".to_string()
         );
+        match crate::do_term(&ti.ctx.id) {
+            Ok(o) => o,
+            Err(e) => panic!("exception = {e}"),
+        };
+    }
+
+    #[test]
+    fn test_raw_search() {
+        crate::test_init();
+        let mut ctx = FakeContext::new();
+        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
+        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        let mut td = match ctx.build(true) {
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}", format!("failed with error {}", e.to_string()));
+            }
+        };
+        let doc1 = match td.create() {
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}", format!("doc1 create failed error {}", e.to_string()));
+            }
+        };
+
+        let doc2 = match td.create() {
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}", format!("doc2 create failed error {}", e.to_string()));
+            }
+        };
+        assert_eq!(
+            td.add_text(0, "The Old Man and the Sea".to_string(), doc1 as u32),
+            0
+        );
+        assert_eq!(td.add_text(1, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish.".to_string(), doc1 as u32), 0);
+        assert_eq!(
+            td.add_text(0, "Of Mice and Men".to_string(), doc2 as u32),
+            0
+        );
+        assert_eq!(td.add_text(1, r#"A few miles south of Soledad, the Salinas River drops in close to the hillside bank and runs deep and green. The water is warm too, for it has slipped twinkling over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up to the strong and rocky Gabilan Mountains, but on the valley side the water is lined with trees—willows fresh and green with every spring, carrying in their lower leaf junctures the debris of the winter's flooding; and sycamores with mottled, white, recumbent limbs and branches that arch over the pool"#.to_string(), doc2 as u32), 0);
+        let mut ti = match td.create_index() {
+            Ok(i) => i,
+            Err(e) => panic!("failed to create index err ={} ", e),
+        };
+        let op1 = ti.add_document(doc1 as i32).unwrap();
+        let op2 = ti.add_document(doc2 as i32).unwrap();
+        assert_eq!(op1, 0);
+        assert_eq!(op2, 1);
+        ti.commit().unwrap();
+        let mut rb = ti.reader_builder().unwrap();
+        let mut qp = rb.searcher().unwrap();
+        qp.for_index(vec!["title".to_string()]).unwrap();
+        let mut searcher = qp.parse_query("title:Sea".to_string()).unwrap();
+        let rs = searcher.raw_search(0).unwrap();
+        info!("return string = {rs}");
         match crate::do_term(&ti.ctx.id) {
             Ok(o) => o,
             Err(e) => panic!("exception = {e}"),
@@ -574,7 +630,7 @@ pub mod tests {
         qp.for_index(vec!["title".to_string(), "body".to_string()])
             .unwrap();
         let mut searcher = qp.parse_query("order:111".to_string()).unwrap();
-        let sres = &searcher.search(1).unwrap();
+        let sres = &searcher.search(1, false).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(
             title_result[0].doc.0.get("title").unwrap()[0]
@@ -583,7 +639,6 @@ pub mod tests {
             "The Old Man and the Sea".to_string()
         );
 
-        let _rs = searcher.raw_search(0);
         let _ = crate::do_term(&ti.ctx.id);
     }
 
@@ -635,10 +690,10 @@ pub mod tests {
         let mut qp = rb.searcher().unwrap();
         qp.for_index(vec!["title".to_string()]).unwrap();
         let mut top_searcher = qp.parse_query("and".to_string()).unwrap();
-        let sres = &top_searcher.search(1).unwrap();
+        let sres = &top_searcher.search(1, true).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(1, title_result.len());
-        let sres = &top_searcher.search(2).unwrap();
+        let sres = &top_searcher.search(2, true).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(2, title_result.len());
         let _ = crate::do_term(&ti.ctx.id);
