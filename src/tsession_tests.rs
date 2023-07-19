@@ -100,10 +100,10 @@ pub mod tests {
             let s = std::str::from_utf8(&b).unwrap();
             Ok(s.to_string())
         }
-        pub fn raw_search(&mut self, limit: u64) -> InternalCallResult<String> {
+        pub fn search_raw(&mut self, limit: u64) -> InternalCallResult<String> {
             let b = self.ctx.call_jpc(
                 "searcher".to_string(),
-                "raw_search".to_string(),
+                "search_raw".to_string(),
                 json!({ "limit": limit }),
                 true,
             );
@@ -123,6 +123,15 @@ pub mod tests {
     }
 
     impl TestQueryParser<'_> {
+        pub fn for_raw(&mut self) -> InternalCallResult<i32> {
+            self.ctx.call_jpc(
+                "query_parser".to_string(),
+                "for_raw".to_string(),
+                json!({}),
+                false,
+            );
+            Ok(0)
+        }
         pub fn for_index(&mut self, v: Vec<String>) -> InternalCallResult<i32> {
             self.ctx.call_jpc(
                 "query_parser".to_string(),
@@ -566,10 +575,14 @@ pub mod tests {
         ti.commit().unwrap();
         let mut rb = ti.reader_builder().unwrap();
         let mut qp = rb.searcher().unwrap();
-        qp.for_index(vec!["title".to_string()]).unwrap();
-        let mut searcher = qp.parse_query("title:Sea".to_string()).unwrap();
-        let rs = searcher.raw_search(0).unwrap();
-        info!("return string = {rs}");
+        qp.for_raw().unwrap();
+        let mut searcher = qp
+            .parse_query("title:Sea OR title:Mice".to_string())
+            .unwrap();
+        let rs = searcher.search_raw(0).unwrap();
+        let expected = r#"{"body":["He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."],"title":["The Old Man and the Sea"]}\n{"body":["A few miles south of Soledad, the Salinas River drops in close to the hillside bank and runs deep and green. The water is warm too, for it has slipped twinkling over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up to the strong and rocky Gabilan Mountains, but on the valley side the water is lined with trees—willows fresh and green with every spring, carrying in their lower leaf junctures the debris of the winter's flooding; and sycamores with mottled, white, recumbent limbs and branches that arch over the pool"],"title":["Of Mice and Men"]}\n"#;
+        let formatted_string = expected.replace("\\n", "\n");
+        assert_eq!(rs, formatted_string);
         match crate::do_term(&ti.ctx.id) {
             Ok(o) => o,
             Err(e) => panic!("exception = {e}"),

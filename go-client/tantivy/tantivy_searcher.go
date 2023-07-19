@@ -16,6 +16,11 @@ func (s *TSearcher) Search(explain bool, topLimit uint64, ordered bool) (string,
 	return s.callTantivy("searcher", "search", args)
 }
 
+func (s *TSearcher) SearchRaw() (string, error) {
+	args := msi{}
+	return s.callTantivy("searcher", "search_raw", args)
+}
+
 func (s *TSearcher) FuzzySearch(topLimit ...uint64) (string, error) {
 	args := msi{}
 	if len(topLimit) >= 1 {
