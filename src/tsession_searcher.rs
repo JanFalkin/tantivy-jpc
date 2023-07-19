@@ -25,6 +25,12 @@ pub struct ResultElement {
     pub explain: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RawElement {
+    pub title: String,
+    pub body: String,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ResultElementDoc {
     pub doc: Document,
@@ -211,8 +217,9 @@ impl TantivySession {
         ))?;
         let schema = &idx.schema();
         let mut counter = 1u64;
-        let mut vret: String = "".to_string();
-        for segment_reader in searcher.segment_readers() {
+        let mut vret: String = "[".to_string();
+        let segr = searcher.segment_readers();
+        for segment_reader in segr {
             let mut scorer = weight.scorer(segment_reader, 10.0)?;
             let store_reader = segment_reader.get_store_reader(10)?;
             loop {
@@ -223,8 +230,17 @@ impl TantivySession {
                 let doc = store_reader.get(doc_id)?;
                 let named_doc = schema.to_named_doc(&doc);
 
-                vret.push_str(format!("{}\n", serde_json::to_string(&named_doc).unwrap()).as_str());
+                if counter == 1 {
+                    vret.push_str(
+                        format!("{}", serde_json::to_string(&named_doc).unwrap()).as_str(),
+                    );
+                } else {
+                    vret.push_str(
+                        format!(",{}", serde_json::to_string(&named_doc).unwrap()).as_str(),
+                    );
+                }
                 counter += 1;
+
                 if counter > limit {
                     break;
                 }
@@ -234,7 +250,7 @@ impl TantivySession {
                 break;
             }
         }
-        self.return_buffer = vret;
+        self.return_buffer = vret + "]";
         debug!("ret = {}", self.return_buffer);
         Ok(0)
     }

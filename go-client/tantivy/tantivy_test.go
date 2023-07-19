@@ -356,10 +356,10 @@ func TestRawSearch(t *testing.T) {
 	require.NoError(t, err)
 	s, err := searcher.SearchRaw()
 	require.NoError(t, err)
-	results := map[string]interface{}{}
+	results := []map[string]interface{}{}
 	err = json.Unmarshal([]byte(s), &results)
 	require.NoError(t, err)
-	require.EqualValues(t, "The Old Man and the Sea", results["title"].([]interface{})[0].(string))
+	require.EqualValues(t, "The Old Man and the Sea", results[0]["title"].([]interface{})[0].(string))
 
 	searcherAgain, err := qp.ParseQuery("order:2")
 	require.NoError(t, err)
@@ -367,7 +367,7 @@ func TestRawSearch(t *testing.T) {
 	require.NoError(t, err)
 	err = json.Unmarshal([]byte(s), &results)
 	require.NoError(t, err)
-	require.EqualValues(t, "Of Mice and Men", results["title"].([]interface{})[0].(string))
+	require.EqualValues(t, "Of Mice and Men", results[0]["title"].([]interface{})[0].(string))
 }
 
 func TestIndexer(t *testing.T) {
