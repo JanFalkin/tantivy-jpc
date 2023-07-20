@@ -118,7 +118,6 @@ impl TantivySession {
         match method {
             "add_text_field" => {
                 let (name, field_type, stored, indexed, fast) = Self::extract_field_params(params)?;
-
                 let mut ti: TextOptions;
                 match field_type {
                     1 => {
@@ -141,13 +140,14 @@ impl TantivySession {
                 if indexed {
                     ti = ti.set_indexing_options(
                         TextFieldIndexing::default()
-                            .set_tokenizer("en_stem")
+                            .set_tokenizer("en_stem_with_stop_words")
                             .set_index_option(IndexRecordOption::WithFreqsAndPositions),
                     );
                 }
                 if fast {
                     ti = ti.set_fast(None);
                 }
+
                 debug!(
                     "add_text_field: name = {}, field_type = {} stored = {}",
                     &name, &field_type, &stored

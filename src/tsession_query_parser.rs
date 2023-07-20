@@ -29,10 +29,6 @@ impl TantivySession {
         debug!("QueryParser");
         if method == "for_index" {
             let mut v_out: Vec<Field> = Vec::<Field>::new();
-            let idx = &self
-                .index
-                .clone()
-                .ok_or(ErrorKinds::NotExist("index is None".to_string()))?;
             debug!("QueryParser aquired");
             let schema = match self.schema.as_ref() {
                 Some(s) => s,
@@ -52,7 +48,19 @@ impl TantivySession {
                     v_out.append(vec![f].as_mut())
                 }
             }
-            self.query_parser = Some(Box::new(QueryParser::for_index(idx, v_out)));
+            let tm = match &self.tokenizer_manager {
+                Some(tm) => tm,
+                None => {
+                    return make_internal_json_error(ErrorKinds::BadInitialization(
+                        "token manager not available on session".to_string(),
+                    ))
+                }
+            };
+            self.query_parser = Some(Box::new(QueryParser::new(
+                schema.clone(),
+                v_out,
+                tm.clone(),
+            )));
             return Ok(0);
         }
         if method == "for_raw" {

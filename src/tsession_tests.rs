@@ -18,7 +18,7 @@ pub mod tests {
 
     use super::*;
     use serde_json::Map;
-    use std::{collections::HashMap, rc::Rc};
+    use std::rc::Rc;
 
     pub static mut GSIZE: usize = 0;
 
@@ -580,7 +580,7 @@ pub mod tests {
             .parse_query("title:Sea OR title:Mice".to_string())
             .unwrap();
         let rs = searcher.search_raw(0).unwrap();
-        let val: Vec<HashMap<String, serde_json::Value>> =
+        let val: Vec<crate::HashMap<String, serde_json::Value>> =
             serde_json::from_slice(rs.as_bytes()).unwrap();
         //let expected = r#"{"body":["He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."],"title":["The Old Man and the Sea"]}\n{"body":["A few miles south of Soledad, the Salinas River drops in close to the hillside bank and runs deep and green. The water is warm too, for it has slipped twinkling over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up to the strong and rocky Gabilan Mountains, but on the valley side the water is lined with trees—willows fresh and green with every spring, carrying in their lower leaf junctures the debris of the winter's flooding; and sycamores with mottled, white, recumbent limbs and branches that arch over the pool"],"title":["Of Mice and Men"]}\n"#;
         //let formatted_string = expected.replace("\\n", "\n");
@@ -689,7 +689,7 @@ pub mod tests {
         );
         assert_eq!(td.add_text(1, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish.".to_string(), doc1 as u32), 0);
         assert_eq!(
-            td.add_text(0, "Of Mice and Men".to_string(), doc2 as u32),
+            td.add_text(0, "Of Mice and Man".to_string(), doc2 as u32),
             0
         );
         assert_eq!(td.add_text(1, r#"A few miles south of Soledad, the Salinas River drops in close to the hillside bank and runs deep and green. The water is warm too, for it has slipped twinkling over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up to the strong and rocky Gabilan Mountains, but on the valley side the water is lined with trees—willows fresh and green with every spring, carrying in their lower leaf junctures the debris of the winter's flooding; and sycamores with mottled, white, recumbent limbs and branches that arch over the pool"#.to_string(), doc2 as u32), 0);
@@ -705,7 +705,7 @@ pub mod tests {
         let mut rb = ti.reader_builder().unwrap();
         let mut qp = rb.searcher().unwrap();
         qp.for_index(vec!["title".to_string()]).unwrap();
-        let mut top_searcher = qp.parse_query("and".to_string()).unwrap();
+        let mut top_searcher = qp.parse_query("Man".to_string()).unwrap();
         let sres = &top_searcher.search(1, true).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(1, title_result.len());

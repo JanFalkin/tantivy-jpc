@@ -27,6 +27,25 @@ impl TantivySession {
             ));
         };
 
+        let tm = match &self.tokenizer_manager {
+            Some(tm) => tm,
+            None => {
+                return make_internal_json_error(ErrorKinds::BadInitialization(
+                    "token manager not available on session".to_string(),
+                ))
+            }
+        };
+
+        const TOKENIZER_NAME: &str = "en_stem_with_stop_words";
+        let tokenizer_cur = match tm.get(TOKENIZER_NAME) {
+            Some(t) => t,
+            None => {
+                return make_internal_json_error(ErrorKinds::BadInitialization(
+                    "Unable to load 'en_stem_with_stop_words'".to_string(),
+                ))
+            }
+        };
+
         let dir_to_use = this.get("directory").and_then(|x| x.as_str()).unwrap_or("");
 
         self.memsize = this
@@ -51,6 +70,7 @@ impl TantivySession {
                     )?
                 }
             };
+            idx.tokenizers().register(TOKENIZER_NAME, tokenizer_cur);
             Ok(Box::new(idx))
         } else {
             debug!("Creating index in RAM");
@@ -68,6 +88,8 @@ impl TantivySession {
                 .index
                 .clone()
                 .ok_or_else(|| ErrorKinds::Other("failed to clone index".to_string()))?;
+
+            r.tokenizers().register(TOKENIZER_NAME, tokenizer_cur);
             Ok(r)
         }
     }
