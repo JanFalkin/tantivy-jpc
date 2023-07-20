@@ -117,7 +117,16 @@ impl TantivySession {
         };
         match method {
             "add_text_field" => {
-                let (name, field_type, stored, indexed, fast) = Self::extract_field_params(params)?;
+                let (name, field_type, stored, indexed, fast) =
+                    Self::extract_field_params(params.clone())?;
+                let m = match params.as_object() {
+                    Some(x) => x,
+                    None => {
+                        return make_internal_json_error(ErrorKinds::BadParams(
+                            "parameters are not a json object".to_string(),
+                        ))
+                    }
+                };
                 let mut ti: TextOptions;
                 match field_type {
                     1 => {
@@ -138,9 +147,16 @@ impl TantivySession {
                     ti = ti | STORED;
                 }
                 if indexed {
+                    const TOKENIZER_DEFAULT: &str = "en_stem_with_stop_words";
+                    let jtok = json!(TOKENIZER_DEFAULT);
+                    let tok = m
+                        .get("tokenizer")
+                        .unwrap_or(&jtok)
+                        .as_str()
+                        .unwrap_or(TOKENIZER_DEFAULT);
                     ti = ti.set_indexing_options(
                         TextFieldIndexing::default()
-                            .set_tokenizer("en_stem_with_stop_words")
+                            .set_tokenizer(tok)
                             .set_index_option(IndexRecordOption::WithFreqsAndPositions),
                     );
                 }

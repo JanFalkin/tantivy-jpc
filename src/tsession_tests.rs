@@ -348,6 +348,7 @@ pub mod tests {
             a_type: i32,
             stored: bool,
             indexed: bool,
+            _tokenizer: String,
         ) -> i64 {
             let j_param = json!({
                 "name":   name,
@@ -462,8 +463,14 @@ pub mod tests {
     fn basic_index() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
         let mut td = match ctx.build(true) {
             Ok(t) => t,
             Err(e) => {
@@ -524,8 +531,14 @@ pub mod tests {
     fn test_raw_search() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
         let mut td = match ctx.build(true) {
             Ok(t) => t,
             Err(e) => {
@@ -588,8 +601,14 @@ pub mod tests {
     fn test_all_fields() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
         assert_eq!(ctx.add_i64_field("order".to_string(), 3, true, true), 2);
 
         let mut td = match ctx.build(true) {
@@ -654,8 +673,14 @@ pub mod tests {
     fn top_limit() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
         let mut td = match ctx.build(true) {
             Ok(t) => t,
             Err(e) => {
@@ -711,7 +736,10 @@ pub mod tests {
     fn basic_index_fuzzy() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
         let mut td = match ctx.build(true) {
             Ok(t) => t,
             Err(e) => {
@@ -785,8 +813,14 @@ pub mod tests {
     fn test_delete_term() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
         assert_eq!(ctx.add_i64_field("order".to_string(), 3, false, true), 2);
 
         let mut td = match ctx.build(true) {
@@ -874,8 +908,14 @@ pub mod tests {
     fn all_simple_fields() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
         assert_eq!(ctx.add_date_field("date".to_string(), 2, true, true), 2);
         assert_eq!(ctx.add_u64_field("someu64".to_string(), 2, true, true), 3);
         assert_eq!(ctx.add_i64_field("somei64".to_string(), 2, true, true), 4);

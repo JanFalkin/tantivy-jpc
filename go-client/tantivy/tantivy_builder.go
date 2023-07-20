@@ -68,15 +68,20 @@ func (tb *TBuilder) standardReturnHandler(s string, err error) (int, error) {
 
 }
 
-func (tb *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool, indexed bool, fast bool) (int, error) {
-	s, err := tb.callTantivy("builder", "add_text_field", msi{
+func (tb *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool, indexed bool, fast bool, tokenizer string) (int, error) {
+	params := msi{
 		"name":    name,
 		"type":    fieldType,
 		"stored":  stored,
 		"indexed": indexed,
 		"id":      tb.JPCId.id,
 		"fast":    fast,
-	})
+	}
+
+	if tokenizer != "" {
+		params["tokenizer"] = tokenizer
+	}
+	s, err := tb.callTantivy("builder", "add_text_field", params)
 	return tb.standardReturnHandler(s, err)
 
 }
