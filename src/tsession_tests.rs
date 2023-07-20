@@ -123,15 +123,6 @@ pub mod tests {
     }
 
     impl TestQueryParser<'_> {
-        pub fn for_raw(&mut self) -> InternalCallResult<i32> {
-            self.ctx.call_jpc(
-                "query_parser".to_string(),
-                "for_raw".to_string(),
-                json!({}),
-                false,
-            );
-            Ok(0)
-        }
         pub fn for_index(&mut self, v: Vec<String>) -> InternalCallResult<i32> {
             self.ctx.call_jpc(
                 "query_parser".to_string(),
@@ -575,7 +566,8 @@ pub mod tests {
         ti.commit().unwrap();
         let mut rb = ti.reader_builder().unwrap();
         let mut qp = rb.searcher().unwrap();
-        qp.for_raw().unwrap();
+        qp.for_index(vec!["title".to_string(), "body".to_string()])
+            .unwrap();
         let mut searcher = qp
             .parse_query("title:Sea OR title:Mice".to_string())
             .unwrap();

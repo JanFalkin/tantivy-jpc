@@ -463,16 +463,16 @@ pub unsafe extern "C" fn tantivy_jpc(
                             "or".to_string(),
                             "such".to_string(),
                             "that".to_string(),
-                            "the".to_string().to_string(),
-                            "their".to_string().to_string(),
-                            "then".to_string().to_string(),
-                            "there".to_string().to_string(),
-                            "these".to_string().to_string(),
-                            "they".to_string().to_string(),
-                            "this".to_string().to_string(),
-                            "to".to_string().to_string(),
-                            "was".to_string().to_string(),
-                            "will".to_string().to_string(),
+                            "the".to_string(),
+                            "their".to_string(),
+                            "then".to_string(),
+                            "there".to_string(),
+                            "these".to_string(),
+                            "they".to_string(),
+                            "this".to_string(),
+                            "to".to_string(),
+                            "was".to_string(),
+                            "will".to_string(),
                             "with".to_string(),
                         ]),
                     };
@@ -482,9 +482,8 @@ pub unsafe extern "C" fn tantivy_jpc(
                     tokenizer_manager.register(
                         "en_stem_with_stop_words",
                         TextAnalyzer::builder(SimpleTokenizer::default())
-                            .filter(LowerCaser)
-                            .filter(stops)
                             .filter(RemoveLongFilter::limit(40))
+                            .filter(stops)
                             .filter(LowerCaser)
                             .filter(Stemmer::new(Language::English))
                             .build(),

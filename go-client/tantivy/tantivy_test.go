@@ -349,7 +349,7 @@ func TestRawSearch(t *testing.T) {
 	qp, err := rb.Searcher()
 	require.NoError(t, err)
 
-	_, err = qp.ForRaw()
+	_, err = qp.ForIndex([]string{"title", "body", "order"})
 	require.NoError(t, err)
 
 	searcher, err := qp.ParseQuery("order:1")
@@ -434,7 +434,7 @@ func TestStops(t *testing.T) {
 	_, err = qp.ForIndex([]string{"title", "body"})
 	require.NoError(t, err)
 
-	searcher, err := qp.ParseQuery("title:The")
+	searcher, err := qp.ParseQuery("title:the")
 	require.NoError(t, err)
 	s, err := searcher.Search(false, 0, true)
 	require.NoError(t, err)

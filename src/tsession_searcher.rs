@@ -76,7 +76,7 @@ impl TantivySession {
 
         let rdr = idx.reader()?;
         let searcher = rdr.searcher();
-        let td = match searcher.search(&*query, &(TopDocs::with_limit(top_limit as usize), Count)) {
+        let td = match searcher.search(query, &(TopDocs::with_limit(top_limit as usize), Count)) {
             Ok(td) => td,
             Err(e) => {
                 return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}")))
@@ -260,7 +260,7 @@ impl TantivySession {
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         let searcher = match &self.leased_item {
-            Some(s) => &*s,
+            Some(s) => s,
             None => {
                 return make_internal_json_error(ErrorKinds::NotExist(
                     "create snippet called with no searcher set".to_string(),
@@ -268,7 +268,7 @@ impl TantivySession {
             }
         };
         let query = match &self.dyn_q {
-            Some(s) => &*s,
+            Some(s) => s,
             None => {
                 return make_internal_json_error(ErrorKinds::NotExist(
                     "create snippet called with no searcher set".to_string(),
@@ -280,7 +280,7 @@ impl TantivySession {
             None => 0,
         };
         let f = Field::from_field_id(field_id as u32);
-        self.snippet_generators = Some(SnippetGenerator::create(&searcher, query, f)?);
+        self.snippet_generators = Some(SnippetGenerator::create(searcher, query, f)?);
         Ok(0)
     }
 
@@ -290,7 +290,7 @@ impl TantivySession {
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         debug!("Searcher");
-        return match method {
+        match method {
             "search" => self.do_search(params),
             "snippet" => self.do_create_snippet_generator(params),
             "search_raw" => self.do_raw_search(params),
@@ -298,6 +298,6 @@ impl TantivySession {
                 error!("unknown method {method}");
                 Err(ErrorKinds::NotExist(format!("unknown method {method}")))
             }
-        };
+        }
     }
 }
