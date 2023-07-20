@@ -4,15 +4,21 @@ type TSearcher struct {
 	*TQueryParser
 }
 
-func (s *TSearcher) Search(explain bool, topLimit ...uint64) (string, error) {
+func (s *TSearcher) Search(explain bool, topLimit uint64, ordered bool) (string, error) {
 	args := msi{}
-	if len(topLimit) >= 1 {
-		args["top_limit"] = topLimit[0]
+	if topLimit >= 1 {
+		args["top_limit"] = topLimit
 	}
 	if explain {
 		args["explain"] = true
 	}
+	args["scoring"] = ordered
 	return s.callTantivy("searcher", "search", args)
+}
+
+func (s *TSearcher) SearchRaw() (string, error) {
+	args := msi{}
+	return s.callTantivy("searcher", "search_raw", args)
 }
 
 func (s *TSearcher) FuzzySearch(topLimit ...uint64) (string, error) {

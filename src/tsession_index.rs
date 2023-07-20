@@ -78,12 +78,12 @@ impl TantivySession {
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         debug!("Index");
-        let idx = match &self.index {
+        let idx: &mut Box<tantivy::Index> = match self.index.as_mut() {
             Some(x) => x,
-            None => match self.create_index(params) {
+            None => match self.create_index(params.clone()) {
                 Ok(x) => {
                     self.index = Some(x);
-                    let r = match self.index.as_ref() {
+                    let r = match self.index.as_mut() {
                         Some(s) => s,
                         None => {
                             return make_internal_json_error(ErrorKinds::Other(
@@ -106,6 +106,20 @@ impl TantivySession {
                 self.index_reader_builder = Some(Box::new(idx.reader_builder()));
                 idx
             }
+            "set_multithread_executor" => {
+                debug!("set_multithread_executor");
+                let m = params.as_object().ok_or(ErrorKinds::BadParams(
+                    "invalid parameters pass to set_multithread_executor".to_string(),
+                ))?;
+                let mt = m
+                    .get("max_threads")
+                    .ok_or(ErrorKinds::BadParams("expected max_threads".to_string()))?
+                    .as_u64()
+                    .ok_or(ErrorKinds::BadParams("max_threads is a u64".to_string()))?;
+                idx.set_multithread_executor(mt as usize)?;
+                idx
+            }
+
             "create" => idx,
             &_ => {
                 return make_internal_json_error(ErrorKinds::UnRecognizedCommand(format!(
