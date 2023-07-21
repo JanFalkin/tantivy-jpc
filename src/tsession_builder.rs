@@ -117,7 +117,7 @@ impl TantivySession {
         };
         match method {
             "add_text_field" => {
-                let (name, field_type, stored, indexed, fast) =
+                let (name, field_type, stored, _indexed, fast) =
                     Self::extract_field_params(params.clone())?;
                 let m = match params.as_object() {
                     Some(x) => x,
@@ -146,7 +146,7 @@ impl TantivySession {
                 if stored {
                     ti = ti | STORED;
                 }
-                if indexed {
+                if field_type != 1 {
                     const TOKENIZER_DEFAULT: &str = "en_stem_with_stop_words";
                     let jtok = json!(TOKENIZER_DEFAULT);
                     let tok = m
