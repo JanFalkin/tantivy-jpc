@@ -4,6 +4,7 @@ use crate::ErrorKinds;
 use crate::InternalCallResult;
 use crate::TantivySession;
 use tantivy::DocAddress;
+use tantivy::Searcher;
 use tantivy::TERMINATED;
 
 extern crate serde;
@@ -16,8 +17,8 @@ use tantivy::collector::{Count, TopDocs};
 use tantivy::query::Query;
 use tantivy::schema::Field;
 use tantivy::schema::NamedFieldDocument;
-use tantivy::Document;
 use tantivy::SnippetGenerator;
+use tantivy::{Document, Index};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ResultElement {
@@ -110,17 +111,7 @@ impl TantivySession {
         Ok(0)
     }
 
-    fn do_docset(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
-        const DEF_LIMIT: u64 = 10;
-        let (top_limit, score) = match params.as_object() {
-            Some(p) => (
-                p.get("top_limit")
-                    .and_then(|u| u.as_u64())
-                    .unwrap_or(DEF_LIMIT),
-                p.get("scoring").and_then(|u| u.as_bool()).unwrap_or(true),
-            ),
-            None => (DEF_LIMIT, true),
-        };
+    fn setup_searcher(&self) -> InternalCallResult<(&dyn Query, &Index, Searcher)> {
         let query = match self.dyn_q.as_ref() {
             Some(dq) => dq,
             None => {
@@ -140,6 +131,21 @@ impl TantivySession {
 
         let rdr = idx.reader()?;
         let searcher = rdr.searcher();
+        Ok((query, idx, searcher))
+    }
+
+    fn do_docset(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
+        const DEF_LIMIT: u64 = 10;
+        let (top_limit, score) = match params.as_object() {
+            Some(p) => (
+                p.get("top_limit")
+                    .and_then(|u| u.as_u64())
+                    .unwrap_or(DEF_LIMIT),
+                p.get("scoring").and_then(|u| u.as_bool()).unwrap_or(true),
+            ),
+            None => (DEF_LIMIT, true),
+        };
+        let (query, idx, searcher) = self.setup_searcher()?;
 
         let enable_scoring = match score {
             false => tantivy::query::EnableScoring::disabled_from_searcher(&searcher),
@@ -188,25 +194,7 @@ impl TantivySession {
             doc_id,
             segment_ord,
         };
-        let idx = match &self.index {
-            Some(r) => r,
-            None => {
-                return make_internal_json_error(ErrorKinds::NotExist(
-                    "Reader unavailable".to_string(),
-                ))
-            }
-        };
-        let query = match self.dyn_q.as_ref() {
-            Some(dq) => dq,
-            None => {
-                return make_internal_json_error(ErrorKinds::NotExist(
-                    "dyn query not created".to_string(),
-                ));
-            }
-        };
-
-        let rdr = idx.reader()?;
-        let searcher = rdr.searcher();
+        let (query, _idx, searcher) = self.setup_searcher()?;
 
         let retrieved_doc = searcher.doc(doc_address)?;
         let schema = self
@@ -241,25 +229,7 @@ impl TantivySession {
             ),
             None => (DEF_LIMIT, false, true),
         };
-        let query = match self.dyn_q.as_ref() {
-            Some(dq) => dq,
-            None => {
-                return make_internal_json_error(ErrorKinds::NotExist(
-                    "dyn query not created".to_string(),
-                ));
-            }
-        };
-        let idx = match &self.index {
-            Some(r) => r,
-            None => {
-                return make_internal_json_error(ErrorKinds::NotExist(
-                    "Reader unavailable".to_string(),
-                ))
-            }
-        };
-
-        let rdr = idx.reader()?;
-        let searcher = rdr.searcher();
+        let (query, idx, searcher) = self.setup_searcher()?;
 
         let enable_scoring = match score {
             false => tantivy::query::EnableScoring::disabled_from_searcher(&searcher),
@@ -308,25 +278,8 @@ impl TantivySession {
             Some(p) => p.get("limit").and_then(|u| u.as_u64()).unwrap_or(DEF_LIMIT),
             None => DEF_LIMIT,
         };
-        let query = match self.dyn_q.as_ref() {
-            Some(dq) => dq,
-            None => {
-                return make_internal_json_error(ErrorKinds::NotExist(
-                    "dyn query not created".to_string(),
-                ));
-            }
-        };
-        let idx = match &self.index {
-            Some(r) => r,
-            None => {
-                return make_internal_json_error(ErrorKinds::NotExist(
-                    "Reader unavailable".to_string(),
-                ))
-            }
-        };
 
-        let rdr = idx.reader()?;
-        let searcher = rdr.searcher();
+        let (query, idx, searcher) = self.setup_searcher()?;
 
         if limit == 0 {
             limit = searcher.num_docs();
