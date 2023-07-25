@@ -146,7 +146,7 @@ impl TantivySession {
                     );
                 }
                 if fast {
-                    ti = ti.set_fast(None);
+                    ti = ti.set_fast();
                 }
                 debug!(
                     "add_text_field: name = {}, field_type = {} stored = {}",
