@@ -18,7 +18,7 @@ serde = "1.0.166"
 serde_json = "1.0.99"
 serde_derive = "1.0.166"
 log = "0.4.14"
-tantivy = { git = "https://github.com/JanFalkin/tantivy.git", rev = "95721970f99712571f14bf5642fa5c8205e077ae" }
+tantivy = { git = "https://github.com/JanFalkin/tantivy.git", rev = "4e18354ced438c8f8f55c869ea4dc573ecdbcd57" }
 lazy_static = "1.4.0"
 env_logger = "0.10.0"
 tempdir = "0.3.7"

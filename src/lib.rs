@@ -481,7 +481,7 @@ pub unsafe extern "C" fn tantivy_jpc(
                     let tokenizer_manager = TokenizerManager::default();
                     tokenizer_manager.register(
                         "en_stem_with_stop_words",
-                        TextAnalyzer::builder(SimpleTokenizer::default())
+                        TextAnalyzer::builder(SimpleTokenizer)
                             .filter(RemoveLongFilter::limit(40))
                             .filter(stops)
                             .filter(LowerCaser)
