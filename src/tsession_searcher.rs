@@ -3,6 +3,8 @@ use crate::make_internal_json_error;
 use crate::ErrorKinds;
 use crate::InternalCallResult;
 use crate::TantivySession;
+use tantivy::DocAddress;
+use tantivy::Searcher;
 use tantivy::TERMINATED;
 
 extern crate serde;
@@ -15,8 +17,8 @@ use tantivy::collector::{Count, TopDocs};
 use tantivy::query::Query;
 use tantivy::schema::Field;
 use tantivy::schema::NamedFieldDocument;
-use tantivy::Document;
 use tantivy::SnippetGenerator;
+use tantivy::{Document, Index};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ResultElement {
@@ -76,7 +78,7 @@ impl TantivySession {
 
         let rdr = idx.reader()?;
         let searcher = rdr.searcher();
-        let td = match searcher.search(&*query, &(TopDocs::with_limit(top_limit as usize), Count)) {
+        let td = match searcher.search(query, &(TopDocs::with_limit(top_limit as usize), Count)) {
             Ok(td) => td,
             Err(e) => {
                 return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}")))
@@ -109,18 +111,7 @@ impl TantivySession {
         Ok(0)
     }
 
-    fn do_search(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
-        const DEF_LIMIT: u64 = 10;
-        let (top_limit, explain, score) = match params.as_object() {
-            Some(p) => (
-                p.get("top_limit")
-                    .and_then(|u| u.as_u64())
-                    .unwrap_or(DEF_LIMIT),
-                p.get("explain").and_then(|u| u.as_bool()).unwrap_or(false),
-                p.get("scoring").and_then(|u| u.as_bool()).unwrap_or(true),
-            ),
-            None => (DEF_LIMIT, false, true),
-        };
+    fn setup_searcher(&self) -> InternalCallResult<(&dyn Query, &Index, Searcher)> {
         let query = match self.dyn_q.as_ref() {
             Some(dq) => dq,
             None => {
@@ -140,6 +131,105 @@ impl TantivySession {
 
         let rdr = idx.reader()?;
         let searcher = rdr.searcher();
+        Ok((query, idx, searcher))
+    }
+
+    fn do_docset(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
+        const DEF_LIMIT: u64 = 10;
+        let (top_limit, score) = match params.as_object() {
+            Some(p) => (
+                p.get("top_limit")
+                    .and_then(|u| u.as_u64())
+                    .unwrap_or(DEF_LIMIT),
+                p.get("scoring").and_then(|u| u.as_bool()).unwrap_or(true),
+            ),
+            None => (DEF_LIMIT, true),
+        };
+        let (query, idx, searcher) = self.setup_searcher()?;
+
+        let enable_scoring = match score {
+            false => tantivy::query::EnableScoring::disabled_from_searcher(&searcher),
+            true => tantivy::query::EnableScoring::enabled_from_searcher(&searcher),
+        };
+
+        let td = match searcher.search_with_executor(
+            query,
+            &TopDocs::with_limit(top_limit as usize),
+            idx.search_executor(),
+            enable_scoring,
+        ) {
+            Ok(td) => td,
+            Err(e) => {
+                return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}")))
+            }
+        };
+        debug!("search complete len = {}, td = {:?}", td.len(), td);
+        let vec_str = td
+            .iter()
+            .map(|(score, doc_address)| {
+                format!(
+                    r#"{{ "score":{},   "segment_ord":{}, "doc_id":{}  }}"#,
+                    score, doc_address.segment_ord, doc_address.doc_id
+                )
+            })
+            .collect::<Vec<String>>()
+            .join(", ");
+        self.return_buffer = format!(r#"{{ "docset" : [{vec_str}] }}"#);
+        debug!("ret = {}", self.return_buffer);
+        Ok(0)
+    }
+
+    fn do_get_document(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
+        let (segment_ord, doc_id, score, explain) = match params.as_object() {
+            Some(p) => (
+                (p.get("segment_ord").and_then(|u| u.as_u64()).unwrap_or(0)) as u32,
+                (p.get("doc_id").and_then(|u| u.as_u64()).unwrap_or(0)) as u32,
+                (p.get("score").and_then(|u| u.as_f64()).unwrap_or(0.0)),
+                p.get("explain").and_then(|u| u.as_bool()).unwrap_or(false),
+            ),
+            None => (0, 0, 0.0, false),
+        };
+
+        let doc_address = DocAddress {
+            doc_id,
+            segment_ord,
+        };
+        let (query, _idx, searcher) = self.setup_searcher()?;
+
+        let retrieved_doc = searcher.doc(doc_address)?;
+        let schema = self
+            .schema
+            .as_ref()
+            .ok_or_else(|| ErrorKinds::NotExist("Schema not present".to_string()))?;
+        let named_doc = schema.to_named_doc(&retrieved_doc);
+        let mut s: String = "noexplain".to_string();
+        if explain {
+            s = query.explain(&searcher, doc_address)?.to_pretty_json();
+        }
+        debug!("retrieved doc {:?}", retrieved_doc.field_values());
+
+        let re = ResultElement {
+            doc: named_doc,
+            score: score as f32,
+            explain: s,
+        };
+        self.return_buffer = serde_json::to_string(&re)?;
+        Ok(0)
+    }
+
+    fn do_search(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
+        const DEF_LIMIT: u64 = 10;
+        let (top_limit, explain, score) = match params.as_object() {
+            Some(p) => (
+                p.get("top_limit")
+                    .and_then(|u| u.as_u64())
+                    .unwrap_or(DEF_LIMIT),
+                p.get("explain").and_then(|u| u.as_bool()).unwrap_or(false),
+                p.get("scoring").and_then(|u| u.as_bool()).unwrap_or(true),
+            ),
+            None => (DEF_LIMIT, false, true),
+        };
+        let (query, idx, searcher) = self.setup_searcher()?;
 
         let enable_scoring = match score {
             false => tantivy::query::EnableScoring::disabled_from_searcher(&searcher),
@@ -188,25 +278,8 @@ impl TantivySession {
             Some(p) => p.get("limit").and_then(|u| u.as_u64()).unwrap_or(DEF_LIMIT),
             None => DEF_LIMIT,
         };
-        let query = match self.dyn_q.as_ref() {
-            Some(dq) => dq,
-            None => {
-                return make_internal_json_error(ErrorKinds::NotExist(
-                    "dyn query not created".to_string(),
-                ));
-            }
-        };
-        let idx = match &self.index {
-            Some(r) => r,
-            None => {
-                return make_internal_json_error(ErrorKinds::NotExist(
-                    "Reader unavailable".to_string(),
-                ))
-            }
-        };
 
-        let rdr = idx.reader()?;
-        let searcher = rdr.searcher();
+        let (query, idx, searcher) = self.setup_searcher()?;
 
         if limit == 0 {
             limit = searcher.num_docs();
@@ -260,7 +333,7 @@ impl TantivySession {
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         let searcher = match &self.leased_item {
-            Some(s) => &*s,
+            Some(s) => s,
             None => {
                 return make_internal_json_error(ErrorKinds::NotExist(
                     "create snippet called with no searcher set".to_string(),
@@ -268,7 +341,7 @@ impl TantivySession {
             }
         };
         let query = match &self.dyn_q {
-            Some(s) => &*s,
+            Some(s) => s,
             None => {
                 return make_internal_json_error(ErrorKinds::NotExist(
                     "create snippet called with no searcher set".to_string(),
@@ -280,7 +353,7 @@ impl TantivySession {
             None => 0,
         };
         let f = Field::from_field_id(field_id as u32);
-        self.snippet_generators = Some(SnippetGenerator::create(&searcher, query, f)?);
+        self.snippet_generators = Some(SnippetGenerator::create(searcher, query, f)?);
         Ok(0)
     }
 
@@ -290,14 +363,16 @@ impl TantivySession {
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         debug!("Searcher");
-        return match method {
+        match method {
             "search" => self.do_search(params),
             "snippet" => self.do_create_snippet_generator(params),
             "search_raw" => self.do_raw_search(params),
+            "docset" => self.do_docset(params),
+            "get_document" => self.do_get_document(params),
             _ => {
                 error!("unknown method {method}");
                 Err(ErrorKinds::NotExist(format!("unknown method {method}")))
             }
-        };
+        }
     }
 }

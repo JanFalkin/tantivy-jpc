@@ -16,29 +16,38 @@ use tantivy::DateOptions;
 macro_rules! impl_simple_type {
     () => {};
     ($self:ident, $handler_params:ident, $handler_obj:ident, $handler_func:ident, $default_type:ident) => {
-        let (name, _field_type, stored, indexed, fast) =
+        let field_params =
             Self::extract_field_params($handler_params)?;
         let mut ni: $default_type;
-        if stored {
+        if field_params.stored {
             ni = $default_type::default().set_stored();
         } else {
             ni = $default_type::default();
         }
-        if indexed {
+        if field_params.indexed {
             ni = ni.set_indexed();
         }
-        if fast {
+        if field_params.fast {
             ni = ni.set_fast();
         }
-        let f = $handler_obj.$handler_func(&name, ni);
+        let f = $handler_obj.$handler_func(&field_params.name, ni);
         $self.return_buffer = json!({ "field": f }).to_string();
     };
 }
 
+//let (name, field_type, stored, _indexed, fast) =
+#[derive(Clone)]
+pub struct ParamData {
+    pub name: String,
+    pub field_type: u64,
+    pub stored: bool,
+    pub indexed: bool,
+    pub fast: bool,
+    pub tokenizer: String,
+}
+
 impl TantivySession {
-    pub fn extract_field_params(
-        params: serde_json::Value,
-    ) -> InternalCallResult<(String, u64, bool, bool, bool)> {
+    pub fn extract_field_params(params: serde_json::Value) -> InternalCallResult<ParamData> {
         let m = match params.as_object() {
             Some(x) => x,
             None => {
@@ -98,7 +107,23 @@ impl TantivySession {
             Some(v) => v.as_bool().unwrap_or(false),
             None => false,
         };
-        Ok((name.to_string(), field_type, stored, indexed, fast))
+
+        const TOKENIZER_DEFAULT: &str = "en_stem_with_stop_words";
+        let jtok = json!(TOKENIZER_DEFAULT);
+        let tok = m
+            .get("tokenizer")
+            .unwrap_or(&jtok)
+            .as_str()
+            .unwrap_or(TOKENIZER_DEFAULT);
+
+        Ok(ParamData {
+            name: name.to_string(),
+            field_type,
+            stored,
+            indexed,
+            fast,
+            tokenizer: tok.to_string(),
+        })
     }
     pub fn handler_builder(
         &mut self,
@@ -117,10 +142,9 @@ impl TantivySession {
         };
         match method {
             "add_text_field" => {
-                let (name, field_type, stored, indexed, fast) = Self::extract_field_params(params)?;
-
+                let field_params = Self::extract_field_params(params)?;
                 let mut ti: TextOptions;
-                match field_type {
+                match field_params.field_type {
                     1 => {
                         debug!("Found STRING");
                         ti = STRING
@@ -135,24 +159,25 @@ impl TantivySession {
                         ))
                     }
                 };
-                if stored {
+                if field_params.stored {
                     ti = ti | STORED;
                 }
-                if indexed {
+                if field_params.field_type != 1 {
                     ti = ti.set_indexing_options(
                         TextFieldIndexing::default()
-                            .set_tokenizer("en_stem")
+                            .set_tokenizer(&field_params.tokenizer)
                             .set_index_option(IndexRecordOption::WithFreqsAndPositions),
                     );
                 }
-                if fast {
+                if field_params.fast {
                     ti = ti.set_fast();
                 }
+
                 debug!(
                     "add_text_field: name = {}, field_type = {} stored = {}",
-                    &name, &field_type, &stored
+                    &field_params.name, &field_params.field_type, &field_params.stored
                 );
-                let f = sb.add_text_field(&name, ti);
+                let f = sb.add_text_field(&field_params.name, ti);
                 self.return_buffer = json!({ "field": f }).to_string();
             }
             "add_date_field" => {

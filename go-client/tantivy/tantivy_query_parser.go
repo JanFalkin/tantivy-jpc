@@ -4,14 +4,6 @@ type TQueryParser struct {
 	*TIndex
 }
 
-func (qp *TQueryParser) ForRaw() (uint, error) {
-	_, err := qp.callTantivy("query_parser", "for_raw", msi{})
-	if err != nil {
-		return 0, err
-	}
-	return 0, nil
-}
-
 func (qp *TQueryParser) ForIndex(fields []string) (uint, error) {
 	_, err := qp.callTantivy("query_parser", "for_index", msi{
 		"fields": fields,

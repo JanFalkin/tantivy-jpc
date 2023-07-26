@@ -20,7 +20,7 @@ type jm = map[string]interface{}
 func makeFuzzyIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	builder, err := NewBuilder(td)
 	require.NoError(t, err)
-	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, true)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, "")
 	require.NoError(t, err)
 	require.EqualValues(t, 0, idxFieldTitle)
 	idxFieldInt, err := builder.AddI64Field("test", INT, true, true, false)
@@ -88,10 +88,10 @@ func makeFuzzyIndex(t *testing.T, td string, useExisting bool) *TIndex {
 func makeIndex(t *testing.T, td string, useExisting bool) *TIndex {
 	builder, err := NewBuilder(td)
 	require.NoError(t, err)
-	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, true)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, "")
 	require.NoError(t, err)
 	require.EqualValues(t, 0, idxFieldTitle)
-	idxFieldBody, err := builder.AddTextField("body", TEXT, true, true, true)
+	idxFieldBody, err := builder.AddTextField("body", TEXT, true, true, "")
 	require.NoError(t, err)
 	require.EqualValues(t, 1, idxFieldBody)
 	idxFieldInt, err := builder.AddI64Field("test", INT, true, true, true)
@@ -222,7 +222,7 @@ func testExpectedTopIndex(t *testing.T, idx *TIndex) {
 	_, err = qp.ForIndex([]string{"title", "body"})
 	require.NoError(t, err)
 
-	searcher, err := qp.ParseQuery("and")
+	searcher, err := qp.ParseQuery("title:Mice OR title:Man")
 	require.NoError(t, err)
 	s, err := searcher.Search(false, uint64(1), true)
 	require.NoError(t, err)
@@ -291,10 +291,10 @@ func TestTantivyIntField(t *testing.T) {
 func TestRawSearch(t *testing.T) {
 	builder, err := NewBuilder("")
 	require.NoError(t, err)
-	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, true)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, "")
 	require.NoError(t, err)
 	require.EqualValues(t, 0, idxFieldTitle)
-	idxFieldBody, err := builder.AddTextField("body", TEXT, true, true, true)
+	idxFieldBody, err := builder.AddTextField("body", TEXT, true, true, "")
 	require.NoError(t, err)
 	require.EqualValues(t, 1, idxFieldBody)
 	idxFieldInt, err := builder.AddI64Field("order", INT, true, true, true)
@@ -349,7 +349,7 @@ func TestRawSearch(t *testing.T) {
 	qp, err := rb.Searcher()
 	require.NoError(t, err)
 
-	_, err = qp.ForRaw()
+	_, err = qp.ForIndex([]string{"title", "body", "order"})
 	require.NoError(t, err)
 
 	searcher, err := qp.ParseQuery("order:1")
@@ -370,13 +370,186 @@ func TestRawSearch(t *testing.T) {
 	require.EqualValues(t, "Of Mice and Men", results[0]["title"].([]interface{})[0].(string))
 }
 
+func TestDocsetSearch(t *testing.T) {
+	builder, err := NewBuilder("")
+	require.NoError(t, err)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, "")
+	require.NoError(t, err)
+	require.EqualValues(t, 0, idxFieldTitle)
+	idxFieldBody, err := builder.AddTextField("body", TEXT, true, true, "")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, idxFieldBody)
+	idxFieldInt, err := builder.AddI64Field("order", INT, true, true, true)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, idxFieldInt)
+	doc, err := builder.Build()
+	require.NoError(t, err)
+	doc1, err := doc.Create()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, doc1)
+	doc2, err := doc.Create()
+	require.NoError(t, err)
+	require.EqualValues(t, 2, doc2)
+	_, err = doc.AddText(idxFieldTitle, "The Old Man and the Sea", doc1)
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldBody, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless.", doc1)
+	require.NoError(t, err)
+	_, err = doc.AddInt(idxFieldInt, 1, doc1)
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldTitle, "Of Mice and Men", doc2)
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldBody, `A few miles south of Soledad, the Salinas River drops in close to the hillside
+	bank and runs deep and green. The water is warm too, for it has slipped twinkling
+	over the yellow sands in the sunlight before reaching the narrow pool. On one
+	side of the river the golden foothill slopes curve up to the strong and rocky
+	Gabilan Mountains, but on the valley side the water is lined with trees—willows
+	fresh and green with every spring, carrying in their lower leaf junctures the
+	debris of the winter's flooding; and sycamores with mottled, white, recumbent
+	limbs and branches that arch over the pool`, doc2)
+	require.NoError(t, err)
+	_, err = doc.AddInt(idxFieldInt, 2, doc2)
+	require.NoError(t, err)
+
+	indexer, err := doc.CreateIndex()
+	require.NoError(t, err)
+
+	idw, err := indexer.CreateIndexWriter()
+	require.NoError(t, err)
+	opst1, err := idw.AddDocument(doc1)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, opst1)
+	opst2, err := idw.AddDocument(doc2)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, opst2)
+	fmt.Printf("op1 = %v op2 = %v\n", opst1, opst2)
+	idCommit, err := idw.Commit()
+	require.NoError(t, err)
+	fmt.Printf("commit id = %v", idCommit)
+
+	rb, err := indexer.ReaderBuilder()
+	require.NoError(t, err)
+	qp, err := rb.Searcher()
+	require.NoError(t, err)
+
+	_, err = qp.ForIndex([]string{"title", "body", "order"})
+	require.NoError(t, err)
+
+	searcher, err := qp.ParseQuery("title:Sea OR title:Mice")
+	require.NoError(t, err)
+	s, err := searcher.Docset(true, 20)
+	require.NoError(t, err)
+	results := map[string]interface{}{}
+	err = json.Unmarshal([]byte(s), &results)
+	require.NoError(t, err)
+	resElement, ok := results["docset"].([]interface{})[0].(jm)
+	require.EqualValues(t, true, ok)
+	sDoc, err := searcher.GetDocument(true, float32(resElement["score"].(float64)), uint32(resElement["doc_id"].(float64)), uint32(resElement["segment_ord"].(float64)))
+	require.NoError(t, err)
+	log.Info(sDoc)
+	err = json.Unmarshal([]byte(sDoc), &results)
+	require.NoError(t, err)
+
+	require.EqualValues(t, "Of Mice and Men", results["doc"].(jm)["title"].([]interface{})[0].(string))
+	resElement, ok = results["docset"].([]interface{})[1].(jm)
+	require.EqualValues(t, true, ok)
+	sDoc, err = searcher.GetDocument(true, float32(resElement["score"].(float64)), uint32(resElement["doc_id"].(float64)), uint32(resElement["segment_ord"].(float64)))
+	require.NoError(t, err)
+	log.Info(sDoc)
+	err = json.Unmarshal([]byte(sDoc), &results)
+	require.NoError(t, err)
+
+	require.EqualValues(t, "The Old Man and the Sea", results["doc"].(jm)["title"].([]interface{})[0].(string))
+
+	// searcherAgain, err := qp.ParseQuery("order:2")
+	// require.NoError(t, err)
+	// s, err = searcherAgain.SearchRaw()
+	// require.NoError(t, err)
+	// err = json.Unmarshal([]byte(s), &results)
+	// require.NoError(t, err)
+	// require.EqualValues(t, "Of Mice and Men", results[0]["title"].([]interface{})[0].(string))
+}
+
+func TestStops(t *testing.T) {
+	builder, err := NewBuilder("")
+	require.NoError(t, err)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, "")
+	require.NoError(t, err)
+	require.EqualValues(t, 0, idxFieldTitle)
+	idxFieldBody, err := builder.AddTextField("body", TEXT, true, true, "")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, idxFieldBody)
+	idxFieldInt, err := builder.AddI64Field("order", INT, true, true, true)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, idxFieldInt)
+	doc, err := builder.Build()
+	require.NoError(t, err)
+	doc1, err := doc.Create()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, doc1)
+	doc2, err := doc.Create()
+	require.NoError(t, err)
+	require.EqualValues(t, 2, doc2)
+	_, err = doc.AddText(idxFieldTitle, "The Old Man and the Sea", doc1)
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldBody, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless.", doc1)
+	require.NoError(t, err)
+	_, err = doc.AddInt(idxFieldInt, 1, doc1)
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldTitle, "Of Mice and Men", doc2)
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldBody, `A few miles south of Soledad, the Salinas River drops in close to the hillside
+	bank and runs deep and green. The water is warm too, for it has slipped twinkling
+	over the yellow sands in the sunlight before reaching the narrow pool. On one
+	side of the river the golden foothill slopes curve up to the strong and rocky
+	Gabilan Mountains, but on the valley side the water is lined with trees—willows
+	fresh and green with every spring, carrying in their lower leaf junctures the
+	debris of the winter's flooding; and sycamores with mottled, white, recumbent
+	limbs and branches that arch over the pool`, doc2)
+	require.NoError(t, err)
+	_, err = doc.AddInt(idxFieldInt, 2, doc2)
+	require.NoError(t, err)
+
+	indexer, err := doc.CreateIndex()
+	require.NoError(t, err)
+
+	idw, err := indexer.CreateIndexWriter()
+	require.NoError(t, err)
+	opst1, err := idw.AddDocument(doc1)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, opst1)
+	opst2, err := idw.AddDocument(doc2)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, opst2)
+	fmt.Printf("op1 = %v op2 = %v\n", opst1, opst2)
+	idCommit, err := idw.Commit()
+	require.NoError(t, err)
+	fmt.Printf("commit id = %v", idCommit)
+
+	rb, err := indexer.ReaderBuilder()
+	require.NoError(t, err)
+	qp, err := rb.Searcher()
+	require.NoError(t, err)
+
+	_, err = qp.ForIndex([]string{"title", "body"})
+	require.NoError(t, err)
+
+	searcher, err := qp.ParseQuery("title:the")
+	require.NoError(t, err)
+	s, err := searcher.Search(false, 0, true)
+	require.NoError(t, err)
+	results := []map[string]interface{}{}
+	err = json.Unmarshal([]byte(s), &results)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, len(results))
+}
+
 func TestIndexer(t *testing.T) {
 	builder, err := NewBuilder("")
 	require.NoError(t, err)
-	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, true)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, "")
 	require.NoError(t, err)
 	require.EqualValues(t, 0, idxFieldTitle)
-	idxFieldBody, err := builder.AddTextField("body", TEXT, true, true, true)
+	idxFieldBody, err := builder.AddTextField("body", TEXT, true, true, "")
 	require.NoError(t, err)
 	require.EqualValues(t, 1, idxFieldBody)
 	idxFieldInt, err := builder.AddI64Field("order", INT, true, true, true)
@@ -504,11 +677,11 @@ func TestTantivyStress(t *testing.T) {
 	fields := []string{"title", "body", "speech", "shot", "action", "logo", "segment", "celeb", "cast"}
 	fieldsLong := []string{"description", "has_field"}
 	for _, f := range fields {
-		fieldIds[f], err = builder.AddTextField(f, TEXT, true, true, true)
+		fieldIds[f], err = builder.AddTextField(f, TEXT, true, true, "")
 		require.NoError(t, err)
 	}
 	for _, f := range fieldsLong {
-		fieldIds[f], err = builder.AddTextField(f, TEXT, true, true, true)
+		fieldIds[f], err = builder.AddTextField(f, TEXT, true, true, "")
 		require.NoError(t, err)
 	}
 
@@ -549,7 +722,7 @@ func TestTantivyStress(t *testing.T) {
 func TestTantivyDeleteTerm(t *testing.T) {
 	builder, err := NewBuilder("")
 	require.NoError(t, err)
-	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, true)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, "")
 	require.NoError(t, err)
 	require.EqualValues(t, 0, idxFieldTitle)
 	idxFieldInt, err := builder.AddI64Field("test", INT, true, true, true)

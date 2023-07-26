@@ -9,7 +9,6 @@ extern crate serde_derive;
 extern crate serde_json;
 use tantivy::query::FuzzyTermQuery;
 use tantivy::query::QueryParser;
-use tantivy::schema::FieldType;
 use tantivy::schema::{Field, Term};
 
 impl TantivySession {
@@ -29,10 +28,6 @@ impl TantivySession {
         debug!("QueryParser");
         if method == "for_index" {
             let mut v_out: Vec<Field> = Vec::<Field>::new();
-            let idx = &self
-                .index
-                .clone()
-                .ok_or(ErrorKinds::NotExist("index is None".to_string()))?;
             debug!("QueryParser aquired");
             let schema = match self.schema.as_ref() {
                 Some(s) => s,
@@ -52,38 +47,18 @@ impl TantivySession {
                     v_out.append(vec![f].as_mut())
                 }
             }
-            self.query_parser = Some(Box::new(QueryParser::for_index(idx, v_out)));
-            return Ok(0);
-        }
-        if method == "for_raw" {
-            let idx = &self
-                .index
-                .clone()
-                .ok_or(ErrorKinds::NotExist("index is None".to_string()))?;
-            debug!("QueryParser aquired");
-            let schema = match self.schema.as_ref() {
-                Some(s) => s,
+            let tm = match &self.tokenizer_manager {
+                Some(tm) => tm,
                 None => {
                     return make_internal_json_error(ErrorKinds::BadInitialization(
-                        "schema not available during for_index".to_string(),
+                        "token manager not available on session".to_string(),
                     ))
                 }
             };
-            let default_fields: Vec<Field> = schema
-                .fields()
-                .into_iter()
-                .filter(|&(_, ref field_entry)| match *field_entry.field_type() {
-                    FieldType::Str(ref text_field_options) => {
-                        text_field_options.get_indexing_options().is_some()
-                    }
-                    _ => false,
-                })
-                .map(|(field, _)| field)
-                .collect();
             self.query_parser = Some(Box::new(QueryParser::new(
                 schema.clone(),
-                default_fields,
-                idx.tokenizers().clone(),
+                v_out,
+                tm.clone(),
             )));
             return Ok(0);
         }

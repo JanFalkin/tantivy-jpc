@@ -18,7 +18,7 @@ pub mod tests {
 
     use super::*;
     use serde_json::Map;
-    use std::{collections::HashMap, rc::Rc};
+    use std::rc::Rc;
 
     pub static mut GSIZE: usize = 0;
 
@@ -90,6 +90,32 @@ pub mod tests {
     }
 
     impl TestSearcher<'_> {
+        pub fn get_document(
+            &mut self,
+            explain: bool,
+            score: f32,
+            segment_ord: u32,
+            doc_id: u32,
+        ) -> InternalCallResult<String> {
+            let b = self.ctx.call_jpc(
+                "searcher".to_string(),
+                "get_document".to_string(),
+                json!({ "explain": explain, "score":score, "segment_ord": segment_ord, "doc_id": doc_id}),
+                true,
+            );
+            let s = std::str::from_utf8(&b).unwrap();
+            Ok(s.to_string())
+        }
+        pub fn docset(&mut self, top: u64, score: bool) -> InternalCallResult<String> {
+            let b = self.ctx.call_jpc(
+                "searcher".to_string(),
+                "docset".to_string(),
+                json!({ "top_limit": top, "scoring":score }),
+                true,
+            );
+            let s = std::str::from_utf8(&b).unwrap();
+            Ok(s.to_string())
+        }
         pub fn search(&mut self, top: u64, score: bool) -> InternalCallResult<String> {
             let b = self.ctx.call_jpc(
                 "searcher".to_string(),
@@ -123,15 +149,6 @@ pub mod tests {
     }
 
     impl TestQueryParser<'_> {
-        pub fn for_raw(&mut self) -> InternalCallResult<i32> {
-            self.ctx.call_jpc(
-                "query_parser".to_string(),
-                "for_raw".to_string(),
-                json!({}),
-                false,
-            );
-            Ok(0)
-        }
         pub fn for_index(&mut self, v: Vec<String>) -> InternalCallResult<i32> {
             self.ctx.call_jpc(
                 "query_parser".to_string(),
@@ -357,6 +374,7 @@ pub mod tests {
             a_type: i32,
             stored: bool,
             indexed: bool,
+            _tokenizer: String,
         ) -> i64 {
             let j_param = json!({
                 "name":   name,
@@ -471,8 +489,14 @@ pub mod tests {
     fn basic_index() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
         let mut td = match ctx.build(true) {
             Ok(t) => t,
             Err(e) => {
@@ -530,11 +554,17 @@ pub mod tests {
     }
 
     #[test]
-    fn test_raw_search() {
+    fn test_docset() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
         let mut td = match ctx.build(true) {
             Ok(t) => t,
             Err(e) => {
@@ -575,12 +605,98 @@ pub mod tests {
         ti.commit().unwrap();
         let mut rb = ti.reader_builder().unwrap();
         let mut qp = rb.searcher().unwrap();
-        qp.for_raw().unwrap();
+        qp.for_index(vec!["title".to_string()]).unwrap();
+        let mut searcher = qp
+            .parse_query("title:Sea OR title:Men".to_string())
+            .unwrap();
+        let sres: serde_json::Value =
+            serde_json::from_str(&searcher.docset(4, true).unwrap()).unwrap();
+
+        info!("RESULT={}", sres);
+
+        let vals = sres
+            .as_object()
+            .unwrap()
+            .get("docset")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        for v in vals {
+            let doc_id = v.get("doc_id").unwrap().as_u64().unwrap() as u32;
+            let score = v.get("score").unwrap().as_f64().unwrap() as f32;
+            let segment_ord = v.get("segment_ord").unwrap().as_u64().unwrap() as u32;
+            let res = searcher
+                .get_document(true, score, segment_ord, doc_id)
+                .unwrap();
+            let _re: ResultElement = serde_json::from_str(&res).unwrap();
+            info!("Result= {res}");
+        }
+
+        match crate::do_term(&ti.ctx.id) {
+            Ok(o) => o,
+            Err(e) => panic!("exception = {e}"),
+        };
+    }
+
+    #[test]
+    fn test_raw_search() {
+        crate::test_init();
+        let mut ctx = FakeContext::new();
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
+        let mut td = match ctx.build(true) {
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}", format!("failed with error {}", e.to_string()));
+            }
+        };
+        let doc1 = match td.create() {
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}", format!("doc1 create failed error {}", e.to_string()));
+            }
+        };
+
+        let doc2 = match td.create() {
+            Ok(t) => t,
+            Err(e) => {
+                panic!("{}", format!("doc2 create failed error {}", e.to_string()));
+            }
+        };
+        assert_eq!(
+            td.add_text(0, "The Old Man and the Sea".to_string(), doc1 as u32),
+            0
+        );
+        assert_eq!(td.add_text(1, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish.".to_string(), doc1 as u32), 0);
+        assert_eq!(
+            td.add_text(0, "Of Mice and Men".to_string(), doc2 as u32),
+            0
+        );
+        assert_eq!(td.add_text(1, r#"A few miles south of Soledad, the Salinas River drops in close to the hillside bank and runs deep and green. The water is warm too, for it has slipped twinkling over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up to the strong and rocky Gabilan Mountains, but on the valley side the water is lined with trees—willows fresh and green with every spring, carrying in their lower leaf junctures the debris of the winter's flooding; and sycamores with mottled, white, recumbent limbs and branches that arch over the pool"#.to_string(), doc2 as u32), 0);
+        let mut ti = match td.create_index() {
+            Ok(i) => i,
+            Err(e) => panic!("failed to create index err ={} ", e),
+        };
+        let op1 = ti.add_document(doc1 as i32).unwrap();
+        let op2 = ti.add_document(doc2 as i32).unwrap();
+        assert_eq!(op1, 0);
+        assert_eq!(op2, 1);
+        ti.commit().unwrap();
+        let mut rb = ti.reader_builder().unwrap();
+        let mut qp = rb.searcher().unwrap();
+        qp.for_index(vec!["title".to_string(), "body".to_string()])
+            .unwrap();
         let mut searcher = qp
             .parse_query("title:Sea OR title:Mice".to_string())
             .unwrap();
         let rs = searcher.search_raw(0).unwrap();
-        let val: Vec<HashMap<String, serde_json::Value>> =
+        let val: Vec<crate::HashMap<String, serde_json::Value>> =
             serde_json::from_slice(rs.as_bytes()).unwrap();
         //let expected = r#"{"body":["He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish."],"title":["The Old Man and the Sea"]}\n{"body":["A few miles south of Soledad, the Salinas River drops in close to the hillside bank and runs deep and green. The water is warm too, for it has slipped twinkling over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up to the strong and rocky Gabilan Mountains, but on the valley side the water is lined with trees—willows fresh and green with every spring, carrying in their lower leaf junctures the debris of the winter's flooding; and sycamores with mottled, white, recumbent limbs and branches that arch over the pool"],"title":["Of Mice and Men"]}\n"#;
         //let formatted_string = expected.replace("\\n", "\n");
@@ -596,8 +712,14 @@ pub mod tests {
     fn test_all_fields() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
         assert_eq!(ctx.add_i64_field("order".to_string(), 3, true, true), 2);
 
         let mut td = match ctx.build(true) {
@@ -662,8 +784,14 @@ pub mod tests {
     fn top_limit() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
         let mut td = match ctx.build(true) {
             Ok(t) => t,
             Err(e) => {
@@ -689,7 +817,7 @@ pub mod tests {
         );
         assert_eq!(td.add_text(1, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish.".to_string(), doc1 as u32), 0);
         assert_eq!(
-            td.add_text(0, "Of Mice and Men".to_string(), doc2 as u32),
+            td.add_text(0, "Of Mice and Man".to_string(), doc2 as u32),
             0
         );
         assert_eq!(td.add_text(1, r#"A few miles south of Soledad, the Salinas River drops in close to the hillside bank and runs deep and green. The water is warm too, for it has slipped twinkling over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up to the strong and rocky Gabilan Mountains, but on the valley side the water is lined with trees—willows fresh and green with every spring, carrying in their lower leaf junctures the debris of the winter's flooding; and sycamores with mottled, white, recumbent limbs and branches that arch over the pool"#.to_string(), doc2 as u32), 0);
@@ -705,7 +833,7 @@ pub mod tests {
         let mut rb = ti.reader_builder().unwrap();
         let mut qp = rb.searcher().unwrap();
         qp.for_index(vec!["title".to_string()]).unwrap();
-        let mut top_searcher = qp.parse_query("and".to_string()).unwrap();
+        let mut top_searcher = qp.parse_query("Man".to_string()).unwrap();
         let sres = &top_searcher.search(1, true).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(1, title_result.len());
@@ -719,7 +847,10 @@ pub mod tests {
     fn basic_index_fuzzy() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
         let mut td = match ctx.build(true) {
             Ok(t) => t,
             Err(e) => {
@@ -793,8 +924,14 @@ pub mod tests {
     fn test_delete_term() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
         assert_eq!(ctx.add_i64_field("order".to_string(), 3, false, true), 2);
 
         let mut td = match ctx.build(true) {
@@ -882,8 +1019,14 @@ pub mod tests {
     fn all_simple_fields() {
         crate::test_init();
         let mut ctx = FakeContext::new();
-        assert_eq!(ctx.add_text_field("title".to_string(), 2, true, true), 0);
-        assert_eq!(ctx.add_text_field("body".to_string(), 2, true, true), 1);
+        assert_eq!(
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            0
+        );
+        assert_eq!(
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            1
+        );
         assert_eq!(ctx.add_date_field("date".to_string(), 2, true, true), 2);
         assert_eq!(ctx.add_u64_field("someu64".to_string(), 2, true, true), 3);
         assert_eq!(ctx.add_i64_field("somei64".to_string(), 2, true, true), 4);

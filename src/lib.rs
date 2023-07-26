@@ -17,6 +17,7 @@ use tantivy::{Searcher, SnippetGenerator, TantivyError};
 use chrono::format::ParseError;
 use lazy_static::lazy_static;
 use std::sync::Mutex;
+use tantivy::tokenizer::*;
 
 extern crate thiserror;
 use thiserror::Error;
@@ -57,6 +58,7 @@ struct TantivySession {
     pub(crate) dyn_q: Option<Box<dyn Query>>,
     pub(crate) fuzzy_q: Option<Box<FuzzyTermQuery>>,
     pub(crate) snippet_generators: Option<SnippetGenerator>,
+    pub(crate) tokenizer_manager: Option<TokenizerManager>,
 
     return_buffer: String,
     memsize: u64,
@@ -82,6 +84,7 @@ impl TantivySession {
             dyn_q: None,
             fuzzy_q: None,
             snippet_generators: None,
+            tokenizer_manager: None,
             return_buffer: String::new(),
             memsize: crate::tsession_index::DEFAULT_INDEX_WRITER_MEM_SIZE,
         }
@@ -435,10 +438,62 @@ pub unsafe extern "C" fn tantivy_jpc(
             match cur_session {
                 Some(x) => x,
                 None => {
+                    let stops = match StopWordFilter::new(Language::English) {
+                        Some(swf) => swf,
+                        None => StopWordFilter::remove(vec![
+                            "a".to_string(),
+                            "an".to_string(),
+                            "and".to_string(),
+                            "are".to_string(),
+                            "as".to_string(),
+                            "at".to_string(),
+                            "be".to_string(),
+                            "but".to_string(),
+                            "by".to_string(),
+                            "for".to_string(),
+                            "if".to_string(),
+                            "in".to_string(),
+                            "into".to_string(),
+                            "is".to_string(),
+                            "it".to_string(),
+                            "no".to_string(),
+                            "not".to_string(),
+                            "of".to_string(),
+                            "on".to_string(),
+                            "or".to_string(),
+                            "such".to_string(),
+                            "that".to_string(),
+                            "the".to_string(),
+                            "their".to_string(),
+                            "then".to_string(),
+                            "there".to_string(),
+                            "these".to_string(),
+                            "they".to_string(),
+                            "this".to_string(),
+                            "to".to_string(),
+                            "was".to_string(),
+                            "will".to_string(),
+                            "with".to_string(),
+                        ]),
+                    };
                     let te = TantivySession::new(json_params.id);
                     tm.insert(json_params.id.to_owned(), te);
+                    let tokenizer_manager = TokenizerManager::default();
+                    tokenizer_manager.register(
+                        "en_stem_with_stop_words",
+                        TextAnalyzer::builder(SimpleTokenizer)
+                            .filter(RemoveLongFilter::limit(40))
+                            .filter(stops)
+                            .filter(LowerCaser)
+                            .filter(Stemmer::new(Language::English))
+                            .build(),
+                    );
                     match tm.get_mut(json_params.id) {
-                        Some(s) => s,
+                        Some(s) => {
+                            s.tokenizer_manager = Some(tokenizer_manager);
+                            s
+                        }
+
                         None => {
                             let msg = ErrorKinds::NotExist(format!(
                                 "Session {} not found",
