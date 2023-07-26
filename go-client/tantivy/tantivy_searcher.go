@@ -4,9 +4,10 @@ type TSearcher struct {
 	*TQueryParser
 }
 
-func (s *TSearcher) Docset(scoring bool, topLimit uint64) (string, error) {
+func (s *TSearcher) Docset(scoring bool, topLimit uint64, offset uint64) (string, error) {
 	return s.callTantivy("searcher", "docset", msi{
 		"top_limit": topLimit,
+		"offset":    offset,
 		"scoring":   scoring,
 	})
 }
@@ -20,7 +21,7 @@ func (s *TSearcher) GetDocument(explain bool, score float32, docId uint32, segOr
 	})
 }
 
-func (s *TSearcher) Search(explain bool, topLimit uint64, ordered bool) (string, error) {
+func (s *TSearcher) Search(explain bool, topLimit uint64, offset uint64, ordered bool) (string, error) {
 	args := msi{}
 	if topLimit >= 1 {
 		args["top_limit"] = topLimit
@@ -29,6 +30,7 @@ func (s *TSearcher) Search(explain bool, topLimit uint64, ordered bool) (string,
 		args["explain"] = true
 	}
 	args["scoring"] = ordered
+	args["offset"] = offset
 	return s.callTantivy("searcher", "search", args)
 }
 
