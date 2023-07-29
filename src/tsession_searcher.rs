@@ -136,14 +136,15 @@ impl TantivySession {
 
     fn do_docset(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
         const DEF_LIMIT: u64 = 10;
-        let (top_limit, score) = match params.as_object() {
+        let (top_limit, offset, score) = match params.as_object() {
             Some(p) => (
                 p.get("top_limit")
                     .and_then(|u| u.as_u64())
                     .unwrap_or(DEF_LIMIT),
+                p.get("offset").and_then(|u| u.as_u64()).unwrap_or(0) as usize,
                 p.get("scoring").and_then(|u| u.as_bool()).unwrap_or(true),
             ),
-            None => (DEF_LIMIT, true),
+            None => (DEF_LIMIT, 0, true),
         };
         let (query, idx, searcher) = self.setup_searcher()?;
 
@@ -154,7 +155,7 @@ impl TantivySession {
 
         let td = match searcher.search_with_executor(
             query,
-            &TopDocs::with_limit(top_limit as usize),
+            &TopDocs::with_limit(top_limit as usize).and_offset(offset),
             idx.search_executor(),
             enable_scoring,
         ) {
@@ -219,15 +220,16 @@ impl TantivySession {
 
     fn do_search(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
         const DEF_LIMIT: u64 = 10;
-        let (top_limit, explain, score) = match params.as_object() {
+        let (top_limit, offset, explain, score) = match params.as_object() {
             Some(p) => (
                 p.get("top_limit")
                     .and_then(|u| u.as_u64())
                     .unwrap_or(DEF_LIMIT),
+                p.get("offset").and_then(|u| u.as_u64()).unwrap_or(0) as usize,
                 p.get("explain").and_then(|u| u.as_bool()).unwrap_or(false),
                 p.get("scoring").and_then(|u| u.as_bool()).unwrap_or(true),
             ),
-            None => (DEF_LIMIT, false, true),
+            None => (DEF_LIMIT, 0, false, true),
         };
         let (query, idx, searcher) = self.setup_searcher()?;
 
@@ -238,7 +240,7 @@ impl TantivySession {
 
         let td = match searcher.search_with_executor(
             query,
-            &TopDocs::with_limit(top_limit as usize),
+            &TopDocs::with_limit(top_limit as usize).and_offset(offset),
             idx.search_executor(),
             enable_scoring,
         ) {
