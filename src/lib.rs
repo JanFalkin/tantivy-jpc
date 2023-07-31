@@ -483,8 +483,8 @@ pub unsafe extern "C" fn tantivy_jpc(
                         "en_stem_with_stop_words",
                         TextAnalyzer::builder(SimpleTokenizer)
                             .filter(RemoveLongFilter::limit(40))
-                            .filter(stops)
                             .filter(LowerCaser)
+                            .filter(stops)
                             .filter(Stemmer::new(Language::English))
                             .build(),
                     );
