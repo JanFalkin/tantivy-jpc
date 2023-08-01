@@ -139,7 +139,7 @@ impl TantivySession {
             }
             "index_reader" => {
                 if let Err(e) = self.handle_index_reader(method, params) {
-                    return self.make_json_error(&format!("handle index serde_json::from_str(std::str::from_utf8(s).unwrap()).unwrap();reader error={e}"));
+                    return self.make_json_error(&format!("handle_index_reader error={e}"));
                 };
             }
             "document" => {

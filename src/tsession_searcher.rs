@@ -304,16 +304,22 @@ impl TantivySession {
                 }
                 let doc = store_reader.get(doc_id)?;
                 let named_doc = schema.to_named_doc(&doc);
-
-                if counter == 1 {
-                    vret.push_str(
-                        format!("{}", serde_json::to_string(&named_doc).unwrap()).as_str(),
-                    );
-                } else {
-                    vret.push_str(
-                        format!(",{}", serde_json::to_string(&named_doc).unwrap()).as_str(),
-                    );
-                }
+                let match_string: String;
+                vret.push_str(match serde_json::to_string(&named_doc) {
+                    Ok(s) => {
+                        if counter == 1 {
+                            match_string = s;
+                        } else {
+                            match_string = format!(",{s}");
+                        }
+                        &match_string
+                    }
+                    Err(e) => {
+                        return make_internal_json_error(ErrorKinds::Search(format!(
+                            "json error = {e}"
+                        )))
+                    }
+                });
                 counter += 1;
 
                 if counter > limit {
