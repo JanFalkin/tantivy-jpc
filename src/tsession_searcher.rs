@@ -340,7 +340,7 @@ impl TantivySession {
         &mut self,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
-        let searcher = match &self.leased_item {
+        let searcher = match &self.searcher {
             Some(s) => s,
             None => {
                 return make_internal_json_error(ErrorKinds::NotExist(
