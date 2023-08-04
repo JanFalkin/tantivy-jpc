@@ -12,6 +12,7 @@ extern crate serde_derive;
 extern crate serde_json;
 use log::error;
 use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::Write;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::query::Query;
@@ -330,7 +331,7 @@ impl TantivySession {
         Ok(0)
     }
 
-    fn do_create_snippet_generator(
+    fn do_create_snippets(
         &mut self,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
@@ -354,8 +355,47 @@ impl TantivySession {
             Some(p) => p.get("field_id").and_then(|u| u.as_u64()).unwrap_or(0),
             None => 0,
         };
+        let def_vec = &Vec::<serde_json::Value>::default();
+        let docs: &Vec<serde_json::Value> = match params.as_object() {
+            Some(p) => p.get("documents").and_then(|u| u.as_array()).unwrap_or(def_vec),
+            None => {
+                return make_internal_json_error(ErrorKinds::NotExist(
+                    "create snippet called with no searcher set".to_string(),
+                ))
+            }
+        };
+        let mut ret_map = HashMap::<usize, String>::new();
         let f = Field::from_field_id(field_id as u32);
-        self.snippet_generators = Some(SnippetGenerator::create(searcher, query, f)?);
+        for v in docs{
+            let sg = SnippetGenerator::create(searcher, query, f)?;
+            let d = match &self.doc {
+                Some(dv) => dv,
+                None => {
+                    return make_internal_json_error(ErrorKinds::BadInitialization(
+                        "add_text with no doucments created".to_string(),
+                    ))
+                }
+            };
+            let docid = match v.as_u64(){
+                Some(id) => id,
+                None =>  {return make_internal_json_error(ErrorKinds::NotExist(
+                    "create snippet called with no searcher set".to_string(),
+                ))},
+            };
+            let cur_doc = match d.get(&(docid as usize)){
+                Some(doc) => doc,
+                None =>{return make_internal_json_error(ErrorKinds::NotExist(
+                    "doc not in set".to_string(),
+                ))},
+            };
+            ret_map.insert(docid as usize, sg.snippet_from_doc(cur_doc).to_html());
+        }
+        self.return_buffer = match serde_json::to_string_pretty(&ret_map){
+            Ok(s) => s,
+            Err(e) => {return make_internal_json_error(ErrorKinds::BadParams(
+                format!("to_string_pretty failed {e}"),
+            ))},
+        };
         Ok(0)
     }
 
@@ -367,7 +407,7 @@ impl TantivySession {
         debug!("Searcher");
         match method {
             "search" => self.do_search(params),
-            "snippet" => self.do_create_snippet_generator(params),
+            "snippet" => self.do_create_snippets(params),
             "search_raw" => self.do_raw_search(params),
             "docset" => self.do_docset(params),
             "get_document" => self.do_get_document(params),

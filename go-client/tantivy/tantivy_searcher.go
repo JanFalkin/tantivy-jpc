@@ -46,3 +46,9 @@ func (s *TSearcher) FuzzySearch(topLimit ...uint64) (string, error) {
 	}
 	return s.callTantivy("fuzzy_searcher", "fuzzy_searcher", msi{})
 }
+
+func (s *TSearcher) Snippets(fieldId uint64, docs []uint) (string, error) {
+	args := msi{"field_id": fieldId, "documents": docs}
+
+	return s.callTantivy("searcher", "snippet", args)
+}
