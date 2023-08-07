@@ -120,8 +120,6 @@ func doRun() {
 	if err != nil {
 		panic(err)
 	}
-	snip, err := searcher.Snippets(uint64(idxFieldTitle), []uint{doc1})
-	fmt.Println(snip)
 	searcherAgain, err := qp.ParseQuery("order:222")
 	if err != nil {
 		panic(err)
