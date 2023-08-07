@@ -12,12 +12,13 @@ func (s *TSearcher) Docset(scoring bool, topLimit uint64, offset uint64) (string
 	})
 }
 
-func (s *TSearcher) GetDocument(explain bool, score float32, docId uint32, segOrd uint32) (string, error) {
+func (s *TSearcher) GetDocument(explain bool, score float32, docId uint32, segOrd uint32, snippetField int64) (string, error) {
 	return s.callTantivy("searcher", "get_document", msi{
-		"segment_ord": segOrd,
-		"doc_id":      docId,
-		"score":       score,
-		"explain":     explain,
+		"segment_ord":   segOrd,
+		"doc_id":        docId,
+		"score":         score,
+		"explain":       explain,
+		"snippet_field": snippetField,
 	})
 }
 
