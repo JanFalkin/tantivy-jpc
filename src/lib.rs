@@ -53,7 +53,7 @@ struct TantivySession {
     pub(crate) index: Option<Box<tantivy::Index>>,
     pub(crate) indexwriter: Option<Box<tantivy::IndexWriter>>,
     pub(crate) index_reader_builder: Option<Box<tantivy::IndexReaderBuilder>>,
-    pub(crate) leased_item: Option<Box<Searcher>>,
+    pub(crate) searcher: Option<Box<Searcher>>,
     pub(crate) query_parser: Option<Box<QueryParser>>,
     pub(crate) dyn_q: Option<Box<dyn Query>>,
     pub(crate) fuzzy_q: Option<Box<FuzzyTermQuery>>,
@@ -78,7 +78,7 @@ impl TantivySession {
             index: None,
             indexwriter: None,
             index_reader_builder: None,
-            leased_item: None,
+            searcher: None,
             query_parser: None,
             dyn_q: None,
             fuzzy_q: None,
@@ -137,7 +137,7 @@ impl TantivySession {
             }
             "index_reader" => {
                 if let Err(e) = self.handle_index_reader(method, params) {
-                    return self.make_json_error(&format!("handle index serde_json::from_str(std::str::from_utf8(s).unwrap()).unwrap();reader error={e}"));
+                    return self.make_json_error(&format!("handle_index_reader error={e}"));
                 };
             }
             "document" => {

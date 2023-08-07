@@ -335,7 +335,7 @@ impl TantivySession {
                     {
                         Ok(idx_read) => {
                             debug!("Got leased item");
-                            self.leased_item = Some(Box::new(idx_read.searcher()))
+                            self.searcher = Some(Box::new(idx_read.searcher()))
                         }
                         Err(err) => {
                             return make_internal_json_error(ErrorKinds::Other(format!(
