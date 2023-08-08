@@ -134,6 +134,33 @@ impl TantivySession {
         Ok((query, idx, searcher))
     }
 
+    fn do_search_execute(
+        &self,
+        searcher: &Searcher,
+        query: &dyn Query,
+        idx: &Index,
+        offset: usize,
+        top_limit: u64,
+        score: bool,
+    ) -> Result<Vec<(f32, DocAddress)>, ErrorKinds> {
+        let enable_scoring = match score {
+            false => tantivy::query::EnableScoring::disabled_from_searcher(searcher),
+            true => tantivy::query::EnableScoring::enabled_from_searcher(searcher),
+        };
+
+        match searcher.search_with_executor(
+            query,
+            &TopDocs::with_limit(top_limit as usize).and_offset(offset),
+            idx.search_executor(),
+            enable_scoring,
+        ) {
+            Ok(td) => Ok(td),
+            Err(e) => make_internal_json_error(ErrorKinds::Search(format!(
+                "do_search_execute tantivy error = {e}"
+            ))),
+        }
+    }
+
     fn do_docset(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
         const DEF_LIMIT: u64 = 10;
         let (top_limit, offset, score) = match params.as_object() {
@@ -148,22 +175,7 @@ impl TantivySession {
         };
         let (query, idx, searcher) = self.setup_searcher()?;
 
-        let enable_scoring = match score {
-            false => tantivy::query::EnableScoring::disabled_from_searcher(&searcher),
-            true => tantivy::query::EnableScoring::enabled_from_searcher(&searcher),
-        };
-
-        let td = match searcher.search_with_executor(
-            query,
-            &TopDocs::with_limit(top_limit as usize).and_offset(offset),
-            idx.search_executor(),
-            enable_scoring,
-        ) {
-            Ok(td) => td,
-            Err(e) => {
-                return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}")))
-            }
-        };
+        let td = self.do_search_execute(&searcher, query, idx, offset, top_limit, score)?;
         debug!("search complete len = {}, td = {:?}", td.len(), td);
         let vec_str = td
             .iter()
@@ -246,22 +258,8 @@ impl TantivySession {
         };
         let (query, idx, searcher) = self.setup_searcher()?;
 
-        let enable_scoring = match score {
-            false => tantivy::query::EnableScoring::disabled_from_searcher(&searcher),
-            true => tantivy::query::EnableScoring::enabled_from_searcher(&searcher),
-        };
+        let td = self.do_search_execute(&searcher, query, idx, offset, top_limit, score)?;
 
-        let td = match searcher.search_with_executor(
-            query,
-            &TopDocs::with_limit(top_limit as usize).and_offset(offset),
-            idx.search_executor(),
-            enable_scoring,
-        ) {
-            Ok(td) => td,
-            Err(e) => {
-                return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}")))
-            }
-        };
         let snip_field: tantivy::schema::Field;
         let snippet_generator: Option<SnippetGenerator>;
         let snippets = field_id >= 0;
@@ -322,7 +320,6 @@ impl TantivySession {
         if limit == 0 {
             limit = searcher.num_docs();
         }
-        //let csq = tantivy::query::ConstScoreQuery::new((**query).box_clone(), 1.0);
         let weight = query.weight(tantivy::query::EnableScoring::disabled_from_searcher(
             &searcher,
         ))?;
