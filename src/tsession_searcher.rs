@@ -210,7 +210,8 @@ impl TantivySession {
         };
         let snip_field = sc.get_field(v)?;
         //let snip_field = tantivy::schema::Field::from_field_id(*v as u32);
-        let snippet_generator = SnippetGenerator::create(searcher, query, snip_field)?;
+        let mut snippet_generator = SnippetGenerator::create(searcher, query, snip_field)?;
+        snippet_generator.set_max_num_chars(1000);
         Ok(snippet_generator.snippet_from_doc(retrieved_doc).to_html())
     }
 
