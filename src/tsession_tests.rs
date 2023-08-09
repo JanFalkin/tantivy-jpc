@@ -96,7 +96,7 @@ pub mod tests {
             score: f32,
             segment_ord: u32,
             doc_id: u32,
-            field_id: i64,
+            field_id: Vec<i64>,
         ) -> InternalCallResult<String> {
             let b = self.ctx.call_jpc(
                 "searcher".to_string(),
@@ -121,12 +121,12 @@ pub mod tests {
             &mut self,
             top: u64,
             score: bool,
-            snippets: bool,
+            snippets: Vec<i64>,
         ) -> InternalCallResult<String> {
             let b = self.ctx.call_jpc(
                 "searcher".to_string(),
                 "search".to_string(),
-                json!({ "top_limit": top, "scoring":score, "snippets":snippets }),
+                json!({ "top_limit": top, "scoring":score, "snippet_field":snippets }),
                 true,
             );
             let s = std::str::from_utf8(&b).unwrap();
@@ -545,7 +545,7 @@ pub mod tests {
         let mut qp = rb.searcher().unwrap();
         qp.for_index(vec!["title".to_string()]).unwrap();
         let mut searcher = qp.parse_query("Sea".to_string()).unwrap();
-        let sres = &searcher.search(1, true, false).unwrap();
+        let sres = &searcher.search(1, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(
             title_result[0].doc.0.get("title").unwrap()[0]
@@ -614,7 +614,7 @@ pub mod tests {
         qp.for_index(vec!["title".to_string(), "body".to_string()])
             .unwrap();
         let mut searcher = qp.parse_query("sycamores".to_string()).unwrap();
-        let sres = &searcher.search(10, true, true).unwrap();
+        let sres = &searcher.search(10, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(
             title_result[0].doc.0.get("title").unwrap()[0]
@@ -701,7 +701,7 @@ pub mod tests {
             let score = v.get("score").unwrap().as_f64().unwrap() as f32;
             let segment_ord = v.get("segment_ord").unwrap().as_u64().unwrap() as u32;
             let res = searcher
-                .get_document(true, score, segment_ord, doc_id, -1)
+                .get_document(true, score, segment_ord, doc_id, vec![-1])
                 .unwrap();
             let _re: ResultElement = serde_json::from_str(&res).unwrap();
             info!("Result= {res}");
@@ -785,11 +785,13 @@ pub mod tests {
             let score = v.get("score").unwrap().as_f64().unwrap() as f32;
             let segment_ord = v.get("segment_ord").unwrap().as_u64().unwrap() as u32;
             let res = searcher
-                .get_document(true, score, segment_ord, doc_id, 1)
+                .get_document(true, score, segment_ord, doc_id, vec![1])
                 .unwrap();
             let re: ResultElement = serde_json::from_str(&res).unwrap();
-            assert!(re.snippet_html != None && re.snippet_html != Some("".to_string()));
-            assert_eq!(re.snippet_html,Some("<b>twinkling</b> over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up".to_string()));
+            assert!(re.snippet_html != None);
+            let mut hm = crate::HashMap::<u64, String>::new();
+            hm.insert(1, "<b>twinkling</b> over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up".to_string());
+            assert_eq!(re.snippet_html, Some(hm));
             info!("Result= {res}");
         }
 
@@ -929,7 +931,7 @@ pub mod tests {
         qp.for_index(vec!["title".to_string(), "body".to_string()])
             .unwrap();
         let mut searcher = qp.parse_query("order:111".to_string()).unwrap();
-        let sres = &searcher.search(1, false, false).unwrap();
+        let sres = &searcher.search(1, false, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(
             title_result[0].doc.0.get("title").unwrap()[0]
@@ -995,10 +997,10 @@ pub mod tests {
         let mut qp = rb.searcher().unwrap();
         qp.for_index(vec!["title".to_string()]).unwrap();
         let mut top_searcher = qp.parse_query("Man".to_string()).unwrap();
-        let sres = &top_searcher.search(1, true, false).unwrap();
+        let sres = &top_searcher.search(1, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(1, title_result.len());
-        let sres = &top_searcher.search(2, true, false).unwrap();
+        let sres = &top_searcher.search(2, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(2, title_result.len());
         let _ = crate::do_term(&ti.ctx.id);

@@ -10,6 +10,7 @@ use tantivy::TERMINATED;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
+use crate::HashMap;
 use log::error;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Write;
@@ -24,7 +25,7 @@ pub struct ResultElement {
     pub doc: NamedFieldDocument,
     pub score: f32,
     pub explain: String,
-    pub snippet_html: Option<String>,
+    pub snippet_html: Option<HashMap<u64, String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -192,18 +193,35 @@ impl TantivySession {
         Ok(0)
     }
 
+    fn make_snippet(
+        &self,
+        v: &i64,
+        searcher: &Searcher,
+        query: &dyn Query,
+        retrieved_doc: &Document,
+    ) -> Result<String, ErrorKinds> {
+        let snip_field = tantivy::schema::Field::from_field_id(*v as u32);
+        let snippet_generator = SnippetGenerator::create(searcher, query, snip_field)?;
+        Ok(snippet_generator.snippet_from_doc(retrieved_doc).to_html())
+    }
+
     fn do_get_document(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
-        let (segment_ord, doc_id, score, explain, field_id) = match params.as_object() {
+        let (segment_ord, doc_id, score, explain, fields) = match params.as_object() {
             Some(p) => (
                 (p.get("segment_ord").and_then(|u| u.as_u64()).unwrap_or(0)) as u32,
                 (p.get("doc_id").and_then(|u| u.as_u64()).unwrap_or(0)) as u32,
                 (p.get("score").and_then(|u| u.as_f64()).unwrap_or(0.0)),
                 p.get("explain").and_then(|u| u.as_bool()).unwrap_or(false),
                 p.get("snippet_field")
-                    .and_then(|u| u.as_i64())
-                    .unwrap_or(-1),
+                    .and_then(|u| u.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|item| item.as_i64())
+                            .collect::<Vec<i64>>()
+                    })
+                    .unwrap_or_else(|| vec![]), // Default to an empty vector
             ),
-            None => (0, 0, 0.0, false, -1),
+            None => (0, 0, 0.0, false, vec![]), // Default values
         };
 
         let doc_address = DocAddress {
@@ -224,17 +242,25 @@ impl TantivySession {
         }
         debug!("retrieved doc {:?}", retrieved_doc.field_values());
 
+        let mut hm: HashMap<u64, String> = HashMap::new();
+
+        fields.iter().for_each(|&v| {
+            if v > 0 {
+                let e = match self.make_snippet(&v, &searcher, query, &retrieved_doc) {
+                    Ok(g) => (v, g),
+                    Err(e) => (-1, e.to_string()),
+                };
+                if e.0 >= 0 {
+                    hm.insert(e.0 as u64, e.1);
+                }
+            }
+        });
+
         let re = ResultElement {
             doc: named_doc,
             score: score as f32,
             explain: s,
-            snippet_html: if field_id >= 0 {
-                let snip_field = tantivy::schema::Field::from_field_id(field_id as u32);
-                let snippet_generator = SnippetGenerator::create(&searcher, query, snip_field)?;
-                Some(snippet_generator.snippet_from_doc(&retrieved_doc).to_html())
-            } else {
-                None
-            },
+            snippet_html: Some(hm),
         };
         self.return_buffer = serde_json::to_string(&re)?;
         Ok(0)
@@ -242,7 +268,7 @@ impl TantivySession {
 
     fn do_search(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
         const DEF_LIMIT: u64 = 10;
-        let (top_limit, offset, explain, score, field_id) = match params.as_object() {
+        let (top_limit, offset, explain, score, fields) = match params.as_object() {
             Some(p) => (
                 p.get("top_limit")
                     .and_then(|u| u.as_u64())
@@ -251,25 +277,23 @@ impl TantivySession {
                 p.get("explain").and_then(|u| u.as_bool()).unwrap_or(false),
                 p.get("scoring").and_then(|u| u.as_bool()).unwrap_or(true),
                 p.get("snippet_field")
-                    .and_then(|u| u.as_i64())
-                    .unwrap_or(-1),
+                    .and_then(|u| u.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|item| item.as_i64())
+                            .collect::<Vec<i64>>()
+                    })
+                    .unwrap_or_else(|| vec![]), // Default to an empty vector
             ),
-            None => (DEF_LIMIT, 0, false, true, -1),
+            None => (DEF_LIMIT, 0, false, true, vec![]),
         };
         let (query, idx, searcher) = self.setup_searcher()?;
 
         let td = self.do_search_execute(&searcher, query, idx, offset, top_limit, score)?;
 
-        let snip_field: tantivy::schema::Field;
-        let snippet_generator: Option<SnippetGenerator>;
-        let snippets = field_id >= 0;
+        let snippets = !fields.is_empty();
 
-        if snippets {
-            snip_field = tantivy::schema::Field::from_field_id(field_id as u32);
-            snippet_generator = Some(SnippetGenerator::create(&searcher, query, snip_field)?);
-        } else {
-            snippet_generator = None;
-        }
+        let mut hm = HashMap::new();
 
         debug!("search complete len = {}, td = {:?}", td.len(), td);
         let mut vret: Vec<ResultElement> = Vec::<ResultElement>::new();
@@ -284,23 +308,25 @@ impl TantivySession {
             if explain {
                 s = query.explain(&searcher, doc_address)?.to_pretty_json();
             }
-            if snippets {}
+            if snippets {
+                fields.iter().for_each(|v: &i64| {
+                    if *v > 0 {
+                        let e = match self.make_snippet(v, &searcher, query, &retrieved_doc) {
+                            Ok(g) => (v, g),
+                            Err(e) => (&(-1 as i64), e.to_string()),
+                        };
+                        if *e.0 >= 0 {
+                            hm.insert(*e.0 as u64, e.1);
+                        }
+                    }
+                });
+            }
             debug!("retrieved doc {:?}", retrieved_doc.field_values());
             vret.append(&mut vec![ResultElement {
                 doc: named_doc,
                 score,
                 explain: s,
-                snippet_html: if snippets {
-                    Some(
-                        snippet_generator
-                            .as_ref()
-                            .unwrap()
-                            .snippet_from_doc(&retrieved_doc)
-                            .to_html(),
-                    )
-                } else {
-                    None
-                },
+                snippet_html: Some(hm.clone()),
             }]);
         }
         self.return_buffer = serde_json::to_string(&vret)?;

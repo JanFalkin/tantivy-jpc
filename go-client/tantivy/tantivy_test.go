@@ -167,7 +167,7 @@ func testExpectedIndex(t *testing.T, idx *TIndex) {
 
 	searcher, err := qp.ParseQuery("title:Sea")
 	require.NoError(t, err)
-	s, err := searcher.Search(false, 0, 0, true, NOSNIPPET)
+	s, err := searcher.Search(false, 0, 0, true)
 	require.NoError(t, err)
 	results := []map[string]interface{}{}
 	err = json.Unmarshal([]byte(s), &results)
@@ -176,7 +176,7 @@ func testExpectedIndex(t *testing.T, idx *TIndex) {
 
 	searcherAgain, err := qp.ParseQuery("body:mottled")
 	require.NoError(t, err)
-	sAgain, err := searcherAgain.Search(true, 0, 0, true, NOSNIPPET)
+	sAgain, err := searcherAgain.Search(true, 0, 0, true)
 	require.NoError(t, err)
 	err = json.Unmarshal([]byte(sAgain), &results)
 	require.NoError(t, err)
@@ -196,7 +196,7 @@ func testAltExpectedIndex(t *testing.T, idx *TIndex) {
 
 	searcher, err := qp.ParseQuery("title:Sea AND test:555")
 	require.NoError(t, err)
-	s, err := searcher.Search(false, 0, 0, true, NOSNIPPET)
+	s, err := searcher.Search(false, 0, 0, true)
 	require.NoError(t, err)
 	results := []map[string]interface{}{}
 	err = json.Unmarshal([]byte(s), &results)
@@ -205,7 +205,7 @@ func testAltExpectedIndex(t *testing.T, idx *TIndex) {
 
 	searcherAgain, err := qp.ParseQuery("body:mottled AND test:666")
 	require.NoError(t, err)
-	s, err = searcherAgain.Search(true, 0, 0, true, NOSNIPPET)
+	s, err = searcherAgain.Search(true, 0, 0, true)
 	require.NoError(t, err)
 	err = json.Unmarshal([]byte(s), &results)
 	require.NoError(t, err)
@@ -224,7 +224,7 @@ func testExpectedTopIndex(t *testing.T, idx *TIndex) {
 
 	searcher, err := qp.ParseQuery("title:Mice OR title:Man")
 	require.NoError(t, err)
-	s, err := searcher.Search(false, uint64(1), 0, true, NOSNIPPET)
+	s, err := searcher.Search(false, uint64(1), 0, true)
 	require.NoError(t, err)
 	var res []interface{}
 	err = json.Unmarshal([]byte(s), &res)
@@ -352,7 +352,7 @@ func TestSnippetSearch(t *testing.T) {
 	err = json.Unmarshal([]byte(s), &results)
 	require.NoError(t, err)
 	require.EqualValues(t, "Of Mice and Men", results[0]["doc"].(map[string]interface{})["title"].([]interface{})[0].(string))
-	require.EqualValues(t, "carrying in their lower leaf junctures the\n\tdebris of the winter&#x27;s flooding; and <b>sycamores</b> with mottled, white, recumbent\n\tlimbs and branches", results[0]["snippet_html"])
+	require.EqualValues(t, "carrying in their lower leaf junctures the\n\tdebris of the winter&#x27;s flooding; and <b>sycamores</b> with mottled, white, recumbent\n\tlimbs and branches", results[0]["snippet_html"].(jm)["1"])
 }
 
 func TestRawSearch(t *testing.T) {
@@ -510,7 +510,7 @@ func TestDocsetSearch(t *testing.T) {
 	require.NoError(t, err)
 	resElement, ok := results["docset"].([]interface{})[0].(jm)
 	require.EqualValues(t, true, ok)
-	sDoc, err := searcher.GetDocument(true, float32(resElement["score"].(float64)), uint32(resElement["doc_id"].(float64)), uint32(resElement["segment_ord"].(float64)), NOSNIPPET)
+	sDoc, err := searcher.GetDocument(true, float32(resElement["score"].(float64)), uint32(resElement["doc_id"].(float64)), uint32(resElement["segment_ord"].(float64)))
 	require.NoError(t, err)
 	log.Info(sDoc)
 	err = json.Unmarshal([]byte(sDoc), &results)
@@ -519,6 +519,7 @@ func TestDocsetSearch(t *testing.T) {
 	require.EqualValues(t, "Of Mice and Men", results["doc"].(jm)["title"].([]interface{})[0].(string))
 	resElement, ok = results["docset"].([]interface{})[1].(jm)
 	require.EqualValues(t, true, ok)
+	//using NOSNIPPET to show it works as well
 	sDoc, err = searcher.GetDocument(true, float32(resElement["score"].(float64)), uint32(resElement["doc_id"].(float64)), uint32(resElement["segment_ord"].(float64)), NOSNIPPET)
 	require.NoError(t, err)
 	log.Info(sDoc)
@@ -671,7 +672,7 @@ func TestStops(t *testing.T) {
 
 	searcher, err := qp.ParseQuery("title:the")
 	require.NoError(t, err)
-	s, err := searcher.Search(false, 0, 0, true, NOSNIPPET)
+	s, err := searcher.Search(false, 0, 0, true)
 	require.NoError(t, err)
 	results := []map[string]interface{}{}
 	err = json.Unmarshal([]byte(s), &results)
@@ -745,7 +746,7 @@ func TestIndexer(t *testing.T) {
 
 	searcher, err := qp.ParseQuery("order:1")
 	require.NoError(t, err)
-	s, err := searcher.Search(false, 0, 0, true, NOSNIPPET)
+	s, err := searcher.Search(false, 0, 0, true)
 	require.NoError(t, err)
 	results := []map[string]interface{}{}
 	err = json.Unmarshal([]byte(s), &results)
@@ -754,7 +755,7 @@ func TestIndexer(t *testing.T) {
 
 	searcherAgain, err := qp.ParseQuery("order:2")
 	require.NoError(t, err)
-	s, err = searcherAgain.Search(true, 0, 0, true, NOSNIPPET)
+	s, err = searcherAgain.Search(true, 0, 0, true)
 	require.NoError(t, err)
 	err = json.Unmarshal([]byte(s), &results)
 	require.NoError(t, err)
