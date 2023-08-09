@@ -401,6 +401,8 @@ impl TantivySession {
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         debug!("Searcher");
+        let s = format!("{}", params);
+        println!("{}", s);
         match method {
             "search" => self.do_search(params),
             "search_raw" => self.do_raw_search(params),

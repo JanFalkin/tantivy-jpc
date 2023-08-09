@@ -725,6 +725,10 @@ pub mod tests {
             ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
             1
         );
+        assert_eq!(
+            ctx.add_text_field("body2".to_string(), 2, true, true, "".to_string()),
+            2
+        );
         let mut td = match ctx.build(true) {
             Ok(t) => t,
             Err(e) => {
@@ -749,11 +753,13 @@ pub mod tests {
             0
         );
         assert_eq!(td.add_text(1, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish.".to_string(), doc1 as u32), 0);
+        assert_eq!(td.add_text(2, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish.".to_string(), doc1 as u32), 0);
         assert_eq!(
             td.add_text(0, "Of Mice and Men".to_string(), doc2 as u32),
             0
         );
         assert_eq!(td.add_text(1, r#"A few miles south of Soledad, the Salinas River drops in close to the hillside bank and runs deep and green. The water is warm too, for it has slipped twinkling over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up to the strong and rocky Gabilan Mountains, but on the valley side the water is lined with trees—willows fresh and green with every spring, carrying in their lower leaf junctures the debris of the winter's flooding; and sycamores with mottled, white, recumbent limbs and branches that arch over the pool"#.to_string(), doc2 as u32), 0);
+        assert_eq!(td.add_text(2, r#"A few miles south of Soledad, the Salinas River drops in close to the hillside bank and runs deep and green. The water is warm too, for it has slipped twinkling over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up to the strong and rocky Gabilan Mountains, but on the valley side the water is lined with trees—willows fresh and green with every spring, carrying in their lower leaf junctures the debris of the winter's flooding; and sycamores with mottled, white, recumbent limbs and branches that arch over the pool"#.to_string(), doc2 as u32), 0);
         let mut ti = match td.create_index() {
             Ok(i) => i,
             Err(e) => panic!("failed to create index err ={} ", e),
@@ -765,8 +771,12 @@ pub mod tests {
         ti.commit().unwrap();
         let mut rb = ti.reader_builder().unwrap();
         let mut qp = rb.searcher().unwrap();
-        qp.for_index(vec!["title".to_string(), "body".to_string()])
-            .unwrap();
+        qp.for_index(vec![
+            "title".to_string(),
+            "body".to_string(),
+            "body2".to_string(),
+        ])
+        .unwrap();
         let mut searcher = qp.parse_query("twinkling".to_string()).unwrap();
         let sres: serde_json::Value =
             serde_json::from_str(&searcher.docset(4, true).unwrap()).unwrap();
@@ -785,12 +795,13 @@ pub mod tests {
             let score = v.get("score").unwrap().as_f64().unwrap() as f32;
             let segment_ord = v.get("segment_ord").unwrap().as_u64().unwrap() as u32;
             let res = searcher
-                .get_document(true, score, segment_ord, doc_id, vec![1])
+                .get_document(true, score, segment_ord, doc_id, vec![1, 2])
                 .unwrap();
             let re: ResultElement = serde_json::from_str(&res).unwrap();
             assert!(re.snippet_html != None);
             let mut hm = crate::HashMap::<u64, String>::new();
             hm.insert(1, "<b>twinkling</b> over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up".to_string());
+            hm.insert(2, "<b>twinkling</b> over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up".to_string());
             assert_eq!(re.snippet_html, Some(hm));
             info!("Result= {res}");
         }
