@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::ffi::{c_char, CStr};
 use std::str;
 use tantivy::query::{FuzzyTermQuery, Query, QueryParser};
-use tantivy::{Searcher, SnippetGenerator, TantivyError};
+use tantivy::{Searcher, TantivyError};
 
 use chrono::format::ParseError;
 use lazy_static::lazy_static;
@@ -57,7 +57,6 @@ struct TantivySession {
     pub(crate) query_parser: Option<Box<QueryParser>>,
     pub(crate) dyn_q: Option<Box<dyn Query>>,
     pub(crate) fuzzy_q: Option<Box<FuzzyTermQuery>>,
-    pub(crate) snippet_generators: Option<SnippetGenerator>,
     pub(crate) tokenizer_manager: Option<TokenizerManager>,
 
     return_buffer: String,
@@ -83,7 +82,6 @@ impl TantivySession {
             query_parser: None,
             dyn_q: None,
             fuzzy_q: None,
-            snippet_generators: None,
             tokenizer_manager: None,
             return_buffer: String::new(),
             memsize: crate::tsession_index::DEFAULT_INDEX_WRITER_MEM_SIZE,

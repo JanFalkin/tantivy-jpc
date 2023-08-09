@@ -10,12 +10,12 @@ use tantivy::TERMINATED;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
+use crate::HashMap;
 use log::error;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Write;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::query::Query;
-use tantivy::schema::Field;
 use tantivy::schema::NamedFieldDocument;
 use tantivy::SnippetGenerator;
 use tantivy::{Document, Index};
@@ -25,6 +25,7 @@ pub struct ResultElement {
     pub doc: NamedFieldDocument,
     pub score: f32,
     pub explain: String,
+    pub snippet_html: Option<HashMap<String, String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -134,6 +135,33 @@ impl TantivySession {
         Ok((query, idx, searcher))
     }
 
+    fn do_search_execute(
+        &self,
+        searcher: &Searcher,
+        query: &dyn Query,
+        idx: &Index,
+        offset: usize,
+        top_limit: u64,
+        score: bool,
+    ) -> Result<Vec<(f32, DocAddress)>, ErrorKinds> {
+        let enable_scoring = match score {
+            false => tantivy::query::EnableScoring::disabled_from_searcher(searcher),
+            true => tantivy::query::EnableScoring::enabled_from_searcher(searcher),
+        };
+
+        match searcher.search_with_executor(
+            query,
+            &TopDocs::with_limit(top_limit as usize).and_offset(offset),
+            idx.search_executor(),
+            enable_scoring,
+        ) {
+            Ok(td) => Ok(td),
+            Err(e) => make_internal_json_error(ErrorKinds::Search(format!(
+                "do_search_execute tantivy error = {e}"
+            ))),
+        }
+    }
+
     fn do_docset(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
         const DEF_LIMIT: u64 = 10;
         let (top_limit, offset, score) = match params.as_object() {
@@ -148,22 +176,7 @@ impl TantivySession {
         };
         let (query, idx, searcher) = self.setup_searcher()?;
 
-        let enable_scoring = match score {
-            false => tantivy::query::EnableScoring::disabled_from_searcher(&searcher),
-            true => tantivy::query::EnableScoring::enabled_from_searcher(&searcher),
-        };
-
-        let td = match searcher.search_with_executor(
-            query,
-            &TopDocs::with_limit(top_limit as usize).and_offset(offset),
-            idx.search_executor(),
-            enable_scoring,
-        ) {
-            Ok(td) => td,
-            Err(e) => {
-                return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}")))
-            }
-        };
+        let td = self.do_search_execute(&searcher, query, idx, offset, top_limit, score)?;
         debug!("search complete len = {}, td = {:?}", td.len(), td);
         let vec_str = td
             .iter()
@@ -180,15 +193,45 @@ impl TantivySession {
         Ok(0)
     }
 
+    fn make_snippet(
+        &self,
+        v: &str,
+        searcher: &Searcher,
+        query: &dyn Query,
+        retrieved_doc: &Document,
+    ) -> Result<String, ErrorKinds> {
+        let sc = match &self.schema {
+            Some(s) => s,
+            None => {
+                return make_internal_json_error(ErrorKinds::Search(
+                    "snippet called with no schema".to_string(),
+                ))
+            }
+        };
+        let snip_field = sc.get_field(v)?;
+        //let snip_field = tantivy::schema::Field::from_field_id(*v as u32);
+        let mut snippet_generator = SnippetGenerator::create(searcher, query, snip_field)?;
+        snippet_generator.set_max_num_chars(1000);
+        Ok(snippet_generator.snippet_from_doc(retrieved_doc).to_html())
+    }
+
     fn do_get_document(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
-        let (segment_ord, doc_id, score, explain) = match params.as_object() {
+        let (segment_ord, doc_id, score, explain, fields) = match params.as_object() {
             Some(p) => (
                 (p.get("segment_ord").and_then(|u| u.as_u64()).unwrap_or(0)) as u32,
                 (p.get("doc_id").and_then(|u| u.as_u64()).unwrap_or(0)) as u32,
                 (p.get("score").and_then(|u| u.as_f64()).unwrap_or(0.0)),
                 p.get("explain").and_then(|u| u.as_bool()).unwrap_or(false),
+                p.get("snippet_field")
+                    .and_then(|u| u.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|item| item.as_str())
+                            .collect::<Vec<&str>>()
+                    })
+                    .unwrap_or_else(Vec::new), // Default to an empty vector
             ),
-            None => (0, 0, 0.0, false),
+            None => (0, 0, 0.0, false, vec![]), // Default values
         };
 
         let doc_address = DocAddress {
@@ -209,10 +252,25 @@ impl TantivySession {
         }
         debug!("retrieved doc {:?}", retrieved_doc.field_values());
 
+        let mut hm: HashMap<String, String> = HashMap::new();
+
+        fields.iter().for_each(|&v| {
+            if !v.is_empty() {
+                let e = match self.make_snippet(v, &searcher, query, &retrieved_doc) {
+                    Ok(g) => (v, g),
+                    Err(e) => ("", e.to_string()),
+                };
+                if !e.0.is_empty() {
+                    hm.insert(e.0.to_string(), e.1);
+                }
+            }
+        });
+
         let re = ResultElement {
             doc: named_doc,
             score: score as f32,
             explain: s,
+            snippet_html: Some(hm),
         };
         self.return_buffer = serde_json::to_string(&re)?;
         Ok(0)
@@ -220,7 +278,7 @@ impl TantivySession {
 
     fn do_search(&mut self, params: serde_json::Value) -> InternalCallResult<u32> {
         const DEF_LIMIT: u64 = 10;
-        let (top_limit, offset, explain, score) = match params.as_object() {
+        let (top_limit, offset, explain, score, fields) = match params.as_object() {
             Some(p) => (
                 p.get("top_limit")
                     .and_then(|u| u.as_u64())
@@ -228,27 +286,25 @@ impl TantivySession {
                 p.get("offset").and_then(|u| u.as_u64()).unwrap_or(0) as usize,
                 p.get("explain").and_then(|u| u.as_bool()).unwrap_or(false),
                 p.get("scoring").and_then(|u| u.as_bool()).unwrap_or(true),
+                p.get("snippet_field")
+                    .and_then(|u| u.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|item| item.as_str())
+                            .collect::<Vec<&str>>()
+                    })
+                    .unwrap_or_else(Vec::new), // Default to an empty vector
             ),
-            None => (DEF_LIMIT, 0, false, true),
+            None => (DEF_LIMIT, 0, false, true, vec![]),
         };
         let (query, idx, searcher) = self.setup_searcher()?;
 
-        let enable_scoring = match score {
-            false => tantivy::query::EnableScoring::disabled_from_searcher(&searcher),
-            true => tantivy::query::EnableScoring::enabled_from_searcher(&searcher),
-        };
+        let td = self.do_search_execute(&searcher, query, idx, offset, top_limit, score)?;
 
-        let td = match searcher.search_with_executor(
-            query,
-            &TopDocs::with_limit(top_limit as usize).and_offset(offset),
-            idx.search_executor(),
-            enable_scoring,
-        ) {
-            Ok(td) => td,
-            Err(e) => {
-                return make_internal_json_error(ErrorKinds::Search(format!("tantivy error = {e}")))
-            }
-        };
+        let snippets = !fields.is_empty();
+
+        let mut hm = HashMap::new();
+
         debug!("search complete len = {}, td = {:?}", td.len(), td);
         let mut vret: Vec<ResultElement> = Vec::<ResultElement>::new();
         for (score, doc_address) in td {
@@ -262,11 +318,25 @@ impl TantivySession {
             if explain {
                 s = query.explain(&searcher, doc_address)?.to_pretty_json();
             }
+            if snippets {
+                fields.iter().for_each(|&v| {
+                    if !v.is_empty() {
+                        let e = match self.make_snippet(v, &searcher, query, &retrieved_doc) {
+                            Ok(g) => (v, g),
+                            Err(e) => ("", e.to_string()),
+                        };
+                        if !e.0.is_empty() {
+                            hm.insert(e.0.to_string(), e.1);
+                        }
+                    }
+                });
+            }
             debug!("retrieved doc {:?}", retrieved_doc.field_values());
             vret.append(&mut vec![ResultElement {
                 doc: named_doc,
                 score,
                 explain: s,
+                snippet_html: Some(hm.clone()),
             }]);
         }
         self.return_buffer = serde_json::to_string(&vret)?;
@@ -286,7 +356,6 @@ impl TantivySession {
         if limit == 0 {
             limit = searcher.num_docs();
         }
-        //let csq = tantivy::query::ConstScoreQuery::new((**query).box_clone(), 1.0);
         let weight = query.weight(tantivy::query::EnableScoring::disabled_from_searcher(
             &searcher,
         ))?;
@@ -336,44 +405,16 @@ impl TantivySession {
         Ok(0)
     }
 
-    fn do_create_snippet_generator(
-        &mut self,
-        params: serde_json::Value,
-    ) -> InternalCallResult<u32> {
-        let searcher = match &self.searcher {
-            Some(s) => s,
-            None => {
-                return make_internal_json_error(ErrorKinds::NotExist(
-                    "create snippet called with no searcher set".to_string(),
-                ))
-            }
-        };
-        let query = match &self.dyn_q {
-            Some(s) => s,
-            None => {
-                return make_internal_json_error(ErrorKinds::NotExist(
-                    "create snippet called with no searcher set".to_string(),
-                ))
-            }
-        };
-        let field_id: u64 = match params.as_object() {
-            Some(p) => p.get("field_id").and_then(|u| u.as_u64()).unwrap_or(0),
-            None => 0,
-        };
-        let f = Field::from_field_id(field_id as u32);
-        self.snippet_generators = Some(SnippetGenerator::create(searcher, query, f)?);
-        Ok(0)
-    }
-
     pub fn handle_searcher(
         &mut self,
         method: &str,
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         debug!("Searcher");
+        let s = format!("{}", params);
+        println!("{}", s);
         match method {
             "search" => self.do_search(params),
-            "snippet" => self.do_create_snippet_generator(params),
             "search_raw" => self.do_raw_search(params),
             "docset" => self.do_docset(params),
             "get_document" => self.do_get_document(params),

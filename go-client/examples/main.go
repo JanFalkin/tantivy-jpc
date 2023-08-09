@@ -117,6 +117,9 @@ func doRun() {
 	if sr[0]["doc"].(map[string]interface{})["title"].([]interface{})[0] != "The Old Man and the Sea" {
 		panic("expected value not received")
 	}
+	if err != nil {
+		panic(err)
+	}
 	searcherAgain, err := qp.ParseQuery("order:222")
 	if err != nil {
 		panic(err)
