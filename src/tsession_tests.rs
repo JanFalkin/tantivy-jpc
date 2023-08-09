@@ -96,7 +96,7 @@ pub mod tests {
             score: f32,
             segment_ord: u32,
             doc_id: u32,
-            field_id: Vec<i64>,
+            field_id: Vec<String>,
         ) -> InternalCallResult<String> {
             let b = self.ctx.call_jpc(
                 "searcher".to_string(),
@@ -701,7 +701,7 @@ pub mod tests {
             let score = v.get("score").unwrap().as_f64().unwrap() as f32;
             let segment_ord = v.get("segment_ord").unwrap().as_u64().unwrap() as u32;
             let res = searcher
-                .get_document(true, score, segment_ord, doc_id, vec![-1])
+                .get_document(true, score, segment_ord, doc_id, vec!["".to_string()])
                 .unwrap();
             let _re: ResultElement = serde_json::from_str(&res).unwrap();
             info!("Result= {res}");
@@ -795,13 +795,19 @@ pub mod tests {
             let score = v.get("score").unwrap().as_f64().unwrap() as f32;
             let segment_ord = v.get("segment_ord").unwrap().as_u64().unwrap() as u32;
             let res = searcher
-                .get_document(true, score, segment_ord, doc_id, vec![1, 2])
+                .get_document(
+                    true,
+                    score,
+                    segment_ord,
+                    doc_id,
+                    vec!["body".to_string(), "body2".to_string()],
+                )
                 .unwrap();
             let re: ResultElement = serde_json::from_str(&res).unwrap();
             assert!(re.snippet_html != None);
-            let mut hm = crate::HashMap::<u64, String>::new();
-            hm.insert(1, "<b>twinkling</b> over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up".to_string());
-            hm.insert(2, "<b>twinkling</b> over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up".to_string());
+            let mut hm = crate::HashMap::<String, String>::new();
+            hm.insert("body2".to_string(), "<b>twinkling</b> over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up".to_string());
+            hm.insert("body".to_string(), "<b>twinkling</b> over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up".to_string());
             assert_eq!(re.snippet_html, Some(hm));
             info!("Result= {res}");
         }

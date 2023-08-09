@@ -105,7 +105,7 @@ func doRun() {
 
 	var sr []map[string]interface{}
 
-	s, err := searcher.Search(false, 0, 0, true, tantivy.NOSNIPPET)
+	s, err := searcher.Search(false, 0, 0, true)
 	if err != nil {
 		panic(err)
 	}
@@ -124,7 +124,7 @@ func doRun() {
 	if err != nil {
 		panic(err)
 	}
-	s, err = searcherAgain.Search(false, 0, 0, true, tantivy.NOSNIPPET)
+	s, err = searcherAgain.Search(false, 0, 0, true)
 	if err != nil {
 		panic(err)
 	}

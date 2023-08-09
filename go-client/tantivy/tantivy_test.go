@@ -346,13 +346,13 @@ func TestSnippetSearch(t *testing.T) {
 
 	searcher, err := qp.ParseQuery("sycamores")
 	require.NoError(t, err)
-	s, err := searcher.Search(false, 4, 0, false, 1)
+	s, err := searcher.Search(false, 4, 0, false, "body")
 	require.NoError(t, err)
 	results := []map[string]interface{}{}
 	err = json.Unmarshal([]byte(s), &results)
 	require.NoError(t, err)
 	require.EqualValues(t, "Of Mice and Men", results[0]["doc"].(map[string]interface{})["title"].([]interface{})[0].(string))
-	require.EqualValues(t, "carrying in their lower leaf junctures the\n\tdebris of the winter&#x27;s flooding; and <b>sycamores</b> with mottled, white, recumbent\n\tlimbs and branches", results[0]["snippet_html"].(jm)["1"])
+	require.EqualValues(t, "carrying in their lower leaf junctures the\n\tdebris of the winter&#x27;s flooding; and <b>sycamores</b> with mottled, white, recumbent\n\tlimbs and branches", results[0]["snippet_html"].(jm)["body"])
 }
 
 func TestRawSearch(t *testing.T) {
@@ -520,7 +520,7 @@ func TestDocsetSearch(t *testing.T) {
 	resElement, ok = results["docset"].([]interface{})[1].(jm)
 	require.EqualValues(t, true, ok)
 	//using NOSNIPPET to show it works as well
-	sDoc, err = searcher.GetDocument(true, float32(resElement["score"].(float64)), uint32(resElement["doc_id"].(float64)), uint32(resElement["segment_ord"].(float64)), NOSNIPPET)
+	sDoc, err = searcher.GetDocument(true, float32(resElement["score"].(float64)), uint32(resElement["doc_id"].(float64)), uint32(resElement["segment_ord"].(float64)))
 	require.NoError(t, err)
 	log.Info(sDoc)
 	err = json.Unmarshal([]byte(sDoc), &results)
@@ -610,14 +610,14 @@ func TestDocsetSnippetSearch(t *testing.T) {
 	require.NoError(t, err)
 	resElement, ok := results["docset"].([]interface{})[0].(jm)
 	require.EqualValues(t, true, ok)
-	sDoc, err := searcher.GetDocument(true, float32(resElement["score"].(float64)), uint32(resElement["doc_id"].(float64)), uint32(resElement["segment_ord"].(float64)), 1, 2)
+	sDoc, err := searcher.GetDocument(true, float32(resElement["score"].(float64)), uint32(resElement["doc_id"].(float64)), uint32(resElement["segment_ord"].(float64)), "body", "body2")
 	require.NoError(t, err)
 	log.Info(sDoc)
 	err = json.Unmarshal([]byte(sDoc), &results)
 	require.NoError(t, err)
 	resDoc := results["doc"].(jm)
 	require.EqualValues(t, "Of Mice and Men", resDoc["title"].([]interface{})[0].(string))
-	require.EqualValues(t, "slipped <b>twinkling</b>\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve", results["snippet_html"].(jm)["1"])
+	require.EqualValues(t, "slipped <b>twinkling</b>\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve", results["snippet_html"].(jm)["body"])
 }
 
 func TestStops(t *testing.T) {

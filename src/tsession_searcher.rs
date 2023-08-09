@@ -25,7 +25,7 @@ pub struct ResultElement {
     pub doc: NamedFieldDocument,
     pub score: f32,
     pub explain: String,
-    pub snippet_html: Option<HashMap<u64, String>>,
+    pub snippet_html: Option<HashMap<String, String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -195,12 +195,21 @@ impl TantivySession {
 
     fn make_snippet(
         &self,
-        v: &i64,
+        v: &str,
         searcher: &Searcher,
         query: &dyn Query,
         retrieved_doc: &Document,
     ) -> Result<String, ErrorKinds> {
-        let snip_field = tantivy::schema::Field::from_field_id(*v as u32);
+        let sc = match &self.schema {
+            Some(s) => s,
+            None => {
+                return make_internal_json_error(ErrorKinds::Search(
+                    "snippet called with no schema".to_string(),
+                ))
+            }
+        };
+        let snip_field = sc.get_field(v)?;
+        //let snip_field = tantivy::schema::Field::from_field_id(*v as u32);
         let snippet_generator = SnippetGenerator::create(searcher, query, snip_field)?;
         Ok(snippet_generator.snippet_from_doc(retrieved_doc).to_html())
     }
@@ -216,10 +225,10 @@ impl TantivySession {
                     .and_then(|u| u.as_array())
                     .map(|arr| {
                         arr.iter()
-                            .filter_map(|item| item.as_i64())
-                            .collect::<Vec<i64>>()
+                            .filter_map(|item| item.as_str())
+                            .collect::<Vec<&str>>()
                     })
-                    .unwrap_or_else(|| vec![]), // Default to an empty vector
+                    .unwrap_or_else(Vec::new), // Default to an empty vector
             ),
             None => (0, 0, 0.0, false, vec![]), // Default values
         };
@@ -242,16 +251,16 @@ impl TantivySession {
         }
         debug!("retrieved doc {:?}", retrieved_doc.field_values());
 
-        let mut hm: HashMap<u64, String> = HashMap::new();
+        let mut hm: HashMap<String, String> = HashMap::new();
 
         fields.iter().for_each(|&v| {
-            if v > 0 {
-                let e = match self.make_snippet(&v, &searcher, query, &retrieved_doc) {
+            if !v.is_empty() {
+                let e = match self.make_snippet(v, &searcher, query, &retrieved_doc) {
                     Ok(g) => (v, g),
-                    Err(e) => (-1, e.to_string()),
+                    Err(e) => ("", e.to_string()),
                 };
-                if e.0 >= 0 {
-                    hm.insert(e.0 as u64, e.1);
+                if !e.0.is_empty() {
+                    hm.insert(e.0.to_string(), e.1);
                 }
             }
         });
@@ -280,10 +289,10 @@ impl TantivySession {
                     .and_then(|u| u.as_array())
                     .map(|arr| {
                         arr.iter()
-                            .filter_map(|item| item.as_i64())
-                            .collect::<Vec<i64>>()
+                            .filter_map(|item| item.as_str())
+                            .collect::<Vec<&str>>()
                     })
-                    .unwrap_or_else(|| vec![]), // Default to an empty vector
+                    .unwrap_or_else(Vec::new), // Default to an empty vector
             ),
             None => (DEF_LIMIT, 0, false, true, vec![]),
         };
@@ -309,14 +318,14 @@ impl TantivySession {
                 s = query.explain(&searcher, doc_address)?.to_pretty_json();
             }
             if snippets {
-                fields.iter().for_each(|v: &i64| {
-                    if *v > 0 {
+                fields.iter().for_each(|&v| {
+                    if !v.is_empty() {
                         let e = match self.make_snippet(v, &searcher, query, &retrieved_doc) {
                             Ok(g) => (v, g),
-                            Err(e) => (&(-1 as i64), e.to_string()),
+                            Err(e) => ("", e.to_string()),
                         };
-                        if *e.0 >= 0 {
-                            hm.insert(*e.0 as u64, e.1);
+                        if !e.0.is_empty() {
+                            hm.insert(e.0.to_string(), e.1);
                         }
                     }
                 });
