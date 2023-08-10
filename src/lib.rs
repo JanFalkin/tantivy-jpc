@@ -32,6 +32,7 @@ pub mod tsession_builder;
 pub mod tsession_document;
 pub mod tsession_index;
 pub mod tsession_query_parser;
+pub mod tsession_schema;
 pub mod tsession_searcher;
 pub mod tsession_tests;
 
@@ -39,6 +40,7 @@ pub use self::tsession_builder::*;
 pub use self::tsession_document::*;
 pub use self::tsession_index::*;
 pub use self::tsession_query_parser::*;
+pub use self::tsession_schema::*;
 pub use self::tsession_searcher::*;
 pub use self::tsession_tests::*;
 
@@ -150,7 +152,11 @@ impl TantivySession {
                     return self.make_json_error(&format!("handle builder error={e}"));
                 };
             }
-            "schema" => {}
+            "schema" => {
+                if let Err(e) = self.handler_schema(method, params) {
+                    return self.make_json_error(&format!("handle schema error={e}"));
+                };
+            }
             &_ => {}
         };
         let _ = &self.doc;

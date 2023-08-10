@@ -11,6 +11,7 @@ use scopeguard::defer;
 pub mod tests {
     extern crate tempdir;
 
+    use tantivy::schema::FieldEntry;
     use tempdir::TempDir;
     use uuid::Uuid;
 
@@ -95,25 +96,25 @@ pub mod tests {
     }
 
     impl TestSchema<'_> {
-        pub fn get_field_entry(&self, name: &str) -> InternalCallResult<String> {
+        pub fn get_field_entry(&self, name: &str) -> InternalCallResult<FieldEntry> {
             let b = self.ctx.call_jpc(
                 "schema".to_string(),
                 "get_field_entry".to_string(),
                 json!({"field": vec![name]}),
                 true,
             );
-            let s = std::str::from_utf8(&b).unwrap();
-            Ok(s.to_string())
+            let fe: FieldEntry = serde_json::from_slice(&b).unwrap();
+            Ok(fe)
         }
-        pub fn num_fields(&self) -> InternalCallResult<String> {
+        pub fn num_fields(&self) -> InternalCallResult<u64> {
             let b = self.ctx.call_jpc(
                 "schema".to_string(),
                 "num_fields".to_string(),
                 json!({}),
                 true,
             );
-            let s = std::str::from_utf8(&b).unwrap();
-            Ok(s.to_string())
+            let s: u64 = serde_json::from_slice(&b).unwrap();
+            Ok(s)
         }
     }
 
@@ -803,10 +804,11 @@ pub mod tests {
         assert_eq!(op1, 0);
         assert_eq!(op2, 1);
         ti.commit().unwrap();
-        let mut rb = ti.reader_builder().unwrap();
         let sc = ti.schema().unwrap();
         let n = sc.num_fields().unwrap();
+        assert_eq!(n, 3);
         let d = sc.get_field_entry("body").unwrap();
+        assert_eq!(d.name(), "body");
     }
 
     #[test]
