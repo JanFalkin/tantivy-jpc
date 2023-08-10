@@ -431,7 +431,7 @@ pub unsafe extern "C" fn tantivy_jpc(
     };
     let entity: &mut TantivySession = match json_params.obj {
         "document" | "builder" | "index" | "indexwriter" | "query_parser" | "searcher"
-        | "index_reader" | "fuzzy_searcher" => {
+        | "index_reader" | "fuzzy_searcher" | "schema" => {
             let cur_session = tm.get_mut(json_params.id);
             match cur_session {
                 Some(x) => x,

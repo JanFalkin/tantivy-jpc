@@ -95,3 +95,9 @@ func (idx *TIndex) SetMultiThreadExecutor(threadCount int32) (*TIndex, error) {
 	}
 	return idx, nil
 }
+
+func (idx *TIndex) GetSchema() *TSchema {
+	return &TSchema{
+		JPCId: idx.JPCId,
+	}
+}
