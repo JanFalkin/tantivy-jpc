@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::debug;
 use crate::make_internal_json_error;
 use crate::ErrorKinds;
@@ -9,7 +11,7 @@ extern crate serde_derive;
 extern crate serde_json;
 use serde_json::json;
 use tantivy::schema::{
-    IndexRecordOption, NumericOptions, Schema, TextFieldIndexing, TextOptions, STORED, STRING, TEXT,
+    Field, FieldEntry, Schema, TextFieldIndexing, TextOptions, STORED, STRING, TEXT,
 };
 
 impl TantivySession {
@@ -27,35 +29,43 @@ impl TantivySession {
                 ))
             }
         };
-        let fields = match params.as_object() {
-            Some(p) => {
-                p.get("field")
-                    .and_then(|u| u.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|item| item.as_str())
-                            .collect::<Vec<&str>>()
-                    })
-                    .unwrap_or_else(Vec::new) // Default to an empty vector
+        let ve = Vec::<serde_json::Value>::new();
+        fn get_fields<'a>(
+            params: &'a serde_json::Value,
+            empty: &'a Vec<serde_json::Value>,
+        ) -> &'a Vec<serde_json::Value> {
+            match params.as_object() {
+                Some(p) => {
+                    let v = p.get("field").unwrap();
+                    debug!("p={p:?} v={v}");
+                    p.get("field").and_then(|u| u.as_array()).unwrap_or(empty) // Default to an empty vector
+                }
+                None => empty, // Default values
             }
-            None => vec![], // Default values
-        };
+        }
 
         match method {
             "get_field_entry" => {
-                let field = sc.get_field(fields[0])?;
+                let fields = get_fields(&params, &ve);
+                let field = sc.get_field(fields[0].as_str().unwrap())?;
                 self.return_buffer = serde_json::to_string(sc.get_field_entry(field))?;
-            }
-            "get_field_name" => {
-                let field = sc.get_field(fields[0])?;
-                self.return_buffer = serde_json::to_string(sc.get_field_entry(field).name())?;
             }
             "num_fields" => {
                 let c = sc.fields().count();
                 self.return_buffer = serde_json::to_string(&c)?;
             }
-            "fields" => {}
-            "get_field" => {}
+            "fields" => {
+                let hashmap: HashMap<Field, FieldEntry> = sc
+                    .fields()
+                    .map(|(field, field_entry)| (field, field_entry.clone())) // Assuming you want to clone FieldEntry
+                    .collect();
+                self.return_buffer = serde_json::to_string(&hashmap)?;
+            }
+            "get_field" => {
+                let fields = get_fields(&params, &ve);
+                self.return_buffer =
+                    serde_json::to_string(&sc.get_field(fields[0].as_str().unwrap())?)?;
+            }
             "convert_named_doc" => {}
             "to_named_doc" => {}
             "to_json" => {}
