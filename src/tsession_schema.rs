@@ -47,7 +47,7 @@ impl TantivySession {
         match method {
             "get_field_entry" => {
                 let fields = get_fields(&params, &ve);
-                let field = sc.get_field(fields[0].as_str().unwrap())?;
+                let field = sc.get_field(fields[0].as_str().unwrap_or(""))?;
                 self.return_buffer = serde_json::to_string(sc.get_field_entry(field))?;
             }
             "num_fields" => {
@@ -64,14 +64,34 @@ impl TantivySession {
             "get_field" => {
                 let fields = get_fields(&params, &ve);
                 self.return_buffer =
-                    serde_json::to_string(&sc.get_field(fields[0].as_str().unwrap())?)?;
+                    serde_json::to_string(&sc.get_field(fields[0].as_str().unwrap_or(""))?)?;
             }
-            "convert_named_doc" => {}
-            "to_named_doc" => {}
-            "to_json" => {}
-            "parse_document" => {}
-            "json_object_to_doc" => {}
-            "find_field" => {}
+            "convert_named_doc" => {
+                return Err(ErrorKinds::NotExist(
+                    "convert_named_doc not implemented".to_string(),
+                ))
+            }
+            "to_named_doc" => {
+                return Err(ErrorKinds::NotExist(
+                    "to_named_doc not implemented".to_string(),
+                ))
+            }
+            "to_json" => return Err(ErrorKinds::NotExist("to_json not implemented".to_string())),
+            "parse_document" => {
+                return Err(ErrorKinds::NotExist(
+                    "parse_document not implemented".to_string(),
+                ))
+            }
+            "json_object_to_doc" => {
+                return Err(ErrorKinds::NotExist(
+                    "json_object_to_doc not implemented".to_string(),
+                ))
+            }
+            "find_field" => {
+                return Err(ErrorKinds::NotExist(
+                    "find_field not implemented".to_string(),
+                ))
+            }
             &_ => {}
         };
         Ok(0)
