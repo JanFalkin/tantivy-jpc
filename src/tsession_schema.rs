@@ -9,10 +9,7 @@ use crate::TantivySession;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
-use serde_json::json;
-use tantivy::schema::{
-    Field, FieldEntry, Schema, TextFieldIndexing, TextOptions, STORED, STRING, TEXT,
-};
+use tantivy::schema::{Field, FieldEntry};
 
 impl TantivySession {
     pub fn handler_schema(

@@ -411,7 +411,7 @@ func TestSnippetSearch(t *testing.T) {
 	err = json.Unmarshal([]byte(s), &results)
 	require.NoError(t, err)
 	require.EqualValues(t, "Of Mice and Men", results[0]["doc"].(map[string]interface{})["title"].([]interface{})[0].(string))
-	require.EqualValues(t, "carrying in their lower leaf junctures the\n\tdebris of the winter&#x27;s flooding; and <b>sycamores</b> with mottled, white, recumbent\n\tlimbs and branches", results[0]["snippet_html"].(jm)["body"])
+	require.EqualValues(t, "A few miles south of Soledad, the Salinas River drops in close to the hillside\n\tbank and runs deep and green. The water is warm too, for it has slipped twinkling\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve up to the strong and rocky\n\tGabilan Mountains, but on the valley side the water is lined with trees—willows\n\tfresh and green with every spring, carrying in their lower leaf junctures the\n\tdebris of the winter&#x27;s flooding; and <b>sycamores</b> with mottled, white, recumbent\n\tlimbs and branches that arch over the pool", results[0]["snippet_html"].(jm)["body"])
 }
 
 func TestRawSearch(t *testing.T) {
@@ -676,7 +676,7 @@ func TestDocsetSnippetSearch(t *testing.T) {
 	require.NoError(t, err)
 	resDoc := results["doc"].(jm)
 	require.EqualValues(t, "Of Mice and Men", resDoc["title"].([]interface{})[0].(string))
-	require.EqualValues(t, "slipped <b>twinkling</b>\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve", results["snippet_html"].(jm)["body"])
+	require.EqualValues(t, "A few miles south of Soledad, the Salinas River drops in close to the hillside\n\tbank and runs deep and green. The water is warm too, for it has slipped <b>twinkling</b>\n\tover the yellow sands in the sunlight before reaching the narrow pool. On one\n\tside of the river the golden foothill slopes curve up to the strong and rocky\n\tGabilan Mountains, but on the valley side the water is lined with trees—willows\n\tfresh and green with every spring, carrying in their lower leaf junctures the\n\tdebris of the winter&#x27;s flooding; and sycamores with mottled, white, recumbent\n\tlimbs and branches that arch over the pool", results["snippet_html"].(jm)["body"])
 }
 
 func TestStops(t *testing.T) {

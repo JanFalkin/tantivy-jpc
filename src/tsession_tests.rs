@@ -902,8 +902,8 @@ pub mod tests {
             let re: ResultElement = serde_json::from_str(&res).unwrap();
             assert!(re.snippet_html != None);
             let mut hm = crate::HashMap::<String, String>::new();
-            hm.insert("body2".to_string(), "<b>twinkling</b> over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up".to_string());
-            hm.insert("body".to_string(), "<b>twinkling</b> over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up".to_string());
+            hm.insert("body2".to_string(), "A few miles south of Soledad, the Salinas River drops in close to the hillside bank and runs deep and green. The water is warm too, for it has slipped <b>twinkling</b> over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up to the strong and rocky Gabilan Mountains, but on the valley side the water is lined with trees—willows fresh and green with every spring, carrying in their lower leaf junctures the debris of the winter&#x27;s flooding; and sycamores with mottled, white, recumbent limbs and branches that arch over the pool".to_string());
+            hm.insert("body".to_string(), "A few miles south of Soledad, the Salinas River drops in close to the hillside bank and runs deep and green. The water is warm too, for it has slipped <b>twinkling</b> over the yellow sands in the sunlight before reaching the narrow pool. On one side of the river the golden foothill slopes curve up to the strong and rocky Gabilan Mountains, but on the valley side the water is lined with trees—willows fresh and green with every spring, carrying in their lower leaf junctures the debris of the winter&#x27;s flooding; and sycamores with mottled, white, recumbent limbs and branches that arch over the pool".to_string());
             assert_eq!(re.snippet_html, Some(hm));
             info!("Result= {res}");
         }
