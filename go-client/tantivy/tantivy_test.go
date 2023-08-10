@@ -327,7 +327,7 @@ func TestSchema(t *testing.T) {
 	require.NoError(t, err)
 	_, err = doc.AddText(idxFieldBody2, `A few miles south of Soledad, the Salinas River drops in close to the hillside
 	bank and runs deep and green. The water is warm too, for it has slipped twinkling
-	over the yellow sands in the sunlight before reaching the narrow pool. On one
+	over the yellow sands in the sunlight befjmore reaching the narrow pool. On one
 	side of the river the golden foothill slopes curve up to the strong and rocky
 	Gabilan Mountains, but on the valley side the water is lined with trees—willows
 	fresh and green with every spring, carrying in their lower leaf junctures the
@@ -340,10 +340,22 @@ func TestSchema(t *testing.T) {
 	schema := indexer.GetSchema()
 	n, err := schema.NumFields()
 	require.NoError(t, err)
+	require.EqualValues(t, 3, n)
 	log.Info("fields", "val", n)
 	fe, err := schema.GetFieldEntry("body2")
 	require.NoError(t, err)
-	log.Info("field", "body2", fe)
+	require.EqualValues(t, "body2", fe.Name)
+	require.EqualValues(t, "text", fe.Type)
+	require.EqualValues(t, true, fe.Options["stored"])
+	fields, err := schema.Fields()
+	require.NoError(t, err)
+	require.EqualValues(t, "title", fields["0"].(msi)["name"])
+	require.EqualValues(t, "body", fields["1"].(msi)["name"])
+	require.EqualValues(t, "body2", fields["2"].(msi)["name"])
+	log.Info("fields=", fields)
+	afield, err := schema.GetField("body2")
+	require.NoError(t, err)
+	require.EqualValues(t, 2, afield)
 
 }
 
