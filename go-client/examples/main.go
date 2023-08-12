@@ -23,11 +23,11 @@ func doRun() {
 	if err != nil {
 		panic(err)
 	}
-	idxFieldTitle, err := builder.AddTextField("title", tantivy.TEXT, true, true, "")
+	idxFieldTitle, err := builder.AddTextField("title", tantivy.TEXT, true, true, "", false)
 	if err != nil {
 		panic(err)
 	}
-	idxFieldBody, err := builder.AddTextField("body", tantivy.TEXT, false, true, "")
+	idxFieldBody, err := builder.AddTextField("body", tantivy.TEXT, false, true, "", false)
 	if err != nil {
 		panic(err)
 	}
