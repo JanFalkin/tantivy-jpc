@@ -68,13 +68,14 @@ func (tb *TBuilder) standardReturnHandler(s string, err error) (int, error) {
 
 }
 
-func (tb *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool, fast bool, tokenizer string) (int, error) {
+func (tb *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool, fast bool, tokenizer string, basic bool) (int, error) {
 	params := msi{
 		"name":   name,
 		"type":   fieldType,
 		"stored": stored,
 		"id":     tb.JPCId.id,
 		"fast":   fast,
+		"basic":  basic,
 	}
 
 	if tokenizer != "" {

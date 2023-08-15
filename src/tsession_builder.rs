@@ -44,6 +44,7 @@ pub struct ParamData {
     pub indexed: bool,
     pub fast: bool,
     pub tokenizer: String,
+    pub basic: bool
 }
 
 impl TantivySession {
@@ -116,6 +117,18 @@ impl TantivySession {
             .as_str()
             .unwrap_or(TOKENIZER_DEFAULT);
 
+        let basic = match m.get("basic") {
+            Some(v) => match v.as_bool() {
+                Some(b) => b,
+                None => {
+                    return make_internal_json_error(ErrorKinds::BadParams(
+                        "basic must be set to true or false".to_string(),
+                    ))
+                }
+            },
+            None => false,
+        };
+
         Ok(ParamData {
             name: name.to_string(),
             field_type,
@@ -123,6 +136,7 @@ impl TantivySession {
             indexed,
             fast,
             tokenizer: tok.to_string(),
+            basic,
         })
     }
     pub fn handler_builder(
@@ -163,10 +177,16 @@ impl TantivySession {
                     ti = ti | STORED;
                 }
                 if field_params.field_type != 1 {
+                    let options;
+                    if field_params.basic {
+                        options = IndexRecordOption::Basic;
+                    } else {
+                        options = IndexRecordOption::WithFreqsAndPositions;
+                    }
                     ti = ti.set_indexing_options(
                         TextFieldIndexing::default()
                             .set_tokenizer(&field_params.tokenizer)
-                            .set_index_option(IndexRecordOption::WithFreqsAndPositions),
+                            .set_index_option(options),
                     );
                 }
                 if field_params.fast {
