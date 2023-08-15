@@ -416,7 +416,7 @@ pub mod tests {
             stored: bool,
             indexed: bool,
             _tokenizer: String,
-            _basic: bool
+            _basic: bool,
         ) -> i64 {
             let j_param = json!({
                 "name":   name,
@@ -754,15 +754,15 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string()),
+            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string(), true),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string()),
+            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string(), true),
             1
         );
         assert_eq!(
-            ctx.add_text_field("body2".to_string(), 2, true, true, "".to_string()),
+            ctx.add_text_field("body2".to_string(), 2, true, true, "".to_string(), true),
             2
         );
         let mut td = match ctx.build(true) {
