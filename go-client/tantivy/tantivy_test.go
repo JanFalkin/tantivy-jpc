@@ -288,6 +288,77 @@ func TestTantivyIntField(t *testing.T) {
 	testAltExpectedIndex(t, idx)
 }
 
+func TestSchema(t *testing.T) {
+	builder, err := NewBuilder("")
+	require.NoError(t, err)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, "", true)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, idxFieldTitle)
+	idxFieldBody, err := builder.AddTextField("body", TEXT, true, true, "", true)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, idxFieldBody)
+	idxFieldBody2, err := builder.AddTextField("body2", TEXT, true, true, "", true)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, idxFieldBody2)
+	doc, err := builder.Build()
+	require.NoError(t, err)
+	doc1, err := doc.Create()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, doc1)
+	doc2, err := doc.Create()
+	require.NoError(t, err)
+	require.EqualValues(t, 2, doc2)
+	_, err = doc.AddText(idxFieldTitle, "The Old Man and the Sea", doc1)
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldBody, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless.", doc1)
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldBody2, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless.", doc1)
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldTitle, "Of Mice and Men", doc2)
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldBody, `A few miles south of Soledad, the Salinas River drops in close to the hillside
+	bank and runs deep and green. The water is warm too, for it has slipped twinkling
+	over the yellow sands in the sunlight before reaching the narrow pool. On one
+	side of the river the golden foothill slopes curve up to the strong and rocky
+	Gabilan Mountains, but on the valley side the water is lined with trees—willows
+	fresh and green with every spring, carrying in their lower leaf junctures the
+	debris of the winter's flooding; and sycamores with mottled, white, recumbent
+	limbs and branches that arch over the pool`, doc2)
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldBody2, `A few miles south of Soledad, the Salinas River drops in close to the hillside
+	bank and runs deep and green. The water is warm too, for it has slipped twinkling
+	over the yellow sands in the sunlight befjmore reaching the narrow pool. On one
+	side of the river the golden foothill slopes curve up to the strong and rocky
+	Gabilan Mountains, but on the valley side the water is lined with trees—willows
+	fresh and green with every spring, carrying in their lower leaf junctures the
+	debris of the winter's flooding; and sycamores with mottled, white, recumbent
+	limbs and branches that arch over the pool`, doc2)
+	require.NoError(t, err)
+
+	indexer, err := doc.CreateIndex()
+	require.NoError(t, err)
+	schema := indexer.GetSchema()
+	n, err := schema.NumFields()
+	require.NoError(t, err)
+	require.EqualValues(t, 3, n)
+	log.Info("fields", "val", n)
+	fe, err := schema.GetFieldEntry("body2")
+	require.NoError(t, err)
+	require.EqualValues(t, "body2", fe.Name)
+	require.EqualValues(t, "text", fe.Type)
+	require.EqualValues(t, true, fe.Options["stored"])
+	fields, err := schema.Fields()
+	require.NoError(t, err)
+	require.EqualValues(t, "title", fields["0"].(msi)["name"])
+	require.EqualValues(t, "body", fields["1"].(msi)["name"])
+	require.EqualValues(t, "body2", fields["2"].(msi)["name"])
+	log.Info("fields=", fields)
+	afield, err := schema.GetField("body2")
+	require.NoError(t, err)
+	require.EqualValues(t, 2, afield)
+
+}
+
 func TestSnippetSearch(t *testing.T) {
 	builder, err := NewBuilder("")
 	require.NoError(t, err)

@@ -88,9 +88,9 @@ impl TantivySession {
             };
             self.dyn_q = match qp.parse_query(query) {
                 Ok(qp) => Some(qp),
-                Err(_e) => {
+                Err(e) => {
                     return make_internal_json_error::<u32>(ErrorKinds::BadParams(format!(
-                        "query parser error : {_e}"
+                        "query parser error : {e}"
                     )))
                 }
             };
