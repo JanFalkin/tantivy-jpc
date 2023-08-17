@@ -383,9 +383,6 @@ pub mod tests {
             unsafe {
                 iret = tantivy_jpc(sp.as_mut_ptr(), sp.len(), &mut p, my_ret_ptr);
             }
-            if iret < 0 {
-                panic!("call_jpc failed")
-            }
             let sl = unsafe { self.ptr_to_vec(p, my_ret_ptr) };
             defer! {
                 unsafe{free_data(iret);}

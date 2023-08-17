@@ -109,58 +109,68 @@ impl TantivySession {
     }
 
     // do_method is a translation from a string json method to an actual call.  All json params are passed
-    pub fn do_method(&mut self, method: &str, obj: &str, params: serde_json::Value) {
+    pub fn do_method(&mut self, method: &str, obj: &str, params: serde_json::Value) -> i64 {
         debug!("In do_method");
         match obj {
             "query_parser" => {
                 if let Err(e) = self.handle_query_parser(method, params) {
-                    return self.make_json_error(&format!("handle query parser error={e}"));
+                    self.make_json_error(&format!("handle query parser error={e}"));
+                    return -1;
                 };
             }
             "searcher" => {
                 if let Err(e) = self.handle_searcher(method, params) {
-                    return self.make_json_error(&format!("handle searcher error={e}"));
+                    self.make_json_error(&format!("handle searcher error={e}"));
+                    return -1;
                 };
             }
             "fuzzy_searcher" => {
                 if let Err(e) = self.handle_fuzzy_searcher(method, params) {
-                    return self.make_json_error(&format!("handle searcher error={e}"));
+                    self.make_json_error(&format!("handle searcher error={e}"));
+                    return -1;
                 };
             }
             "index" => {
                 if let Err(e) = self.handle_index(method, params) {
-                    return self.make_json_error(&format!("handle index error={e}"));
+                    self.make_json_error(&format!("handle index error={e}"));
+                    return -1;
                 };
             }
             "indexwriter" => {
                 if let Err(e) = self.handle_index_writer(method, params) {
-                    return self.make_json_error(&format!("handle index writer error={e}"));
+                    self.make_json_error(&format!("handle index writer error={e}"));
+                    return -1;
                 };
             }
             "index_reader" => {
                 if let Err(e) = self.handle_index_reader(method, params) {
-                    return self.make_json_error(&format!("handle_index_reader error={e}"));
+                    self.make_json_error(&format!("handle_index_reader error={e}"));
+                    return -1;
                 };
             }
             "document" => {
                 if let Err(e) = self.handle_document(method, params) {
-                    return self.make_json_error(&format!("handle document error={e}"));
+                    self.make_json_error(&format!("handle document error={e}"));
+                    return -1;
                 };
             }
             "builder" => {
                 if let Err(e) = self.handler_builder(method, params) {
-                    return self.make_json_error(&format!("handle builder error={e}"));
+                    self.make_json_error(&format!("handle builder error={e}"));
+                    return -1;
                 };
             }
             "schema" => {
                 if let Err(e) = self.handler_schema(method, params) {
-                    return self.make_json_error(&format!("handle schema error={e}"));
+                    self.make_json_error(&format!("handle schema error={e}"));
+                    return -1;
                 };
             }
             &_ => {}
         };
         let _ = &self.doc;
         let _ = &self.builder;
+        0
     }
 }
 /// Bitcode representation of a incomming client request
@@ -371,6 +381,7 @@ unsafe fn send_to_golang(
     val_to_send: Vec<u8>,
     go_memory: &mut *const u8,
     go_memory_sz: *mut usize,
+    do_return_val: i64,
 ) -> i64 {
     let mut map = match DATA_MAP.lock() {
         Ok(l) => l,
@@ -394,7 +405,11 @@ unsafe fn send_to_golang(
     };
     *go_memory = mem.bytes.as_ptr() as *mut u8;
     *go_memory_sz = mem.bytes.len();
-    handle
+    if do_return_val < 0 {
+        do_return_val
+    } else {
+        handle
+    }
 }
 
 /**
@@ -418,14 +433,14 @@ pub unsafe extern "C" fn tantivy_jpc(
         Ok(x) => x,
         Err(err) => {
             error!("failed error = {err}");
-            return send_to_golang(err.to_string().as_bytes().to_vec(), ret, ret_len);
+            return send_to_golang(err.to_string().as_bytes().to_vec(), ret, ret_len, -1);
         }
     };
     let json_params: Request = match serde_json::from_str(input_string) {
         Ok(m) => m,
         Err(_err) => {
             let r = make_json_error("parse failed for http", "ID not found");
-            return send_to_golang(r.as_bytes().to_vec(), ret, ret_len);
+            return send_to_golang(r.as_bytes().to_vec(), ret, ret_len, -1);
         }
     };
     let mut tm = match TANTIVY_MAP.lock() {
@@ -504,7 +519,7 @@ pub unsafe extern "C" fn tantivy_jpc(
                                 json_params.id
                             ))
                             .to_string();
-                            return send_to_golang(msg.as_bytes().to_vec(), ret, ret_len);
+                            return send_to_golang(msg.as_bytes().to_vec(), ret, ret_len, -1);
                         }
                     } //should be ok just put in
                 }
@@ -516,9 +531,9 @@ pub unsafe extern "C" fn tantivy_jpc(
                 "noid",
             );
 
-            return send_to_golang(msg.as_bytes().to_vec(), ret, ret_len);
+            return send_to_golang(msg.as_bytes().to_vec(), ret, ret_len, -1);
         }
     };
-    entity.do_method(json_params.method, json_params.obj, json_params.params);
-    send_to_golang(entity.return_buffer.as_bytes().to_vec(), ret, ret_len)
+    let dmr = entity.do_method(json_params.method, json_params.obj, json_params.params);
+    send_to_golang(entity.return_buffer.as_bytes().to_vec(), ret, ret_len, dmr)
 }
