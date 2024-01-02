@@ -44,7 +44,7 @@ pub struct ParamData {
     pub indexed: bool,
     pub fast: bool,
     pub tokenizer: String,
-    pub basic: bool
+    pub basic: bool,
 }
 
 impl TantivySession {
@@ -190,7 +190,7 @@ impl TantivySession {
                     );
                 }
                 if field_params.fast {
-                    ti = ti.set_fast();
+                    ti = ti.set_fast(None);
                 }
 
                 debug!(

@@ -581,10 +581,8 @@ pub mod tests {
         let sres = &searcher.search(1, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(
-            title_result[0].doc.0.get("title").unwrap()[0]
-                .as_text()
-                .unwrap(),
-            "The Old Man and the Sea".to_string()
+            title_result[0].doc.0.get("title").unwrap()[0],
+            tantivy::schema::OwnedValue::Str("The Old Man and the Sea".to_string())
         );
         match crate::do_term(&ti.ctx.id) {
             Ok(o) => o,
@@ -650,10 +648,8 @@ pub mod tests {
         let sres = &searcher.search(10, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(
-            title_result[0].doc.0.get("title").unwrap()[0]
-                .as_text()
-                .unwrap(),
-            "Of Mice and Men".to_string()
+            title_result[0].doc.0.get("title").unwrap()[0],
+            tantivy::schema::OwnedValue::Str("Of Mice and Men".to_string())
         );
         match crate::do_term(&ti.ctx.id) {
             Ok(o) => o,
@@ -1047,10 +1043,8 @@ pub mod tests {
         let sres = &searcher.search(1, false, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(
-            title_result[0].doc.0.get("title").unwrap()[0]
-                .as_text()
-                .unwrap(),
-            "The Old Man and the Sea".to_string()
+            title_result[0].doc.0.get("title").unwrap()[0],
+            tantivy::schema::OwnedValue::Str("The Old Man and the Sea".to_string())
         );
 
         let _ = crate::do_term(&ti.ctx.id);

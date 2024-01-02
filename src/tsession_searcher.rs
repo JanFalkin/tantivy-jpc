@@ -5,6 +5,7 @@ use crate::InternalCallResult;
 use crate::TantivySession;
 use tantivy::DocAddress;
 use tantivy::Searcher;
+use tantivy::TantivyDocument;
 use tantivy::TERMINATED;
 
 extern crate serde;
@@ -36,7 +37,7 @@ pub struct RawElement {
 
 #[derive(Serialize, Deserialize)]
 pub struct ResultElementDoc {
-    pub doc: Document,
+    pub doc: TantivyDocument,
     pub score: f32,
 }
 
@@ -198,7 +199,7 @@ impl TantivySession {
         v: &str,
         searcher: &Searcher,
         query: &dyn Query,
-        retrieved_doc: &Document,
+        retrieved_doc: &TantivyDocument,
     ) -> Result<String, ErrorKinds> {
         let sc = match &self.schema {
             Some(s) => s,
@@ -240,12 +241,12 @@ impl TantivySession {
         };
         let (query, _idx, searcher) = self.setup_searcher()?;
 
-        let retrieved_doc = searcher.doc(doc_address)?;
+        let retrieved_doc: TantivyDocument = searcher.doc(doc_address)?;
         let schema = self
             .schema
             .as_ref()
             .ok_or_else(|| ErrorKinds::NotExist("Schema not present".to_string()))?;
-        let named_doc = schema.to_named_doc(&retrieved_doc);
+        let named_doc = retrieved_doc.to_named_doc(schema);
         let mut s: String = "noexplain".to_string();
         if explain {
             s = query.explain(&searcher, doc_address)?.to_pretty_json();
@@ -308,12 +309,12 @@ impl TantivySession {
         debug!("search complete len = {}, td = {:?}", td.len(), td);
         let mut vret: Vec<ResultElement> = Vec::<ResultElement>::new();
         for (score, doc_address) in td {
-            let retrieved_doc = searcher.doc(doc_address)?;
+            let retrieved_doc: TantivyDocument = searcher.doc(doc_address)?;
             let schema = self
                 .schema
                 .as_ref()
                 .ok_or_else(|| ErrorKinds::NotExist("Schema not present".to_string()))?;
-            let named_doc = schema.to_named_doc(&retrieved_doc);
+            let named_doc = retrieved_doc.to_named_doc(schema);
             let mut s: String = "noexplain".to_string();
             if explain {
                 s = query.explain(&searcher, doc_address)?.to_pretty_json();
@@ -371,8 +372,8 @@ impl TantivySession {
                 if doc_id == TERMINATED {
                     break;
                 }
-                let doc = store_reader.get(doc_id)?;
-                let named_doc = schema.to_named_doc(&doc);
+                let doc: TantivyDocument = store_reader.get(doc_id)?;
+                let named_doc = doc.to_named_doc(schema);
                 let match_string: String;
                 vret.push_str(match serde_json::to_string(&named_doc) {
                     Ok(s) => {
