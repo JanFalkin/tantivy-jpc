@@ -377,7 +377,7 @@ pub mod tests {
                 "method": method,
                 "params": params,
             });
-            let mut sp = serde_json::to_vec(&call_p).unwrap_or(vec![]);
+            let mut sp = serde_json::to_vec(&call_p).unwrap_or_default();
             info!("calling tantivy-jpc json = {}", call_p);
             let iret: i64;
             unsafe {

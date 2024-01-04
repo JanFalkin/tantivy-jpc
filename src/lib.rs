@@ -37,10 +37,7 @@ pub mod tsession_searcher;
 pub mod tsession_tests;
 
 pub use self::tsession_builder::*;
-pub use self::tsession_document::*;
 pub use self::tsession_index::*;
-pub use self::tsession_query_parser::*;
-pub use self::tsession_schema::*;
 pub use self::tsession_searcher::*;
 pub use self::tsession_tests::*;
 
