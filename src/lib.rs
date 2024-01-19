@@ -28,6 +28,7 @@ lazy_static! {
     static ref DATA_MAP: Mutex<HashMap<i64, XferData>> = Mutex::new(HashMap::new());
 }
 
+pub mod tokenizer;
 pub mod tsession_builder;
 pub mod tsession_document;
 pub mod tsession_index;
@@ -36,11 +37,9 @@ pub mod tsession_schema;
 pub mod tsession_searcher;
 pub mod tsession_tests;
 
+pub use self::tokenizer::*;
 pub use self::tsession_builder::*;
-pub use self::tsession_document::*;
 pub use self::tsession_index::*;
-pub use self::tsession_query_parser::*;
-pub use self::tsession_schema::*;
 pub use self::tsession_searcher::*;
 pub use self::tsession_tests::*;
 
@@ -500,7 +499,7 @@ pub unsafe extern "C" fn tantivy_jpc(
                     let tokenizer_manager = TokenizerManager::default();
                     tokenizer_manager.register(
                         "en_stem_with_stop_words",
-                        TextAnalyzer::builder(SimpleTokenizer)
+                        TextAnalyzer::builder(CamelCaseDigitTokenizer)
                             .filter(RemoveLongFilter::limit(40))
                             .filter(LowerCaser)
                             .filter(stops)
