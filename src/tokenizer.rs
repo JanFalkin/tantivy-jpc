@@ -1,5 +1,5 @@
-use std::str::CharIndices;
 use std::iter::Peekable;
+use std::str::CharIndices;
 
 use super::{Token, TokenStream, Tokenizer};
 
@@ -31,13 +31,13 @@ impl<'a> CamelCaseDigitTokenStream<'a> {
     // and transitions between letters and digits.
     fn search_token_end(&mut self, start_offset: usize) -> usize {
         let first_char = self.text[start_offset..].chars().next();
-        let mut prev_char_is_digit = first_char.map_or(false, |ch| ch.is_digit(10));
+        let mut prev_char_is_digit = first_char.map_or(false, |ch| ch.is_ascii_digit());
         let mut prev_char_is_lowercase = first_char.map_or(false, |ch| ch.is_lowercase());
 
         while let Some(&(offset, c)) = self.chars.peek() {
             let is_transition = if c.is_uppercase() {
                 prev_char_is_lowercase || prev_char_is_digit
-            } else if c.is_digit(10) {
+            } else if c.is_ascii_digit() {
                 !prev_char_is_digit
             } else {
                 false
@@ -52,7 +52,7 @@ impl<'a> CamelCaseDigitTokenStream<'a> {
                 self.chars.next(); // Advance iterator for normal characters
             }
 
-            prev_char_is_digit = c.is_digit(10);
+            prev_char_is_digit = c.is_ascii_digit();
             prev_char_is_lowercase = c.is_lowercase();
         }
 

@@ -377,7 +377,7 @@ pub mod tests {
                 "method": method,
                 "params": params,
             });
-            let mut sp = serde_json::to_vec(&call_p).unwrap_or(vec![]);
+            let mut sp = serde_json::to_vec(&call_p).unwrap_or_default();
             info!("calling tantivy-jpc json = {}", call_p);
             let iret: i64;
             unsafe {
@@ -1314,11 +1314,25 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "en_stem_with_stopwords".to_string(), false),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stopwords".to_string(),
+                false
+            ),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "en_stem_with_stopwords".to_string(), false),
+            ctx.add_text_field(
+                "body".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stopwords".to_string(),
+                false
+            ),
             1
         );
         let mut td = match ctx.build(true) {

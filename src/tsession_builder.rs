@@ -44,7 +44,7 @@ pub struct ParamData {
     pub indexed: bool,
     pub fast: bool,
     pub tokenizer: String,
-    pub basic: bool
+    pub basic: bool,
 }
 
 impl TantivySession {
@@ -177,12 +177,11 @@ impl TantivySession {
                     ti = ti | STORED;
                 }
                 if field_params.field_type != 1 {
-                    let options;
-                    if field_params.basic {
-                        options = IndexRecordOption::Basic;
+                    let options: IndexRecordOption = if field_params.basic {
+                        IndexRecordOption::Basic
                     } else {
-                        options = IndexRecordOption::WithFreqsAndPositions;
-                    }
+                        IndexRecordOption::WithFreqsAndPositions
+                    };
                     ti = ti.set_indexing_options(
                         TextFieldIndexing::default()
                             .set_tokenizer(&field_params.tokenizer)
