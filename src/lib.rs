@@ -34,6 +34,7 @@ pub mod tsession_index;
 pub mod tsession_query_parser;
 pub mod tsession_schema;
 pub mod tsession_searcher;
+pub mod tokenizer;
 pub mod tsession_tests;
 
 pub use self::tsession_builder::*;
@@ -42,6 +43,7 @@ pub use self::tsession_index::*;
 pub use self::tsession_query_parser::*;
 pub use self::tsession_schema::*;
 pub use self::tsession_searcher::*;
+pub use self::tokenizer::*;
 pub use self::tsession_tests::*;
 
 // TantivySession provides a point of access to all Tantivy functionality on and for an Index.
@@ -494,13 +496,13 @@ pub unsafe extern "C" fn tantivy_jpc(
                             "will".to_string(),
                             "with".to_string(),
                         ]),
-                    };
+                    }; 
                     let te = TantivySession::new(json_params.id);
                     tm.insert(json_params.id.to_owned(), te);
                     let tokenizer_manager = TokenizerManager::default();
                     tokenizer_manager.register(
                         "en_stem_with_stop_words",
-                        TextAnalyzer::builder(SimpleTokenizer)
+                        TextAnalyzer::builder(CamelCaseDigitTokenizer)
                             .filter(RemoveLongFilter::limit(40))
                             .filter(LowerCaser)
                             .filter(stops)
