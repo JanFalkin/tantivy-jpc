@@ -177,7 +177,7 @@ impl TantivySession {
                     ti = ti | STORED;
                 }
                 if field_params.field_type != 1 {
-                    let options: IndexRecordOption = if field_params.basic {
+                    let options = if field_params.basic {
                         IndexRecordOption::Basic
                     } else {
                         IndexRecordOption::WithFreqsAndPositions

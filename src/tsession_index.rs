@@ -36,12 +36,20 @@ impl TantivySession {
             }
         };
 
-        const TOKENIZER_NAME: &str = "en_stem_with_stop_words";
-        let tokenizer_cur = match tm.get(TOKENIZER_NAME) {
+        let default_tokenizer = match tm.get("en_stem_with_stop_words") {
             Some(t) => t,
             None => {
                 return make_internal_json_error(ErrorKinds::BadInitialization(
                     "Unable to load 'en_stem_with_stop_words'".to_string(),
+                ))
+            }
+        };
+
+        let camelcase_tokenizer = match tm.get("en_stem_with_stop_words_with_camelcase_split") {
+            Some(t) => t,
+            None => {
+                return make_internal_json_error(ErrorKinds::BadInitialization(
+                    "Unable to load 'en_stem_with_stop_words_with_camelcase_split'".to_string(),
                 ))
             }
         };
@@ -70,7 +78,8 @@ impl TantivySession {
                     )?
                 }
             };
-            idx.tokenizers().register(TOKENIZER_NAME, tokenizer_cur);
+            idx.tokenizers().register("en_stem_with_stop_words", default_tokenizer);
+            idx.tokenizers().register("en_stem_with_stop_words_with_camelcase_split", camelcase_tokenizer);
             Ok(Box::new(idx))
         } else {
             debug!("Creating index in RAM");
@@ -89,7 +98,8 @@ impl TantivySession {
                 .clone()
                 .ok_or_else(|| ErrorKinds::Other("failed to clone index".to_string()))?;
 
-            r.tokenizers().register(TOKENIZER_NAME, tokenizer_cur);
+            r.tokenizers().register("en_stem_with_stop_words", default_tokenizer);
+            r.tokenizers().register("en_stem_with_stop_words_with_camelcase_split", camelcase_tokenizer);
             Ok(r)
         }
     }
