@@ -1310,15 +1310,15 @@ pub mod tests {
     }
 
     #[test]
-    fn test_default_alpha() {
+    fn test_camelcase() {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "en_stem_with_stopwords".to_string(), false),
+            ctx.add_text_field("title".to_string(), 2, true, true, "en_stem_with_stop_words_with_camelcase_split".to_string(), false),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "en_stem_with_stopwords".to_string(), false),
+            ctx.add_text_field("body".to_string(), 2, true, true, "en_stem_with_stop_words_with_camelcase_split".to_string(), false),
             1
         );
         let mut td = match ctx.build(true) {
@@ -1362,7 +1362,7 @@ pub mod tests {
         let mut rb = ti.reader_builder().unwrap();
         let mut qp = rb.searcher().unwrap();
         qp.for_index(vec!["title".to_string()]).unwrap();
-        let mut searcher = qp.parse_query("World".to_string()).unwrap();
+        let mut searcher = qp.parse_query("1989".to_string()).unwrap();
         let sres = &searcher.search(1, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         assert_eq!(

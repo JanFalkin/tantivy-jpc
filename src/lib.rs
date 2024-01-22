@@ -459,53 +459,63 @@ pub unsafe extern "C" fn tantivy_jpc(
             match cur_session {
                 Some(x) => x,
                 None => {
+                    let stop_words = vec![
+                        "a".to_string(),
+                        "an".to_string(),
+                        "and".to_string(),
+                        "are".to_string(),
+                        "as".to_string(),
+                        "at".to_string(),
+                        "be".to_string(),
+                        "but".to_string(),
+                        "by".to_string(),
+                        "for".to_string(),
+                        "if".to_string(),
+                        "in".to_string(),
+                        "into".to_string(),
+                        "is".to_string(),
+                        "it".to_string(),
+                        "no".to_string(),
+                        "not".to_string(),
+                        "of".to_string(),
+                        "on".to_string(),
+                        "or".to_string(),
+                        "such".to_string(),
+                        "that".to_string(),
+                        "the".to_string(),
+                        "their".to_string(),
+                        "then".to_string(),
+                        "there".to_string(),
+                        "these".to_string(),
+                        "they".to_string(),
+                        "this".to_string(),
+                        "to".to_string(),
+                        "was".to_string(),
+                        "will".to_string(),
+                        "with".to_string(),
+                    ];
                     let stops = match StopWordFilter::new(Language::English) {
                         Some(swf) => swf,
-                        None => StopWordFilter::remove(vec![
-                            "a".to_string(),
-                            "an".to_string(),
-                            "and".to_string(),
-                            "are".to_string(),
-                            "as".to_string(),
-                            "at".to_string(),
-                            "be".to_string(),
-                            "but".to_string(),
-                            "by".to_string(),
-                            "for".to_string(),
-                            "if".to_string(),
-                            "in".to_string(),
-                            "into".to_string(),
-                            "is".to_string(),
-                            "it".to_string(),
-                            "no".to_string(),
-                            "not".to_string(),
-                            "of".to_string(),
-                            "on".to_string(),
-                            "or".to_string(),
-                            "such".to_string(),
-                            "that".to_string(),
-                            "the".to_string(),
-                            "their".to_string(),
-                            "then".to_string(),
-                            "there".to_string(),
-                            "these".to_string(),
-                            "they".to_string(),
-                            "this".to_string(),
-                            "to".to_string(),
-                            "was".to_string(),
-                            "will".to_string(),
-                            "with".to_string(),
-                        ]),
+                        None => StopWordFilter::remove(stop_words),
                     }; 
                     let te = TantivySession::new(json_params.id);
                     tm.insert(json_params.id.to_owned(), te);
                     let tokenizer_manager = TokenizerManager::default();
                     tokenizer_manager.register(
-                        "en_stem_with_stop_words",
+                        "en_stem_with_stop_words_with_camelcase_split",
                         TextAnalyzer::builder(CamelCaseDigitTokenizer)
                             .filter(RemoveLongFilter::limit(40))
                             .filter(LowerCaser)
-                            .filter(stops)
+                            .filter(stops.clone())
+                            .filter(Stemmer::new(Language::English))
+                            .build(),
+                    );
+                    tokenizer_manager.register(
+                        "en_stem_with_stop_words",
+                        TextAnalyzer::builder(SimpleTokenizer)
+                            .filter(RemoveLongFilter::limit(40))
+                            .filter(LowerCaser)
+                            .filter(stops.clone())
                             .filter(Stemmer::new(Language::English))
                             .build(),
                     );
@@ -514,7 +524,6 @@ pub unsafe extern "C" fn tantivy_jpc(
                             s.tokenizer_manager = Some(tokenizer_manager);
                             s
                         }
-
                         None => {
                             let msg = ErrorKinds::NotExist(format!(
                                 "Session {} not found",
