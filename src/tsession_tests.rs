@@ -377,7 +377,7 @@ pub mod tests {
                 "method": method,
                 "params": params,
             });
-            let mut sp = serde_json::to_vec(&call_p).unwrap_or(vec![]);
+            let mut sp = serde_json::to_vec(&call_p).unwrap_or_default();
             info!("calling tantivy-jpc json = {}", call_p);
             let iret: i64;
             unsafe {
@@ -412,8 +412,8 @@ pub mod tests {
             a_type: i32,
             stored: bool,
             indexed: bool,
-            _tokenizer: String,
-            _basic: bool,
+            tokenizer: String,
+            basic: bool,
         ) -> i64 {
             let j_param = json!({
                 "name":   name,
@@ -421,6 +421,8 @@ pub mod tests {
                 "stored": stored,
                 "indexed" : indexed,
                 "id":     self.id,
+                "tokenizer" : tokenizer,
+                "basic" : basic,
             });
             let s = &self.call_jpc(
                 "builder".to_string(),
@@ -529,11 +531,25 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "body".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             1
         );
         let mut td = match ctx.build(true) {
@@ -597,11 +613,25 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "body".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             1
         );
         let mut td = match ctx.build(true) {
@@ -666,11 +696,25 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "body".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             1
         );
         let mut td = match ctx.build(true) {
@@ -751,15 +795,36 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string(), true),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                true
+            ),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string(), true),
+            ctx.add_text_field(
+                "body".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                true
+            ),
             1
         );
         assert_eq!(
-            ctx.add_text_field("body2".to_string(), 2, true, true, "".to_string(), true),
+            ctx.add_text_field(
+                "body2".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                true
+            ),
             2
         );
         let mut td = match ctx.build(true) {
@@ -814,15 +879,36 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "body".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             1
         );
         assert_eq!(
-            ctx.add_text_field("body2".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "body2".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             2
         );
         let mut td = match ctx.build(true) {
@@ -919,11 +1005,25 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "body".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             1
         );
         let mut td = match ctx.build(true) {
@@ -989,11 +1089,25 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "body".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             1
         );
         assert_eq!(ctx.add_i64_field("order".to_string(), 3, true, true), 2);
@@ -1061,11 +1175,25 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "body".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             1
         );
         let mut td = match ctx.build(true) {
@@ -1124,7 +1252,14 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             0
         );
         let mut td = match ctx.build(true) {
@@ -1201,11 +1336,25 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "body".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             1
         );
         assert_eq!(ctx.add_i64_field("order".to_string(), 3, false, true), 2);
@@ -1296,11 +1445,25 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "".to_string(), false),
+            ctx.add_text_field(
+                "body".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words".to_string(),
+                false
+            ),
             1
         );
         assert_eq!(ctx.add_date_field("date".to_string(), 2, true, true), 2);
@@ -1314,11 +1477,25 @@ pub mod tests {
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
-            ctx.add_text_field("title".to_string(), 2, true, true, "en_stem_with_stop_words_with_camelcase_split".to_string(), false),
+            ctx.add_text_field(
+                "title".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words_with_camelcase_split".to_string(),
+                false
+            ),
             0
         );
         assert_eq!(
-            ctx.add_text_field("body".to_string(), 2, true, true, "en_stem_with_stop_words_with_camelcase_split".to_string(), false),
+            ctx.add_text_field(
+                "body".to_string(),
+                2,
+                true,
+                true,
+                "en_stem_with_stop_words_with_camelcase_split".to_string(),
+                false
+            ),
             1
         );
         let mut td = match ctx.build(true) {
