@@ -509,7 +509,7 @@ pub unsafe extern "C" fn tantivy_jpc(
                     );
                     tokenizer_manager.register(
                         "en_stem_with_stop_words",
-                        TextAnalyzer::builder(SimpleTokenizer)
+                        TextAnalyzer::builder(CamelCaseDigitTokenizer)
                             .filter(RemoveLongFilter::limit(40))
                             .filter(LowerCaser)
                             .filter(stops.clone())
