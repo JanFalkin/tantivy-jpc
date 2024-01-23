@@ -1482,7 +1482,7 @@ pub mod tests {
                 2,
                 true,
                 true,
-                "en_stem_with_stop_words_with_camelcase_split".to_string(),
+                "filename".to_string(),
                 false
             ),
             0
@@ -1493,7 +1493,7 @@ pub mod tests {
                 2,
                 true,
                 true,
-                "en_stem_with_stop_words_with_camelcase_split".to_string(),
+                "filename".to_string(),
                 false
             ),
             1
