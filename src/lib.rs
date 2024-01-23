@@ -499,7 +499,7 @@ pub unsafe extern "C" fn tantivy_jpc(
                     tm.insert(json_params.id.to_owned(), te);
                     let tokenizer_manager = TokenizerManager::default();
                     tokenizer_manager.register(
-                        "en_stem_with_stop_words_with_camelcase_split",
+                        "filename",
                         TextAnalyzer::builder(CamelCaseDigitTokenizer)
                             .filter(RemoveLongFilter::limit(40))
                             .filter(LowerCaser)
