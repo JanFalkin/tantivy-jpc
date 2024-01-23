@@ -499,8 +499,8 @@ pub unsafe extern "C" fn tantivy_jpc(
                     tm.insert(json_params.id.to_owned(), te);
                     let tokenizer_manager = TokenizerManager::default();
                     tokenizer_manager.register(
-                        "filename",
-                        TextAnalyzer::builder(CamelCaseDigitTokenizer)
+                        "en_stem_with_stop_words",
+                        TextAnalyzer::builder(SimpleTokenizer)
                             .filter(RemoveLongFilter::limit(40))
                             .filter(LowerCaser)
                             .filter(stops.clone())
@@ -508,7 +508,7 @@ pub unsafe extern "C" fn tantivy_jpc(
                             .build(),
                     );
                     tokenizer_manager.register(
-                        "en_stem_with_stop_words",
+                        "filename",
                         TextAnalyzer::builder(CamelCaseDigitTokenizer)
                             .filter(RemoveLongFilter::limit(40))
                             .filter(LowerCaser)
