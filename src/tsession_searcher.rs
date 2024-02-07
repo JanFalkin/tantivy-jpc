@@ -3,6 +3,7 @@ use crate::make_internal_json_error;
 use crate::ErrorKinds;
 use crate::InternalCallResult;
 use crate::TantivySession;
+use base64::Engine;
 use tantivy::DocAddress;
 use tantivy::Searcher;
 use tantivy::TERMINATED;
@@ -11,16 +12,126 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 use crate::HashMap;
+use base64::engine::general_purpose;
 use log::error;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::BTreeMap;
 use std::fmt::Write;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::query::Query;
 use tantivy::schema::NamedFieldDocument;
+use tantivy::schema::Value;
 use tantivy::SnippetGenerator;
 use tantivy::{Document, Index};
 
-#[derive(Serialize, Deserialize, Debug)]
+use serde::de::{self, MapAccess, Visitor};
+use serde::ser::SerializeStruct;
+use std::fmt;
+
+impl Serialize for ResultElement {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_struct("ResultElement", 4)?;
+        s.serialize_field("score", &self.score)?;
+        s.serialize_field("explain", &self.explain)?;
+        s.serialize_field("snippet_html", &self.snippet_html)?;
+
+        let doc: HashMap<String, Vec<String>> = self
+            .doc
+            .0
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    v.iter()
+                        .map(|val| match val {
+                            Value::Str(s) => s.clone(),
+                            Value::I64(i) => i.to_string(),
+                            Value::U64(u) => u.to_string(),
+                            Value::F64(f) => f.to_string(),
+                            Value::Date(d) => d.into_timestamp_millis().to_string(),
+                            Value::Bytes(b) => general_purpose::STANDARD.encode(b),
+                            Value::JsonObject(j) => {
+                                serde_json::to_string(j).unwrap_or("{}".to_string())
+                            }
+                            Value::IpAddr(ip) => ip.to_string(),
+                            Value::Facet(f) => f.to_string(),
+                            Value::PreTokStr(s) => s.text.clone().to_string(), // handle other Value variants here
+                            Value::Bool(b) => b.to_string(),
+                        })
+                        .collect(),
+                )
+            })
+            .collect();
+
+        s.serialize_field("doc", &doc)?;
+        s.end()
+    }
+}
+
+struct ResultElementVisitor;
+
+impl<'de> Visitor<'de> for ResultElementVisitor {
+    type Value = ResultElement;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("struct ResultElement")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let mut result_element = ResultElement {
+            doc: NamedFieldDocument(BTreeMap::<String, Vec<Value>>::new()),
+            score: 0.0,
+            explain: String::new(),
+            snippet_html: None,
+        }; // assuming ResultElement has a default
+
+        while let Some(key) = map.next_key()? {
+            match key {
+                "score" => {
+                    result_element.score = map.next_value()?;
+                }
+                "explain" => {
+                    result_element.explain = map.next_value()?;
+                }
+                "snippet_html" => {
+                    result_element.snippet_html = map.next_value()?;
+                }
+                "doc" => {
+                    let doc: HashMap<String, Vec<String>> = map.next_value()?;
+                    result_element.doc = NamedFieldDocument(
+                        doc.into_iter()
+                            .map(|(k, v)| (k, v.into_iter().map(|val| Value::Str(val)).collect()))
+                            .collect::<BTreeMap<String, Vec<Value>>>(),
+                    );
+                }
+                _ => return Err(de::Error::unknown_field(key, &[])),
+            }
+        }
+
+        Ok(result_element)
+    }
+}
+
+impl<'de> Deserialize<'de> for ResultElement {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_struct(
+            "ResultElement",
+            &["score", "explain", "snippet_html", "doc"],
+            ResultElementVisitor,
+        )
+    }
+}
+
+#[derive(Debug)]
 pub struct ResultElement {
     pub doc: NamedFieldDocument,
     pub score: f32,

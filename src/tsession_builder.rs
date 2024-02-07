@@ -9,7 +9,8 @@ extern crate serde_derive;
 extern crate serde_json;
 use serde_json::json;
 use tantivy::schema::{
-    IndexRecordOption, NumericOptions, Schema, TextFieldIndexing, TextOptions, STORED, STRING, TEXT,
+    IndexRecordOption, JsonObjectOptions, NumericOptions, Schema, TextFieldIndexing, TextOptions,
+    STORED, STRING, TEXT,
 };
 use tantivy::DateOptions;
 
@@ -197,6 +198,23 @@ impl TantivySession {
                     &field_params.name, &field_params.field_type, &field_params.stored
                 );
                 let f = sb.add_text_field(&field_params.name, ti);
+                self.return_buffer = json!({ "field": f }).to_string();
+            }
+            "add_json_field" => {
+                let field_params = Self::extract_field_params(params)?;
+                let mut fi = JsonObjectOptions::default();
+                debug!(
+                    "add_json_field: name = {}, field_type = {} stored = {}",
+                    &field_params.name, &field_params.field_type, &field_params.stored
+                );
+                fi = fi
+                    .clone()
+                    .set_indexing_options(TextFieldIndexing::default());
+                if field_params.stored {
+                    fi = fi | STORED;
+                }
+
+                let f = sb.add_json_field(&field_params.name, fi);
                 self.return_buffer = json!({ "field": f }).to_string();
             }
             "add_date_field" => {

@@ -53,6 +53,19 @@ func (td *TDocument) AddText(field int, value string, doc_id uint) (int, error) 
 	return 0, nil
 }
 
+func (td *TDocument) AddJson(field int, value map[string]interface{}, doc_id uint) (int, error) {
+	_, err := td.callTantivy("document", "add_json", msi{
+		"field":  field,
+		"value":  value,
+		"id":     td.JPCId.id,
+		"doc_id": doc_id,
+	})
+	if err != nil {
+		return -1, err
+	}
+	return 0, nil
+}
+
 func (td *TDocument) AddInt(field int, value int64, doc_id uint) (int, error) {
 	_, err := td.callTantivy("document", "add_int", msi{
 		"field":  field,
