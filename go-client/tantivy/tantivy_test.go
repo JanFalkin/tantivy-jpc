@@ -1019,7 +1019,11 @@ func TestIndexerJsonField(t *testing.T) {
 	err = json.Unmarshal([]byte(s), &results)
 	require.NoError(t, err)
 	require.EqualValues(t, "The Old Man and the Sea", results[0]["doc"].(map[string]interface{})["title"].([]interface{})[0].(string))
-	//require.EqualValues(t, "The Old Man and the Sea", results[0]["doc"].(map[string]interface{})["title"].([]interface{})[0].(string))
+	contents := results[0]["doc"].(map[string]interface{})["body"].([]interface{})[0].(string)
+	contentsJson := map[string]interface{}{}
+	err = json.Unmarshal([]byte(contents), &contentsJson)
+	require.NoError(t, err)
+	require.EqualValues(t, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless.", contentsJson["contents"].(string))
 
 	searcherAgain, err := qp.ParseQuery("order:2")
 	require.NoError(t, err)
