@@ -189,7 +189,7 @@ impl TantivySession {
                     );
                 }
                 if field_params.fast {
-                    ti = ti.set_fast();
+                    ti = ti.set_fast(None);
                 }
 
                 debug!(

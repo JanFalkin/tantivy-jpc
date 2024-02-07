@@ -48,7 +48,7 @@ pub use self::tsession_tests::*;
 // conversation based on the TantivySession::id.
 struct TantivySession {
     pub(crate) id: String,
-    pub(crate) doc: Option<HashMap<usize, tantivy::Document>>,
+    pub(crate) doc: Option<HashMap<usize, tantivy::TantivyDocument>>,
     pub(crate) builder: Option<Box<tantivy::schema::SchemaBuilder>>,
     pub(crate) schema: Option<tantivy::schema::Schema>,
     pub(crate) index: Option<Box<tantivy::Index>>,
@@ -500,7 +500,7 @@ pub unsafe extern "C" fn tantivy_jpc(
                     let tokenizer_manager = TokenizerManager::default();
                     tokenizer_manager.register(
                         "en_stem_with_stop_words",
-                        TextAnalyzer::builder(SimpleTokenizer)
+                        TextAnalyzer::builder(SimpleTokenizer::default())
                             .filter(RemoveLongFilter::limit(40))
                             .filter(LowerCaser)
                             .filter(stops.clone())
