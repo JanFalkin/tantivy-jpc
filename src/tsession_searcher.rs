@@ -106,7 +106,7 @@ impl<'de> Visitor<'de> for ResultElementVisitor {
                     let doc: HashMap<String, Vec<String>> = map.next_value()?;
                     result_element.doc = NamedFieldDocument(
                         doc.into_iter()
-                            .map(|(k, v)| (k, v.into_iter().map(|val| Value::Str(val)).collect()))
+                            .map(|(k, v)| (k, v.into_iter().map(Value::Str).collect()))
                             .collect::<BTreeMap<String, Vec<Value>>>(),
                     );
                 }

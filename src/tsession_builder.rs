@@ -207,9 +207,6 @@ impl TantivySession {
                     "add_json_field: name = {}, field_type = {} stored = {}",
                     &field_params.name, &field_params.field_type, &field_params.stored
                 );
-                fi = fi
-                    .clone()
-                    .set_indexing_options(TextFieldIndexing::default());
                 if field_params.stored {
                     fi = fi | STORED;
                 }
