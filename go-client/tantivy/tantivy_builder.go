@@ -15,6 +15,7 @@ const (
 	TEXT   StorageKind = 2
 	INT    StorageKind = 3
 	UINT   StorageKind = 4
+	JSON   StorageKind = 5
 )
 
 type TBuilder struct {
@@ -82,6 +83,23 @@ func (tb *TBuilder) AddTextField(name string, fieldType StorageKind, stored bool
 		params["tokenizer"] = tokenizer
 	}
 	s, err := tb.callTantivy("builder", "add_text_field", params)
+	return tb.standardReturnHandler(s, err)
+
+}
+func (tb *TBuilder) AddJsonField(name string, fieldType StorageKind, stored bool, fast bool, tokenizer string, basic bool) (int, error) {
+	params := msi{
+		"name":   name,
+		"type":   fieldType,
+		"stored": stored,
+		"id":     tb.JPCId.id,
+		"fast":   fast,
+		"basic":  basic,
+	}
+
+	if tokenizer != "" {
+		params["tokenizer"] = tokenizer
+	}
+	s, err := tb.callTantivy("builder", "add_json_field", params)
 	return tb.standardReturnHandler(s, err)
 
 }

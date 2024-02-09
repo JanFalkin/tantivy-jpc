@@ -18,6 +18,10 @@ fn string_val(v: serde_json::Value) -> tantivy::schema::Value {
     tantivy::schema::Value::Str(v.as_str().unwrap_or("empty").to_string())
 }
 
+fn json_val(v: serde_json::Value) -> tantivy::schema::Value {
+    tantivy::schema::Value::JsonObject(v.as_object().unwrap_or(&serde_json::Map::new()).clone())
+}
+
 fn int_val(v: serde_json::Value) -> tantivy::schema::Value {
     tantivy::schema::Value::I64(v.as_i64().unwrap_or(0))
 }
@@ -121,6 +125,10 @@ impl TantivySession {
         match method {
             "add_text" => {
                 self.handle_add_field(params, string_val)?;
+                0
+            }
+            "add_json" => {
+                self.handle_add_field(params, json_val)?;
                 0
             }
             "add_int" => {

@@ -947,6 +947,93 @@ func TestIndexer(t *testing.T) {
 	require.EqualValues(t, "Of Mice and Men", results[0]["doc"].(map[string]interface{})["title"].([]interface{})[0].(string))
 }
 
+func TestIndexerJsonField(t *testing.T) {
+	builder, err := NewBuilder("")
+	require.NoError(t, err)
+	idxFieldTitle, err := builder.AddTextField("title", TEXT, true, true, "", false)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, idxFieldTitle)
+	idxFieldBody, err := builder.AddJsonField("body", JSON, true, true, "", false)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, idxFieldBody)
+	idxFieldInt, err := builder.AddI64Field("order", INT, true, true, true)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, idxFieldInt)
+	doc, err := builder.Build()
+	require.NoError(t, err)
+	doc1, err := doc.Create()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, doc1)
+	doc2, err := doc.Create()
+	require.NoError(t, err)
+	require.EqualValues(t, 2, doc2)
+	_, err = doc.AddText(idxFieldTitle, "The Old Man and the Sea", doc1)
+	require.NoError(t, err)
+	_, err = doc.AddJson(idxFieldBody, msi{"contents": "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless."}, doc1)
+	require.NoError(t, err)
+	_, err = doc.AddInt(idxFieldInt, 1, doc1)
+	require.NoError(t, err)
+	_, err = doc.AddText(idxFieldTitle, "Of Mice and Men", doc2)
+	require.NoError(t, err)
+	_, err = doc.AddJson(idxFieldBody, msi{"contents": `A few miles south of Soledad, the Salinas River drops in close to the hillside
+	bank and runs deep and green. The water is warm too, for it has slipped twinkling
+	over the yellow sands in the sunlight before reaching the narrow pool. On one
+	side of the river the golden foothill slopes curve up to the strong and rocky
+	Gabilan Mountains, but on the valley side the water is lined with trees—willows
+	fresh and green with every spring, carrying in their lower leaf junctures the
+	debris of the winter's flooding; and sycamores with mottled, white, recumbent
+	limbs and branches that arch over the pool`}, doc2)
+	require.NoError(t, err)
+	_, err = doc.AddInt(idxFieldInt, 2, doc2)
+	require.NoError(t, err)
+
+	indexer, err := doc.CreateIndex()
+	require.NoError(t, err)
+
+	idw, err := indexer.CreateIndexWriter()
+	require.NoError(t, err)
+	opst1, err := idw.AddDocument(doc1)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, opst1)
+	opst2, err := idw.AddDocument(doc2)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, opst2)
+	fmt.Printf("op1 = %v op2 = %v\n", opst1, opst2)
+	idCommit, err := idw.Commit()
+	require.NoError(t, err)
+	fmt.Printf("commit id = %v", idCommit)
+
+	rb, err := indexer.ReaderBuilder()
+	require.NoError(t, err)
+	qp, err := rb.Searcher()
+	require.NoError(t, err)
+
+	_, err = qp.ForIndex([]string{"title", "body"})
+	require.NoError(t, err)
+
+	searcher, err := qp.ParseQuery("order:1")
+	require.NoError(t, err)
+	s, err := searcher.Search(false, 0, 0, true)
+	require.NoError(t, err)
+	results := []map[string]interface{}{}
+	err = json.Unmarshal([]byte(s), &results)
+	require.NoError(t, err)
+	require.EqualValues(t, "The Old Man and the Sea", results[0]["doc"].(map[string]interface{})["title"].([]interface{})[0].(string))
+	contents := results[0]["doc"].(map[string]interface{})["body"].([]interface{})[0].(string)
+	contentsJson := map[string]interface{}{}
+	err = json.Unmarshal([]byte(contents), &contentsJson)
+	require.NoError(t, err)
+	require.EqualValues(t, "He was an old man who fished alone in a skiff in the Gulf Stream and he had gone eighty-four days now without taking a fish. The water was warm but fishless.", contentsJson["contents"].(string))
+
+	searcherAgain, err := qp.ParseQuery("order:2")
+	require.NoError(t, err)
+	s, err = searcherAgain.Search(true, 0, 0, true)
+	require.NoError(t, err)
+	err = json.Unmarshal([]byte(s), &results)
+	require.NoError(t, err)
+	require.EqualValues(t, "Of Mice and Men", results[0]["doc"].(map[string]interface{})["title"].([]interface{})[0].(string))
+}
+
 func TestTantivyFuzzy(t *testing.T) {
 	wd, err := os.Getwd()
 	require.NoError(t, err)
