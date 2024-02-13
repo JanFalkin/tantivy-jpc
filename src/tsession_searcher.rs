@@ -38,7 +38,7 @@ impl Serialize for ResultElement {
         s.serialize_field("explain", &self.explain)?;
         s.serialize_field("snippet_html", &self.snippet_html)?;
 
-        let doc: HashMap<String, Vec<String>> = self
+        let doc: HashMap<String, Vec<Value>> = self
             .doc
             .0
             .iter()
@@ -47,19 +47,19 @@ impl Serialize for ResultElement {
                     k.clone(),
                     v.iter()
                         .map(|val| match val {
-                            Value::Str(s) => s.clone(),
-                            Value::I64(i) => i.to_string(),
-                            Value::U64(u) => u.to_string(),
-                            Value::F64(f) => f.to_string(),
-                            Value::Date(d) => d.into_timestamp_millis().to_string(),
-                            Value::Bytes(b) => general_purpose::STANDARD.encode(b),
+                            Value::Str(s) => Value::Str(s.to_string()),
+                            Value::I64(i) => Value::I64(*i),
+                            Value::U64(u) => Value::U64(*u),
+                            Value::F64(f) => Value::F64(*f),
+                            Value::Date(d) => Value::Date(*d),
+                            Value::Bytes(b) => Value::Bytes((*b).clone()),
                             Value::JsonObject(j) => {
-                                serde_json::to_string(j).unwrap_or("{}".to_string())
+                                Value::Str(serde_json::to_string(j).unwrap_or("{}".to_string()))
                             }
-                            Value::IpAddr(ip) => ip.to_string(),
-                            Value::Facet(f) => f.to_string(),
-                            Value::PreTokStr(s) => s.text.clone().to_string(), // handle other Value variants here
-                            Value::Bool(b) => b.to_string(),
+                            Value::IpAddr(ip) => ip.to_string().into(),
+                            Value::Facet(f) => f.to_string().into(),
+                            Value::PreTokStr(s) => s.text.clone().to_string().into(), // handle other Value variants here
+                            Value::Bool(b) => b.to_string().into(),
                         })
                         .collect(),
                 )
@@ -91,6 +91,8 @@ impl<'de> Visitor<'de> for ResultElementVisitor {
             snippet_html: None,
         }; // assuming ResultElement has a default
 
+        let mut first_content: Value;
+
         while let Some(key) = map.next_key()? {
             match key {
                 "score" => {
@@ -103,12 +105,40 @@ impl<'de> Visitor<'de> for ResultElementVisitor {
                     result_element.snippet_html = map.next_value()?;
                 }
                 "doc" => {
-                    let doc: HashMap<String, Vec<String>> = map.next_value()?;
-                    result_element.doc = NamedFieldDocument(
-                        doc.into_iter()
-                            .map(|(k, v)| (k, v.into_iter().map(Value::Str).collect()))
-                            .collect::<BTreeMap<String, Vec<Value>>>(),
-                    );
+                    let mut doc: HashMap<String, Vec<Value>> = map.next_value()?;
+                    if let Some(contents) = doc.remove("contents") {
+                        let contents_str = {
+                            first_content = contents
+                                .into_iter()
+                                .next()
+                                .unwrap_or(Value::Str("".to_string()));
+                            first_content.as_text().unwrap_or_default()
+                        };
+                        result_element.doc = NamedFieldDocument(
+                            doc.into_iter()
+                                .map(|(k, v)| {
+                                    (
+                                        k,
+                                        v.into_iter()
+                                            .map(|k| {
+                                                Value::Str(k.as_text().unwrap_or("").to_string())
+                                            })
+                                            .collect::<Vec<Value>>(),
+                                    )
+                                })
+                                .collect::<BTreeMap<String, Vec<Value>>>(),
+                        );
+                        result_element.doc.0.insert(
+                            "contents".to_string(),
+                            vec![Value::Str(contents_str.to_string())],
+                        );
+                    } else {
+                        result_element.doc = NamedFieldDocument(
+                            doc.into_iter()
+                                // .map(|(k, v)| (k, v.into_iter().map(Value::Str).collect()))
+                                .collect::<BTreeMap<String, Vec<Value>>>(),
+                        );
+                    }
                 }
                 _ => return Err(de::Error::unknown_field(key, &[])),
             }
