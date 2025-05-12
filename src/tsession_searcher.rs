@@ -4,6 +4,9 @@ use crate::ErrorKinds;
 use crate::InternalCallResult;
 use crate::TantivySession;
 use base64::Engine;
+use serde_json::Value;
+use tantivy::schema::OwnedValue;
+use tantivy::schema::Schema;
 use tantivy::DocAddress;
 use tantivy::Searcher;
 use tantivy::TERMINATED;
@@ -11,7 +14,7 @@ use tantivy::TERMINATED;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
-use crate::HashMap;
+use std::collections::HashMap;
 use base64::engine::general_purpose;
 use log::error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -20,8 +23,8 @@ use std::fmt::Write;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::query::Query;
 use tantivy::schema::NamedFieldDocument;
-use tantivy::schema::Value;
-use tantivy::SnippetGenerator;
+use tantivy::snippet::SnippetGenerator;
+use tantivy::schema::document::TantivyDocument;
 use tantivy::{Document, Index};
 
 use serde::de::{self, MapAccess, Visitor};
@@ -38,7 +41,8 @@ impl Serialize for ResultElement {
         s.serialize_field("explain", &self.explain)?;
         s.serialize_field("snippet_html", &self.snippet_html)?;
 
-        let doc: HashMap<String, Vec<Value>> = self
+        // Serialize the `doc` field
+        let doc: HashMap<String, Vec<OwnedValue>> = self
             .doc
             .0
             .iter()
@@ -47,19 +51,8 @@ impl Serialize for ResultElement {
                     k.clone(),
                     v.iter()
                         .map(|val| match val {
-                            Value::Str(s) => Value::Str(s.to_string()),
-                            Value::I64(i) => Value::I64(*i),
-                            Value::U64(u) => Value::U64(*u),
-                            Value::F64(f) => Value::F64(*f),
-                            Value::Date(d) => Value::Date(*d),
-                            Value::Bytes(b) => Value::Bytes((*b).clone()),
-                            Value::JsonObject(j) => {
-                                Value::Str(serde_json::to_string(j).unwrap_or("{}".to_string()))
-                            }
-                            Value::IpAddr(ip) => ip.to_string().into(),
-                            Value::Facet(f) => f.to_string().into(),
-                            Value::PreTokStr(s) => s.text.clone().to_string().into(), // handle other Value variants here
-                            Value::Bool(b) => b.to_string().into(),
+                            OwnedValue::Str(s) => OwnedValue::Str(s.clone()),
+                            _ => val.clone(), // Serialize other variants as-is
                         })
                         .collect(),
                 )
@@ -85,14 +78,12 @@ impl<'de> Visitor<'de> for ResultElementVisitor {
         A: MapAccess<'de>,
     {
         let mut result_element = ResultElement {
-            doc: NamedFieldDocument(BTreeMap::<String, Vec<Value>>::new()),
+            doc: NamedFieldDocument(BTreeMap::<String, Vec<OwnedValue>>::new()),
             score: 0.0,
             explain: String::new(),
             snippet_html: None,
-        }; // assuming ResultElement has a default
-
-        let mut first_content: Value;
-
+        };
+    
         while let Some(key) = map.next_key()? {
             match key {
                 "score" => {
@@ -105,45 +96,30 @@ impl<'de> Visitor<'de> for ResultElementVisitor {
                     result_element.snippet_html = map.next_value()?;
                 }
                 "doc" => {
-                    let mut doc: HashMap<String, Vec<Value>> = map.next_value()?;
-                    if let Some(contents) = doc.remove("contents") {
-                        let contents_str = {
-                            first_content = contents
-                                .into_iter()
-                                .next()
-                                .unwrap_or(Value::Str("".to_string()));
-                            first_content.as_text().unwrap_or_default()
-                        };
-                        result_element.doc = NamedFieldDocument(
-                            doc.into_iter()
-                                .map(|(k, v)| {
-                                    (
-                                        k,
-                                        v.into_iter()
-                                            .map(|k| {
-                                                Value::Str(k.as_text().unwrap_or("").to_string())
-                                            })
-                                            .collect::<Vec<Value>>(),
-                                    )
-                                })
-                                .collect::<BTreeMap<String, Vec<Value>>>(),
-                        );
-                        result_element.doc.0.insert(
-                            "contents".to_string(),
-                            vec![Value::Str(contents_str.to_string())],
-                        );
-                    } else {
-                        result_element.doc = NamedFieldDocument(
-                            doc.into_iter()
-                                // .map(|(k, v)| (k, v.into_iter().map(Value::Str).collect()))
-                                .collect::<BTreeMap<String, Vec<Value>>>(),
-                        );
-                    }
+                    let doc: HashMap<String, Vec<Value>> = map.next_value()?;
+                    result_element.doc = NamedFieldDocument(
+                        doc.into_iter()
+                            .map(|(k, v)| {
+                                (
+                                    k,
+                                    v.into_iter()
+                                        .filter_map(|val| {
+                                            if let Some(inner) = val.get("key") {
+                                                serde_json::from_value(inner.clone()).ok()
+                                            } else {
+                                                serde_json::from_value(val).ok()
+                                            }
+                                        })
+                                        .collect(),
+                                )
+                            })
+                            .collect(),
+                    );
                 }
                 _ => return Err(de::Error::unknown_field(key, &[])),
             }
         }
-
+    
         Ok(result_element)
     }
 }
@@ -175,12 +151,81 @@ pub struct RawElement {
     pub body: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct ResultElementDoc {
-    pub doc: Document,
+    pub doc: tantivy::schema::document::TantivyDocument,
     pub score: f32,
 }
 
+impl ResultElementDoc {
+    pub fn create_schema() -> tantivy::schema::Schema {
+        let mut schema_builder = tantivy::schema::SchemaBuilder::default();
+
+        // Add fields to the schema manually
+        schema_builder.add_text_field("doc", tantivy::schema::TEXT | tantivy::schema::STORED);
+        schema_builder.add_f64_field("score", tantivy::schema::STORED);
+
+        schema_builder.build()
+    }
+}
+
+impl Serialize for ResultElementDoc {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("ResultElementDoc", 2)?;
+
+        // Serialize `doc` as a JSON string
+        let doc_json = self
+            .doc
+            .to_json(&ResultElementDoc::create_schema());
+        state.serialize_field("doc", &doc_json)?;
+
+        state.serialize_field("score", &self.score)?;
+        state.end()
+    }
+}
+
+fn extract_string_from_owned_value(value: &OwnedValue) -> Option<String> {
+    match value {
+        OwnedValue::Str(s) => Some(s.clone()), // Clone the inner String
+        _ => None, // Return None if the OwnedValue is not a Str
+    }
+}
+
+impl<'de> Deserialize<'de> for ResultElementDoc {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+
+        // Define a helper struct to deserialize the raw fields
+        #[derive(Serialize, Deserialize)]
+        #[serde(rename = "ResultElementDoc")]
+        struct RawResultElementDoc {
+            doc: TantivyDocument, // Deserialize `doc` as a JSON string
+            score: f32,  // Deserialize `score` as a native f32
+        }
+
+        // Deserialize into the helper struct
+        let raw: RawResultElementDoc = RawResultElementDoc::deserialize(deserializer)?;
+
+        let str_raw  = serde_json::to_string(&raw.doc).map_err(de::Error::custom)?;
+        // Parse the `doc` JSON string into a CompactDoc
+        let compact_doc = parse_compact_doc(&str_raw).map_err(de::Error::custom)?;
+
+        // Return the constructed ResultElementDoc
+        Ok(ResultElementDoc {
+            doc: compact_doc,
+            score: raw.score,
+        })
+    }
+}
+fn parse_compact_doc(s: &str) -> Result<tantivy::schema::document::TantivyDocument, String> {
+    tantivy::schema::document::TantivyDocument::parse_json(&ResultElementDoc::create_schema(), s)
+        .map_err(|e| format!("Failed to parse CompactDoc: {}", e))
+}
 impl TantivySession {
     pub fn handle_fuzzy_searcher(
         &mut self,
@@ -236,7 +281,7 @@ impl TantivySession {
             });
         }
         let mut s = "".to_string();
-        match writeln!(s, "{}", serde_json::to_string(&vret)?) {
+        match writeln!(s, "{:?}", &vret) {
             Ok(_) => {}
             Err(_) => {
                 return make_internal_json_error(ErrorKinds::NotExist(
@@ -339,7 +384,7 @@ impl TantivySession {
         v: &str,
         searcher: &Searcher,
         query: &dyn Query,
-        retrieved_doc: &Document,
+        retrieved_doc: &TantivyDocument,
     ) -> Result<String, ErrorKinds> {
         let sc = match &self.schema {
             Some(s) => s,
@@ -381,17 +426,20 @@ impl TantivySession {
         };
         let (query, _idx, searcher) = self.setup_searcher()?;
 
-        let retrieved_doc = searcher.doc(doc_address)?;
+        let retrieved_doc: TantivyDocument = searcher.doc(doc_address)?;
         let schema = self
             .schema
             .as_ref()
             .ok_or_else(|| ErrorKinds::NotExist("Schema not present".to_string()))?;
-        let named_doc = schema.to_named_doc(&retrieved_doc);
+        let named_doc = retrieved_doc.to_named_doc(&schema);
         let mut s: String = "noexplain".to_string();
         if explain {
             s = query.explain(&searcher, doc_address)?.to_pretty_json();
         }
-        debug!("retrieved doc {:?}", retrieved_doc.field_values());
+        debug!(
+            "retrieved doc {:?}",
+            retrieved_doc.field_values().collect::<Vec<_>>()
+        );
 
         let mut hm: HashMap<String, String> = HashMap::new();
 
@@ -449,12 +497,12 @@ impl TantivySession {
         debug!("search complete len = {}, td = {:?}", td.len(), td);
         let mut vret: Vec<ResultElement> = Vec::<ResultElement>::new();
         for (score, doc_address) in td {
-            let retrieved_doc = searcher.doc(doc_address)?;
+            let retrieved_doc: TantivyDocument = searcher.doc(doc_address)?;
             let schema = self
                 .schema
                 .as_ref()
                 .ok_or_else(|| ErrorKinds::NotExist("Schema not present".to_string()))?;
-            let named_doc = schema.to_named_doc(&retrieved_doc);
+            let named_doc = retrieved_doc.to_named_doc(&schema);
             let mut s: String = "noexplain".to_string();
             if explain {
                 s = query.explain(&searcher, doc_address)?.to_pretty_json();
@@ -472,7 +520,10 @@ impl TantivySession {
                     }
                 });
             }
-            debug!("retrieved doc {:?}", retrieved_doc.field_values());
+            debug!(
+                "retrieved doc {:?}",
+                retrieved_doc.field_values().collect::<Vec<_>>()
+            );
             vret.append(&mut vec![ResultElement {
                 doc: named_doc,
                 score,
@@ -512,8 +563,8 @@ impl TantivySession {
                 if doc_id == TERMINATED {
                     break;
                 }
-                let doc = store_reader.get(doc_id)?;
-                let named_doc = schema.to_named_doc(&doc);
+                let doc: TantivyDocument = store_reader.get(doc_id)?;
+                let named_doc = doc.to_named_doc(schema);
                 let match_string: String;
                 vret.push_str(match serde_json::to_string(&named_doc) {
                     Ok(s) => {

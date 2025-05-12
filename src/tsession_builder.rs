@@ -12,7 +12,7 @@ use tantivy::schema::{
     IndexRecordOption, JsonObjectOptions, NumericOptions, Schema, TextFieldIndexing, TextOptions,
     STORED, STRING, TEXT,
 };
-use tantivy::DateOptions;
+use tantivy::schema::DateOptions;
 
 macro_rules! impl_simple_type {
     () => {};
@@ -190,7 +190,7 @@ impl TantivySession {
                     );
                 }
                 if field_params.fast {
-                    ti = ti.set_fast();
+                    ti = ti.set_fast(None);
                 }
 
                 debug!(

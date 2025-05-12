@@ -340,7 +340,7 @@ impl TantivySession {
                     debug!("got index reader@@@@@@");
                     match (*idx)
                         .clone()
-                        .reload_policy(tantivy::ReloadPolicy::OnCommit)
+                        .reload_policy(tantivy::ReloadPolicy::OnCommitWithDelay)
                         .try_into()
                     {
                         Ok(idx_read) => {

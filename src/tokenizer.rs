@@ -17,7 +17,7 @@ pub struct CamelCaseDigitTokenStream<'a> {
 impl Tokenizer for CamelCaseDigitTokenizer {
     type TokenStream<'a> = CamelCaseDigitTokenStream<'a>;
 
-    fn token_stream<'a>(&self, text: &'a str) -> CamelCaseDigitTokenStream<'a> {
+    fn token_stream<'a>(&mut self, text: &'a str) -> CamelCaseDigitTokenStream<'a> {
         CamelCaseDigitTokenStream {
             text,
             chars: text.char_indices().peekable(),
