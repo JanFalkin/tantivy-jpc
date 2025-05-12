@@ -65,7 +65,7 @@ impl TantivySession {
             let idx = match tantivy::Index::open_in_dir(dir_to_use) {
                 Ok(p) => p,
                 Err(err) => {
-                    info!("error={}\n", err);
+                    info!("error={err}\n");
                     tantivy::Index::create_in_dir(
                         dir_to_use,
                         if let Some(s) = &self.schema {
@@ -170,7 +170,7 @@ impl TantivySession {
         let writer = match self.indexwriter.as_mut() {
             Some(x) => x,
             None => {
-                let bi = match self.index.as_mut().take() {
+                let bi = match self.index.as_mut() {
                     Some(x) => x,
                     None => {
                         return make_internal_json_error(ErrorKinds::BadInitialization(
@@ -334,8 +334,7 @@ impl TantivySession {
         _params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         debug!("IndexReader");
-        match method {
-            "searcher" => {
+        if method == "searcher"{
                 if let Some(idx) = self.index_reader_builder.as_ref() {
                     debug!("got index reader@@@@@@");
                     match (*idx)
@@ -353,9 +352,11 @@ impl TantivySession {
                             )))
                         }
                     }
-                }
-            }
-            &_ => {}
+        }
+        } else {
+            return make_internal_json_error(ErrorKinds::UnRecognizedCommand(format!(
+                "unknown method {method}"
+            )));
         }
         Ok(0)
     }

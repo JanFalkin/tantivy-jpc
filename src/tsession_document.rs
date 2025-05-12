@@ -61,15 +61,13 @@ impl TantivySession {
                 Some(u) => (u - 1) as usize,
                 None => {
                     return Err(ErrorKinds::BadParams(format!(
-                        "Unable to coerce {} as uint",
-                        d
+                        "Unable to coerce {d} as uint"
                     )))
                 }
             },
             None => {
                 return Err(ErrorKinds::BadParams(format!(
-                    "Could not find doc_id in {:?}",
-                    m
+                    "Could not find doc_id in {m:?}"
                 )))
             }
         };
@@ -78,20 +76,18 @@ impl TantivySession {
                 Some(u) => u as u32,
                 None => {
                     return Err(ErrorKinds::BadParams(format!(
-                        "Unable to coerce {} as uint",
-                        d
+                        "Unable to coerce {d} as uint"
                     )))
                 }
             },
             None => {
                 return Err(ErrorKinds::BadParams(format!(
-                    "Could not find field in {:?}",
-                    m
+                    "Could not find field in {m:?}"
                 )))
             }
         };
         let f = Field::from_field_id(field_idx);
-        debug!("add_text: name = {:?}", m);
+        debug!("add_text: name = {m:?}");
         match m.get("field") {
             Some(f) => f.as_i64(),
             None => {

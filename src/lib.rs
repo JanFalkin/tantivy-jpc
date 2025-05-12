@@ -93,7 +93,7 @@ impl TantivySession {
     /// # Arguments
     /// * `err`- the error to be translated to a response
     pub fn make_json_error(&mut self, err: &str) {
-        debug!("error={}", err);
+        debug!("error={err}");
         let msg = json!(
             {
             "error" :  err,
@@ -186,7 +186,7 @@ pub struct Request<'a> {
 /// # Arguments
 /// * `err`- the error to be translated to a response
 pub fn make_json_error(err: &str, id: &str) -> String {
-    debug!("error={}", err);
+    debug!("error={err}");
     let msg = json!(
         {
         "error" :  err,
@@ -198,7 +198,7 @@ pub fn make_json_error(err: &str, id: &str) -> String {
         Ok(x) => x,
         Err(err) => format!("{err}"),
     };
-    debug!("returning  result = {}", vr);
+    debug!("returning  result = {vr}");
     vr
 }
 

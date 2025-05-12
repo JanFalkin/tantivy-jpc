@@ -11,16 +11,16 @@ use scopeguard::defer;
 pub mod tests {
     extern crate tempdir;
 
-    use tantivy::schema::{FieldEntry, OwnedValue};
+    use tantivy::schema::FieldEntry;
     use tempdir::TempDir;
     use uuid::Uuid;
 
-    use crate::{free_data, ErrorKinds, ResultElementDoc};
+    use crate::{free_data, ErrorKinds};
 
     use super::*;
     use serde_json::Map;
     use std::rc::Rc;
-    use regex::Regex;
+
 
     pub static mut GSIZE: usize = 0;
 
@@ -389,7 +389,7 @@ pub mod tests {
                 "params": params,
             });
             let mut sp = serde_json::to_vec(&call_p).unwrap_or_default();
-            info!("calling tantivy-jpc json = {}", call_p);
+            info!("calling tantivy-jpc json = {call_p}");
             let iret: i64;
             unsafe {
                 iret = tantivy_jpc(sp.as_mut_ptr(), sp.len(), &mut p, my_ret_ptr);
@@ -399,7 +399,7 @@ pub mod tests {
                 unsafe{free_data(iret);}
             }
             match std::str::from_utf8(&sl) {
-                Ok(s) => println!("stringified = {}", s),
+                Ok(s) => println!("stringified = {s}"),
                 Err(err) => {
                     println!("ERROR = {err} sl = {sl:?}")
                 }
@@ -407,9 +407,9 @@ pub mod tests {
             if do_ret {
                 let v: serde_json::Value =
                     serde_json::from_slice(&sl).unwrap_or(json!({"result" : "empty"}));
-                info!("Val = {}", v);
+                info!("Val = {v}");
                 match std::str::from_utf8(&sl) {
-                    Ok(s) => info!("stringified = {}", s),
+                    Ok(s) => info!("stringified = {s}"),
                     Err(err) => panic!("ERROR = {err} p = {sl:?}"),
                 };
                 sl
@@ -441,7 +441,7 @@ pub mod tests {
                 j_param,
                 true,
             );
-            info!("builder ret  = {:?}", s);
+            info!("builder ret  = {s:?}");
             let i: serde_json::Value = serde_json::from_slice(s).unwrap();
             i["field"].as_i64().unwrap()
         }
@@ -470,7 +470,7 @@ pub mod tests {
                 j_param,
                 true,
             );
-            info!("builder ret  = {:?}", s);
+            info!("builder ret  = {s:?}");
             let i: serde_json::Value = serde_json::from_slice(s).unwrap();
             i["field"].as_i64().unwrap()
         }
@@ -553,7 +553,7 @@ pub mod tests {
             self.dirs.append(&mut vec![td]);
             let td_ref = self.dirs.last().unwrap();
             let s = self.call_jpc("builder".to_string(), "build".to_string(), json!({}), false);
-            info!("build returned={:?}", s);
+            info!("build returned={s:?}");
             let tdir = td_ref
                 .path()
                 .to_str()
@@ -640,9 +640,11 @@ pub mod tests {
         for (key, value) in &title_result[0].doc.0 {
             println!("Key: {}, Value: {:?}", key, value);
         }
-        let title =  &titlev[0];
-
-//        assert_eq!(*val, "The Old Man and the Sea".to_string());
+        let val = match &titlev[0] {
+            tantivy::schema::OwnedValue::Str(val) => val,
+            _ => panic!("not a text"),
+        };
+        assert_eq!(*val, "The Old Man and the Sea".to_string());
         match crate::do_term(&ti.ctx.id) {
             Ok(o) => o,
             Err(e) => panic!("exception = {e}"),
@@ -720,7 +722,7 @@ pub mod tests {
         let sres = &searcher.search(1, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         let val = match &title_result[0].doc.0.get("title").unwrap()[0] {
-            OwnedValue::Str(val) => val,
+            tantivy::schema::OwnedValue::Str(val) => val,
             _ => panic!("not a text"),
         };
         assert_eq!(*val, "The Old Man and the Sea".to_string());
@@ -802,7 +804,7 @@ pub mod tests {
         let sres = &searcher.search(10, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         let val = match &title_result[0].doc.0.get("title").unwrap()[0] {
-            OwnedValue::Str(val) => val,
+            tantivy::schema::OwnedValue::Str(val) => val,
             _ => panic!("not a text"),
         };
         assert_eq!(*val, "Of Mice and Men".to_string());
@@ -1282,7 +1284,7 @@ pub mod tests {
         let sres = &searcher.search(1, false, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         let val = match &title_result[0].doc.0.get("title").unwrap()[0] {
-            OwnedValue::Str(val) => val,
+            tantivy::schema::OwnedValue::Str(val) => val,
             _ => panic!("not a text"),
         };
         assert_eq!(*val, "The Old Man and the Sea".to_string());
@@ -1367,34 +1369,6 @@ pub mod tests {
         let _ = crate::do_term(&ti.ctx.id);
     }
 
-    fn convert_to_valid_json(input: &str) -> String {
-        // Step 1: Replace struct names with valid JSON array brackets
-        let mut result = input.replace("[ResultElementDoc", "[")
-                              .replace("ResultElementDoc {", "{")
-                              .replace("CompactDoc {", "{")
-                              .replace("FieldValueAddr {", "{");
-    
-        // Step 2: Quote all keys
-        let key_regex = Regex::new(r"(\w+):").unwrap();
-        result = key_regex.replace_all(&result, r#""$1":"#).to_string();
-    
-        // Step 3: Quote all string values
-        let value_regex = Regex::new(r"\b([a-zA-Z_][a-zA-Z0-9_ ]*)\b").unwrap();
-        result = value_regex.replace_all(&result, r#""$1""#).to_string();
-    
-        // Step 4: Replace Rust-style array brackets with JSON-style brackets
-        result = result.replace("(", "[").replace(")", "]");
-    
-        // Step 5: Remove trailing commas
-        let trailing_comma_regex = Regex::new(r",\s*}").unwrap();
-        result = trailing_comma_regex.replace_all(&result, "}").to_string();
-    
-        // Step 6: Ensure the JSON array ends properly
-        result = result.replace("}, ]", "}]");
-    
-        result
-    }
-
     #[test]
     fn basic_index_fuzzy() {
 
@@ -1477,7 +1451,7 @@ pub mod tests {
             .unwrap();
         let sres = &searcher.fuzzy_search(2).unwrap();
         print!("RESULT={}", sres);
-        let vret: Vec<ResultElementDoc> = serde_json::from_str(sres).unwrap();
+        let vret: Vec<crate::ResultElementDoc> = serde_json::from_str(sres).unwrap();
         assert_eq!(vret.len(), 2);
         let _ = crate::do_term(&ti.ctx.id);
     }
@@ -1694,7 +1668,7 @@ pub mod tests {
         let sres = &searcher.search(1, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
         let val = match &title_result[0].doc.0.get("title").unwrap()[0] {
-            OwnedValue::Str(val) => val,
+            tantivy::schema::OwnedValue::Str(val) => val,
             _ => panic!("not a text"),
         };
         assert_eq!(*val, "abc Hello1989World test".to_string());

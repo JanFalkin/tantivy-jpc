@@ -36,7 +36,7 @@ jobs:
           delete-branch: true
           base: master
   build-mac:
-    runs-on: macos-11
+    runs-on: macos-15
 
     steps:
       - name: Checkout
@@ -67,7 +67,7 @@ jobs:
           base: master
 
   build-mac-arm:
-    runs-on: macos-12
+    runs-on: macos-15 Arm64
 
     steps:
       - name: Checkout

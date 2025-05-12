@@ -191,18 +191,12 @@ fn compact_doc_to_json(doc: &TantivyDocument, schema: &tantivy::schema::Schema) 
         let field_name = field_entry.name().to_string();
 
         obj.entry(field_name)
-           .or_insert(Value::String(format!("{:?}", value))); // Simplified: one value per field
+           .or_insert(Value::String(format!("{value:?}"))); // Simplified: one value per field
     }
 
     Value::Object(obj)
 }
 
-fn extract_string_from_owned_value(value: &OwnedValue) -> Option<String> {
-    match value {
-            OwnedValue::Str(s) => Some(s.clone()), // Clone the inner String
-        _ => None, // Return None if the OwnedValue is not a Str
-    }
-}
 
 impl<'de> Deserialize<'de> for ResultElementDoc {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -225,10 +219,6 @@ impl<'de> Deserialize<'de> for ResultElementDoc {
             score: raw.score,
         })
     }
-}
-fn parse_compact_doc(s: &str) -> Result<tantivy::schema::document::TantivyDocument, String> {
-    tantivy::schema::document::TantivyDocument::parse_json(&ResultElementDoc::create_schema(), s)
-        .map_err(|e| format!("Failed to parse CompactDoc: {}", e))
 }
 impl TantivySession {
     pub fn handle_fuzzy_searcher(
@@ -435,7 +425,7 @@ impl TantivySession {
             .schema
             .as_ref()
             .ok_or_else(|| ErrorKinds::NotExist("Schema not present".to_string()))?;
-        let named_doc = retrieved_doc.to_named_doc(&schema);
+        let named_doc = retrieved_doc.to_named_doc(schema);
         let mut s: String = "noexplain".to_string();
         if explain {
             s = query.explain(&searcher, doc_address)?.to_pretty_json();
@@ -506,7 +496,7 @@ impl TantivySession {
                 .schema
                 .as_ref()
                 .ok_or_else(|| ErrorKinds::NotExist("Schema not present".to_string()))?;
-            let named_doc = retrieved_doc.to_named_doc(&schema);
+            let named_doc = retrieved_doc.to_named_doc(schema);
             let mut s: String = "noexplain".to_string();
             if explain {
                 s = query.explain(&searcher, doc_address)?.to_pretty_json();
@@ -607,8 +597,8 @@ impl TantivySession {
         params: serde_json::Value,
     ) -> InternalCallResult<u32> {
         debug!("Searcher");
-        let s = format!("{}", params);
-        println!("{}", s);
+        let s = format!("{params}");
+        println!("{s}");
         match method {
             "search" => self.do_search(params),
             "search_raw" => self.do_raw_search(params),

@@ -31,8 +31,8 @@ impl<'a> CamelCaseDigitTokenStream<'a> {
     // and transitions between letters and digits.
     fn search_token_end(&mut self, start_offset: usize) -> usize {
         let first_char = self.text[start_offset..].chars().next();
-        let mut prev_char_is_digit = first_char.map_or(false, |ch| ch.is_ascii_digit());
-        let mut prev_char_is_lowercase = first_char.map_or(false, |ch| ch.is_lowercase());
+        let mut prev_char_is_digit = first_char.is_some_and(|ch| ch.is_ascii_digit());
+        let mut prev_char_is_lowercase = first_char.is_some_and(|ch| ch.is_lowercase());
 
         while let Some(&(offset, c)) = self.chars.peek() {
             let is_transition = if c.is_uppercase() {
