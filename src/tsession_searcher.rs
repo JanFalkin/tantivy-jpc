@@ -3,10 +3,8 @@ use crate::make_internal_json_error;
 use crate::ErrorKinds;
 use crate::InternalCallResult;
 use crate::TantivySession;
-use base64::Engine;
 use serde_json::Value;
 use tantivy::schema::OwnedValue;
-use tantivy::schema::Schema;
 use tantivy::DocAddress;
 use tantivy::Searcher;
 use tantivy::TERMINATED;
@@ -15,7 +13,6 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 use std::collections::HashMap;
-use base64::engine::general_purpose;
 use log::error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeMap;
@@ -24,7 +21,7 @@ use tantivy::collector::{Count, TopDocs};
 use tantivy::query::Query;
 use tantivy::schema::NamedFieldDocument;
 use tantivy::snippet::SnippetGenerator;
-use tantivy::schema::document::TantivyDocument;
+use tantivy::TantivyDocument;
 use tantivy::{Document, Index};
 
 use serde::de::{self, MapAccess, Visitor};
@@ -153,7 +150,7 @@ pub struct RawElement {
 
 #[derive(Debug)]
 pub struct ResultElementDoc {
-    pub doc: tantivy::schema::document::TantivyDocument,
+    pub doc:TantivyDocument,
     pub score: f32,
 }
 
@@ -171,25 +168,38 @@ impl ResultElementDoc {
 
 impl Serialize for ResultElementDoc {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("ResultElementDoc", 2)?;
+    where S: Serializer {
+        let schema = ResultElementDoc::create_schema(); // Your function that returns Schema
 
-        // Serialize `doc` as a JSON string
-        let doc_json = self
-            .doc
-            .to_json(&ResultElementDoc::create_schema());
-        state.serialize_field("doc", &doc_json)?;
+        let json_val = compact_doc_to_json(&self.doc, &schema);
 
-        state.serialize_field("score", &self.score)?;
-        state.end()
+        let mut s = serializer.serialize_struct("ResultElementDoc", 2)?;
+        s.serialize_field("doc", &json_val)?;
+        s.serialize_field("score", &self.score)?;
+        s.end()
     }
+}
+
+fn compact_doc_to_json(doc: &TantivyDocument, schema: &tantivy::schema::Schema) -> Value {
+    use serde_json::{Map, Value};
+
+    let mut obj = Map::new();
+    for field_value in doc.field_values() {
+        let field = field_value.0;
+        let value = field_value.1;
+        let field_entry = schema.get_field_entry(field);
+        let field_name = field_entry.name().to_string();
+
+        obj.entry(field_name)
+           .or_insert(Value::String(format!("{:?}", value))); // Simplified: one value per field
+    }
+
+    Value::Object(obj)
 }
 
 fn extract_string_from_owned_value(value: &OwnedValue) -> Option<String> {
     match value {
-        OwnedValue::Str(s) => Some(s.clone()), // Clone the inner String
+            OwnedValue::Str(s) => Some(s.clone()), // Clone the inner String
         _ => None, // Return None if the OwnedValue is not a Str
     }
 }
@@ -199,23 +209,17 @@ impl<'de> Deserialize<'de> for ResultElementDoc {
     where
         D: Deserializer<'de>,
     {
-
-        // Define a helper struct to deserialize the raw fields
-        #[derive(Serialize, Deserialize)]
-        #[serde(rename = "ResultElementDoc")]
-        struct RawResultElementDoc {
-            doc: TantivyDocument, // Deserialize `doc` as a JSON string
-            score: f32,  // Deserialize `score` as a native f32
+        #[derive(Deserialize)]
+        struct Raw {
+            doc: serde_json::Map<String, Value>,
+            score: f32,
         }
 
-        // Deserialize into the helper struct
-        let raw: RawResultElementDoc = RawResultElementDoc::deserialize(deserializer)?;
+        let raw:Raw = Raw::deserialize(deserializer)?;
 
-        let str_raw  = serde_json::to_string(&raw.doc).map_err(de::Error::custom)?;
-        // Parse the `doc` JSON string into a CompactDoc
-        let compact_doc = parse_compact_doc(&str_raw).map_err(de::Error::custom)?;
+        let schema = ResultElementDoc::create_schema();
+        let compact_doc = TantivyDocument::from_json_object(&schema, raw.doc).map_err(de::Error::custom)?;
 
-        // Return the constructed ResultElementDoc
         Ok(ResultElementDoc {
             doc: compact_doc,
             score: raw.score,
@@ -281,7 +285,7 @@ impl TantivySession {
             });
         }
         let mut s = "".to_string();
-        match writeln!(s, "{:?}", &vret) {
+        match writeln!(s, "{}", serde_json::to_string(&vret)?) {
             Ok(_) => {}
             Err(_) => {
                 return make_internal_json_error(ErrorKinds::NotExist(

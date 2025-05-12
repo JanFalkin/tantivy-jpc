@@ -1477,7 +1477,7 @@ pub mod tests {
             .unwrap();
         let sres = &searcher.fuzzy_search(2).unwrap();
         print!("RESULT={}", sres);
-        let vret: Vec<ResultElementDoc> = serde_json::from_str(&convert_to_valid_json(sres)).unwrap();
+        let vret: Vec<ResultElementDoc> = serde_json::from_str(sres).unwrap();
         assert_eq!(vret.len(), 2);
         let _ = crate::do_term(&ti.ctx.id);
     }

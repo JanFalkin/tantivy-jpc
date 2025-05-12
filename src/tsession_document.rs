@@ -12,6 +12,7 @@ extern crate serde_json;
 
 use serde_json::json;
 use tantivy::schema::Field;
+use tantivy::schema::TantivyDocument;
 
 fn string_val(v: serde_json::Value) -> serde_json::Value {
     v.as_str()
