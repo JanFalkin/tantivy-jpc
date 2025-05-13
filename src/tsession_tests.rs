@@ -21,6 +21,7 @@ pub mod tests {
     use serde_json::Map;
     use std::rc::Rc;
 
+
     pub static mut GSIZE: usize = 0;
 
     macro_rules! call_simple_type {
@@ -388,7 +389,7 @@ pub mod tests {
                 "params": params,
             });
             let mut sp = serde_json::to_vec(&call_p).unwrap_or_default();
-            info!("calling tantivy-jpc json = {}", call_p);
+            info!("calling tantivy-jpc json = {call_p}");
             let iret: i64;
             unsafe {
                 iret = tantivy_jpc(sp.as_mut_ptr(), sp.len(), &mut p, my_ret_ptr);
@@ -398,7 +399,7 @@ pub mod tests {
                 unsafe{free_data(iret);}
             }
             match std::str::from_utf8(&sl) {
-                Ok(s) => println!("stringified = {}", s),
+                Ok(s) => println!("stringified = {s}"),
                 Err(err) => {
                     println!("ERROR = {err} sl = {sl:?}")
                 }
@@ -406,9 +407,9 @@ pub mod tests {
             if do_ret {
                 let v: serde_json::Value =
                     serde_json::from_slice(&sl).unwrap_or(json!({"result" : "empty"}));
-                info!("Val = {}", v);
+                info!("Val = {v}");
                 match std::str::from_utf8(&sl) {
-                    Ok(s) => info!("stringified = {}", s),
+                    Ok(s) => info!("stringified = {s}"),
                     Err(err) => panic!("ERROR = {err} p = {sl:?}"),
                 };
                 sl
@@ -440,7 +441,7 @@ pub mod tests {
                 j_param,
                 true,
             );
-            info!("builder ret  = {:?}", s);
+            info!("builder ret  = {s:?}");
             let i: serde_json::Value = serde_json::from_slice(s).unwrap();
             i["field"].as_i64().unwrap()
         }
@@ -469,7 +470,7 @@ pub mod tests {
                 j_param,
                 true,
             );
-            info!("builder ret  = {:?}", s);
+            info!("builder ret  = {s:?}");
             let i: serde_json::Value = serde_json::from_slice(s).unwrap();
             i["field"].as_i64().unwrap()
         }
@@ -552,7 +553,7 @@ pub mod tests {
             self.dirs.append(&mut vec![td]);
             let td_ref = self.dirs.last().unwrap();
             let s = self.call_jpc("builder".to_string(), "build".to_string(), json!({}), false);
-            info!("build returned={:?}", s);
+            info!("build returned={s:?}");
             let tdir = td_ref
                 .path()
                 .to_str()
@@ -635,12 +636,15 @@ pub mod tests {
         let mut searcher = qp.parse_query("Sea".to_string()).unwrap();
         let sres = &searcher.search(1, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
-        assert_eq!(
-            title_result[0].doc.0.get("title").unwrap()[0]
-                .as_text()
-                .unwrap(),
-            "The Old Man and the Sea".to_string()
-        );
+        let titlev  = title_result[0].doc.0.get("title").unwrap();
+        for (key, value) in &title_result[0].doc.0 {
+            println!("Key: {}, Value: {:?}", key, value);
+        }
+        let val = match &titlev[0] {
+            tantivy::schema::OwnedValue::Str(val) => val,
+            _ => panic!("not a text"),
+        };
+        assert_eq!(*val, "The Old Man and the Sea".to_string());
         match crate::do_term(&ti.ctx.id) {
             Ok(o) => o,
             Err(e) => panic!("exception = {e}"),
@@ -717,12 +721,11 @@ pub mod tests {
         let mut searcher = qp.parse_query("Sea".to_string()).unwrap();
         let sres = &searcher.search(1, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
-        assert_eq!(
-            title_result[0].doc.0.get("title").unwrap()[0]
-                .as_text()
-                .unwrap(),
-            "The Old Man and the Sea".to_string()
-        );
+        let val = match &title_result[0].doc.0.get("title").unwrap()[0] {
+            tantivy::schema::OwnedValue::Str(val) => val,
+            _ => panic!("not a text"),
+        };
+        assert_eq!(*val, "The Old Man and the Sea".to_string());
         match crate::do_term(&ti.ctx.id) {
             Ok(o) => o,
             Err(e) => panic!("exception = {e}"),
@@ -800,12 +803,11 @@ pub mod tests {
         let mut searcher = qp.parse_query("sycamores".to_string()).unwrap();
         let sres = &searcher.search(10, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
-        assert_eq!(
-            title_result[0].doc.0.get("title").unwrap()[0]
-                .as_text()
-                .unwrap(),
-            "Of Mice and Men".to_string()
-        );
+        let val = match &title_result[0].doc.0.get("title").unwrap()[0] {
+            tantivy::schema::OwnedValue::Str(val) => val,
+            _ => panic!("not a text"),
+        };
+        assert_eq!(*val, "Of Mice and Men".to_string());
         match crate::do_term(&ti.ctx.id) {
             Ok(o) => o,
             Err(e) => panic!("exception = {e}"),
@@ -1281,12 +1283,11 @@ pub mod tests {
         let mut searcher = qp.parse_query("order:111".to_string()).unwrap();
         let sres = &searcher.search(1, false, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
-        assert_eq!(
-            title_result[0].doc.0.get("title").unwrap()[0]
-                .as_text()
-                .unwrap(),
-            "The Old Man and the Sea".to_string()
-        );
+        let val = match &title_result[0].doc.0.get("title").unwrap()[0] {
+            tantivy::schema::OwnedValue::Str(val) => val,
+            _ => panic!("not a text"),
+        };
+        assert_eq!(*val, "The Old Man and the Sea".to_string());
 
         let _ = crate::do_term(&ti.ctx.id);
     }
@@ -1370,6 +1371,8 @@ pub mod tests {
 
     #[test]
     fn basic_index_fuzzy() {
+
+
         crate::test_init();
         let mut ctx = FakeContext::new();
         assert_eq!(
@@ -1447,7 +1450,8 @@ pub mod tests {
             .parse_fuzzy_query("diari".to_string(), "title".to_string())
             .unwrap();
         let sres = &searcher.fuzzy_search(2).unwrap();
-        let vret: Vec<serde_json::Value> = serde_json::from_str(sres).unwrap();
+        print!("RESULT={}", sres);
+        let vret: Vec<crate::ResultElementDoc> = serde_json::from_str(sres).unwrap();
         assert_eq!(vret.len(), 2);
         let _ = crate::do_term(&ti.ctx.id);
     }
@@ -1663,12 +1667,11 @@ pub mod tests {
         let mut searcher = qp.parse_query("1989".to_string()).unwrap();
         let sres = &searcher.search(1, true, vec![]).unwrap();
         let title_result: Vec<ResultElement> = serde_json::from_str(sres).unwrap();
-        assert_eq!(
-            title_result[0].doc.0.get("title").unwrap()[0]
-                .as_text()
-                .unwrap(),
-            "abc Hello1989World test".to_string()
-        );
+        let val = match &title_result[0].doc.0.get("title").unwrap()[0] {
+            tantivy::schema::OwnedValue::Str(val) => val,
+            _ => panic!("not a text"),
+        };
+        assert_eq!(*val, "abc Hello1989World test".to_string());
         match crate::do_term(&ti.ctx.id) {
             Ok(o) => o,
             Err(e) => panic!("exception = {e}"),

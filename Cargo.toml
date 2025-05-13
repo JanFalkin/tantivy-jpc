@@ -13,12 +13,12 @@ cbindgen = "0.24.5"
 paste = "1.0.0"
 take_mut = "0.2.2"
 chrono = "0.4.26"
-thiserror = "1.0.30"
-serde = "1.0.166"
-serde_json = "1.0.99"
-serde_derive = "1.0.166"
+thiserror = "2.0.12"
+serde = "1.0.219"
+serde_json = "1.0.140"
+serde_derive = "1.0.219"
 log = "0.4.14"
-tantivy = { git = "https://github.com/JanFalkin/tantivy.git", rev = "4e18354ced438c8f8f55c869ea4dc573ecdbcd57" }
+tantivy = { git = "https://github.com/JanFalkin/tantivy.git", rev = "97fbd33b7631be3e4e3047d0b28f14665eab2a24"}
 lazy_static = "1.4.0"
 env_logger = "0.10.0"
 tempdir = "0.3.7"
@@ -26,6 +26,7 @@ stderrlog = "0.5.4"
 scopeguard = "1.1.0"
 rand = "0.8.5"
 base64 = "0.21.7"
+regex = { version = "1.8.5", features = ["unicode"] }
 
 [dependencies.uuid]
 version = "1.0.0"
