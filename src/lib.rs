@@ -10,6 +10,7 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::ffi::{c_char, CStr};
+use std::fs::OpenOptions;
 use std::str;
 use tantivy::query::{FuzzyTermQuery, Query, QueryParser};
 use tantivy::{Searcher, TantivyError};
@@ -289,14 +290,33 @@ pub unsafe extern "C" fn init() -> u8 {
         parse_val = existing_value;
         log_level = &parse_val;
     }
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(log_level))
-        .try_init();
+
+    // Configure logging to write to a file instead of stderr
+    let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("tantivy-jpc.log");
+
+    if let Ok(file) = log_file {
+        let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(log_level))
+            .target(env_logger::Target::Pipe(Box::new(file)))
+            .try_init();
+    }
     0
 }
 
 pub fn test_init() {
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
-        .try_init();
+    // Configure logging to write to a file for tests
+    let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("tantivy-jpc-test.log");
+
+    if let Ok(file) = log_file {
+        let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
+            .target(env_logger::Target::Pipe(Box::new(file)))
+            .try_init();
+    }
 }
 
 fn do_term(s: &str) -> InternalCallResult<String> {
