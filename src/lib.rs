@@ -10,7 +10,8 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::ffi::{c_char, CStr};
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
+use std::path::PathBuf;
 use std::str;
 use tantivy::query::{FuzzyTermQuery, Query, QueryParser};
 use tantivy::{Searcher, TantivyError};
@@ -28,6 +29,10 @@ lazy_static! {
     static ref ERRORS: Mutex<HashMap<String, Vec<String>>> = Mutex::new(HashMap::new());
     static ref DATA_MAP: Mutex<HashMap<i64, XferData>> = Mutex::new(HashMap::new());
 }
+
+const MAX_LOG_SIZE: u64 = 200 * 1024 * 1024; // 200MB
+const LOG_FILE_NAME: &str = "tantivy-jpc.log";
+const TEST_LOG_FILE_NAME: &str = "tantivy-jpc-test.log";
 
 pub mod tokenizer;
 pub mod tsession_builder;
@@ -292,30 +297,86 @@ pub unsafe extern "C" fn init() -> u8 {
     }
 
     // Configure logging to write to a file instead of stderr
+    // Determine log file path from ELV_RUST_LOG_PATH or use CWD
+    let log_path = if let Ok(log_dir) = std::env::var("ELV_RUST_LOG_PATH") {
+        if !log_dir.is_empty() {
+            PathBuf::from(log_dir).join(LOG_FILE_NAME)
+        } else {
+            PathBuf::from(LOG_FILE_NAME)
+        }
+    } else {
+        PathBuf::from(LOG_FILE_NAME)
+    };
+
+    // Check if log rotation is needed
+    if let Ok(metadata) = fs::metadata(&log_path) {
+        if metadata.len() > MAX_LOG_SIZE {
+            // Rotate the log file with timestamp
+            let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+            let rotated_name = log_path.with_file_name(format!("tantivy-jpc_{}.log", timestamp));
+            let _ = fs::rename(&log_path, &rotated_name);
+        }
+    }
+
     let log_file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("tantivy-jpc.log");
+        .open(log_path);
 
-    if let Ok(file) = log_file {
-        let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(log_level))
-            .target(env_logger::Target::Pipe(Box::new(file)))
-            .try_init();
+    match log_file {
+        Ok(file) => {
+            let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(log_level))
+                .target(env_logger::Target::Pipe(Box::new(file)))
+                .try_init();
+        }
+        Err(_) => {
+            // Fallback to stderr if file cannot be opened
+            let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(log_level))
+                .try_init();
+        }
     }
     0
 }
 
 pub fn test_init() {
     // Configure logging to write to a file for tests
+    // Determine log file path from ELV_RUST_LOG_PATH or use CWD
+    let log_path = if let Ok(log_dir) = std::env::var("ELV_RUST_LOG_PATH") {
+        if !log_dir.is_empty() {
+            PathBuf::from(log_dir).join(TEST_LOG_FILE_NAME)
+        } else {
+            PathBuf::from(TEST_LOG_FILE_NAME)
+        }
+    } else {
+        PathBuf::from(TEST_LOG_FILE_NAME)
+    };
+
+    // Check if log rotation is needed
+    if let Ok(metadata) = fs::metadata(&log_path) {
+        if metadata.len() > MAX_LOG_SIZE {
+            // Rotate the log file with timestamp
+            let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+            let rotated_name = log_path.with_file_name(format!("tantivy-jpc-test_{}.log", timestamp));
+            let _ = fs::rename(&log_path, &rotated_name);
+        }
+    }
+
     let log_file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("tantivy-jpc-test.log");
+        .open(&log_path);
 
-    if let Ok(file) = log_file {
-        let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
-            .target(env_logger::Target::Pipe(Box::new(file)))
-            .try_init();
+    match log_file {
+        Ok(file) => {
+            let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
+                .target(env_logger::Target::Pipe(Box::new(file)))
+                .try_init();
+        }
+        Err(_) => {
+            // Fallback to stderr if file cannot be opened
+            let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
+                .try_init();
+        }
     }
 }
 

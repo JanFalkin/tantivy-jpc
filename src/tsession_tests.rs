@@ -195,7 +195,7 @@ pub mod tests {
             );
             Ok(0)
         }
-        pub fn parse_query(&mut self, query: String) -> InternalCallResult<TestSearcher> {
+        pub fn parse_query(&mut self, query: String) -> InternalCallResult<TestSearcher<'_>> {
             self.ctx.call_jpc(
                 "query_parser".to_string(),
                 "parse_query".to_string(),
@@ -210,7 +210,7 @@ pub mod tests {
             &mut self,
             term: String,
             field: String,
-        ) -> InternalCallResult<TestSearcher> {
+        ) -> InternalCallResult<TestSearcher<'_>> {
             self.ctx.call_jpc(
                 "query_parser".to_string(),
                 "parse_fuzzy_query".to_string(),
@@ -223,7 +223,7 @@ pub mod tests {
         }
     }
     impl TestIndexReader<'_> {
-        pub fn searcher(&mut self) -> InternalCallResult<TestQueryParser> {
+        pub fn searcher(&mut self) -> InternalCallResult<TestQueryParser<'_>> {
             self.ctx.call_jpc(
                 "index_reader".to_string(),
                 "searcher".to_string(),
@@ -259,7 +259,7 @@ pub mod tests {
             let i: Map<String, serde_json::Value> = serde_json::from_slice(&r).unwrap();
             Ok(i["id"].as_i64().unwrap())
         }
-        pub fn reader_builder(&mut self) -> InternalCallResult<TestIndexReader> {
+        pub fn reader_builder(&mut self) -> InternalCallResult<TestIndexReader<'_>> {
             self.ctx.call_jpc(
                 "index".to_string(),
                 "reader_builder".to_string(),
@@ -271,7 +271,7 @@ pub mod tests {
             })
         }
 
-        pub fn schema(&mut self) -> InternalCallResult<TestSchema> {
+        pub fn schema(&mut self) -> InternalCallResult<TestSchema<'_>> {
             Ok(TestSchema {
                 ctx: self.ctx.clone(),
             })
@@ -327,7 +327,7 @@ pub mod tests {
             );
             0
         }
-        pub fn create_index(&mut self) -> Result<TestIndex, std::io::Error> {
+        pub fn create_index(&mut self) -> Result<TestIndex<'_>, std::io::Error> {
             self.ctx.call_jpc(
                 "index".to_string(),
                 "create".to_string(),
@@ -539,7 +539,7 @@ pub mod tests {
             call_simple_type!(self, j_param, "add_f64_field")
         }
 
-        pub fn build(&mut self, in_memory: bool) -> InternalCallResult<TestDocument> {
+        pub fn build(&mut self, in_memory: bool) -> InternalCallResult<TestDocument<'_>> {
             if in_memory {
                 let _s =
                     self.call_jpc("builder".to_string(), "build".to_string(), json!({}), false);
