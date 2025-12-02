@@ -285,27 +285,16 @@ impl From<std::net::AddrParseError> for ErrorKinds {
 
 pub type InternalCallResult<T> = Result<T, ErrorKinds>;
 
-/// # Safety
-///
-#[no_mangle]
-pub unsafe extern "C" fn init() -> u8 {
-    let mut log_level: &str = "info";
-    let parse_val: String;
-    if let Ok(existing_value) = std::env::var("ELV_RUST_LOG") {
-        parse_val = existing_value;
-        log_level = &parse_val;
-    }
-
-    // Configure logging to write to a file instead of stderr
+fn configure_logging(log_file_name: &str, default_log_level: &str, fallback_base_name: &str) {
     // Determine log file path from ELV_RUST_LOG_PATH or use CWD
     let log_path = if let Ok(log_dir) = std::env::var("ELV_RUST_LOG_PATH") {
         if !log_dir.is_empty() {
-            PathBuf::from(log_dir).join(LOG_FILE_NAME)
+            PathBuf::from(log_dir).join(log_file_name)
         } else {
-            PathBuf::from(LOG_FILE_NAME)
+            PathBuf::from(log_file_name)
         }
     } else {
-        PathBuf::from(LOG_FILE_NAME)
+        PathBuf::from(log_file_name)
     };
 
     // Check if log rotation is needed
@@ -313,50 +302,11 @@ pub unsafe extern "C" fn init() -> u8 {
         if metadata.len() > MAX_LOG_SIZE {
             // Rotate the log file with timestamp
             let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-            let rotated_name = log_path.with_file_name(format!("tantivy-jpc_{}.log", timestamp));
-            let _ = fs::rename(&log_path, &rotated_name);
-        }
-    }
-
-    let log_file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_path);
-
-    match log_file {
-        Ok(file) => {
-            let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(log_level))
-                .target(env_logger::Target::Pipe(Box::new(file)))
-                .try_init();
-        }
-        Err(_) => {
-            // Fallback to stderr if file cannot be opened
-            let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(log_level))
-                .try_init();
-        }
-    }
-    0
-}
-
-pub fn test_init() {
-    // Configure logging to write to a file for tests
-    // Determine log file path from ELV_RUST_LOG_PATH or use CWD
-    let log_path = if let Ok(log_dir) = std::env::var("ELV_RUST_LOG_PATH") {
-        if !log_dir.is_empty() {
-            PathBuf::from(log_dir).join(TEST_LOG_FILE_NAME)
-        } else {
-            PathBuf::from(TEST_LOG_FILE_NAME)
-        }
-    } else {
-        PathBuf::from(TEST_LOG_FILE_NAME)
-    };
-
-    // Check if log rotation is needed
-    if let Ok(metadata) = fs::metadata(&log_path) {
-        if metadata.len() > MAX_LOG_SIZE {
-            // Rotate the log file with timestamp
-            let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-            let rotated_name = log_path.with_file_name(format!("tantivy-jpc-test_{}.log", timestamp));
+            let base_name = log_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or(fallback_base_name);
+            let rotated_name = log_path.with_file_name(format!("{}_{}.log", base_name, timestamp));
             let _ = fs::rename(&log_path, &rotated_name);
         }
     }
@@ -368,16 +318,39 @@ pub fn test_init() {
 
     match log_file {
         Ok(file) => {
-            let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
-                .target(env_logger::Target::Pipe(Box::new(file)))
-                .try_init();
+            let _ = env_logger::Builder::from_env(
+                env_logger::Env::default().default_filter_or(default_log_level),
+            )
+            .target(env_logger::Target::Pipe(Box::new(file)))
+            .try_init();
         }
         Err(_) => {
             // Fallback to stderr if file cannot be opened
-            let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
-                .try_init();
+            let _ = env_logger::Builder::from_env(
+                env_logger::Env::default().default_filter_or(default_log_level),
+            )
+            .try_init();
         }
     }
+}
+
+/// # Safety
+///
+#[no_mangle]
+pub unsafe extern "C" fn init() -> u8 {
+    let mut log_level: &str = "info";
+    let parse_val: String;
+    if let Ok(existing_value) = std::env::var("ELV_RUST_LOG") {
+        parse_val = existing_value;
+        log_level = &parse_val;
+    }
+
+    configure_logging(LOG_FILE_NAME, log_level, "tantivy-jpc");
+    0
+}
+
+pub fn test_init() {
+    configure_logging(TEST_LOG_FILE_NAME, "trace", "tantivy-jpc-test");
 }
 
 fn do_term(s: &str) -> InternalCallResult<String> {
