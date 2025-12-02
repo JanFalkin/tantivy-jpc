@@ -34,7 +34,7 @@ jobs:
           body: Credit new contributors by updating libtantivy_jpc.a
           branch: update-linux-binary
           delete-branch: true
-          base: ${{ github.ref_name }}
+          base: ${{ github.head_ref || github.ref_name }}
           author: JanFalkin <JanFalkin@users.noreply.github.com>
           committer: GitHub <noreply@github.com>
   build-mac:
@@ -66,7 +66,7 @@ jobs:
           body: Credit new contributors by updating libtantivy_jpc.a
           branch: update-darwin-x86_64-binary
           delete-branch: true
-          base: ${{ github.ref_name }}
+          base: ${{ github.head_ref || github.ref_name }}
           author: JanFalkin <JanFalkin@users.noreply.github.com>
           committer: GitHub <noreply@github.com>
 
@@ -99,6 +99,6 @@ jobs:
           body: Credit new contributors by updating libtantivy_jpc.a
           branch: update-darwin-aarch64-binary
           delete-branch: true
-          base: ${{ github.ref_name }}
+          base: ${{ github.head_ref || github.ref_name }}
           author: JanFalkin <JanFalkin@users.noreply.github.com>
           committer: GitHub <noreply@github.com>
